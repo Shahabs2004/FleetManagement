@@ -642,3 +642,59 @@ h1 {
     color: #6a7a71;
     font-size: .8rem;
 }
+
+
+/* کارت‌های بررسی و تخصیص مأموریت */
+.mission-review-card {
+    margin: 16px 0;
+    padding: 18px;
+    border: 1px solid #dce7df;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.mission-review-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e7eee9;
+    color: #245346;
+}
+
+.mission-review-grid,
+.mission-assignment-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(160px, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.mission-review-grid > div {
+    overflow-wrap: anywhere;
+    color: #42574b;
+}
+
+.mission-assignment-grid select {
+    width: 100%;
+    min-height: 42px;
+    margin-top: 6px;
+    padding: 8px 10px;
+    border: 1px solid #d6e0d9;
+    border-radius: 8px;
+    background: #fff;
+    font: inherit;
+}
+
+.mission-reason {
+    margin-top: 12px;
+    color: #6a5140;
+}
+
+@media (max-width: 760px) {
+    .mission-review-grid,
+    .mission-assignment-grid {
+        grid-template-columns: 1fr;
+    }
+}
