@@ -10,19 +10,16 @@ public sealed class Driver : Entity
     private Driver()
     {
         // سازنده خصوصی برای استفاده EF Core
-        FirstName = string.Empty;
-        LastName = string.Empty;
-        MobilePhone = string.Empty;
     }
 
     /// <summary>نام راننده.</summary>
-    public string FirstName { get; private set; }
+    public string FirstName { get; private set; } = string.Empty;
 
     /// <summary>نام خانوادگی راننده.</summary>
-    public string LastName { get; private set; }
+    public string LastName { get; private set; } = string.Empty;
 
     /// <summary>شماره تلفن همراه راننده.</summary>
-    public string MobilePhone { get; private set; }
+    public string MobilePhone { get; private set; } = string.Empty;
 
     /// <summary>وضعیت استخدامی راننده.</summary>
     public DriverEmploymentStatus EmploymentStatus { get; private set; }
