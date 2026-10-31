@@ -173,6 +173,7 @@ public static class FleetAuthenticationEndpoints
         IAntiforgery antiforgery,
         ActiveDirectoryAuthenticator authenticator,
         DirectoryUserProvisioningService userProvisioning,
+        AuthorizationResolutionService authorizationResolver,
         ILoggerFactory loggerFactory)
     {
         if (!await ValidateAntiforgeryAsync(context, antiforgery))
@@ -220,7 +221,16 @@ public static class FleetAuthenticationEndpoints
                 return Results.Redirect("/login?error=app-disabled");
             }
 
-            await IssueApplicationCookieAsync(context, result.User, provisionedUser.UserId);
+            var authorization = await authorizationResolver.ResolveAsync(
+                result.User,
+                context.RequestAborted);
+
+            await IssueApplicationCookieAsync(
+                context,
+                result.User,
+                provisionedUser.UserId,
+                authorization);
+
             return Results.Redirect("/");
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
