@@ -431,9 +431,11 @@ public sealed class Mission : Entity
 
     private static void ValidateHour(DateTimeOffset value, string parameterName)
     {
-        if (value.Minute != 0 || value.Second != 0 || value.Millisecond != 0)
+        // کنترل دقت ساعت بر مبنای ساعت رسمی تهران انجام می‌شود، نه دقیقه UTC.
+        var tehranTime = value.ToOffset(TimeSpan.FromMinutes(210));
+        if (tehranTime.Minute != 0 || tehranTime.Second != 0 || tehranTime.Millisecond != 0)
         {
-            throw new ArgumentException("زمان مأموریت باید با دقت ساعت کامل ثبت شود.", parameterName);
+            throw new ArgumentException("زمان مأموریت باید با دقت ساعت کامل به وقت تهران ثبت شود.", parameterName);
         }
     }
 
