@@ -38,7 +38,7 @@
     else if (!_hasLocalAdministrator)
     {
         <div class="setup-step">
-            <div class="step-caption">گام ۱ از ۳ · ایجاد مدیر محلی اضطراری</div>
+            <div class="step-caption">گام ۱ از ۵ · ایجاد مدیر محلی اضطراری</div>
             <p>کد یک‌بارمصرف را از فایل محدودشده روی Windows Server دریافت کنید.</p>
 
             <EditForm Model="_administratorModel" OnValidSubmit="CreateAdministratorAsync">
@@ -64,7 +64,7 @@
     else if (!_administratorVerified)
     {
         <div class="setup-step">
-            <div class="step-caption">گام ۲ از ۳ · تأیید مدیر محلی</div>
+            <div class="step-caption">گام ۲ از ۵ · تأیید مدیر محلی</div>
             <p>حساب مدیر محلی ایجاد شده است. برای ادامه، هویت مدیر را دوباره تأیید کنید.</p>
 
             <EditForm Model="_verificationModel" OnValidSubmit="VerifyAdministratorAsync">
@@ -301,51 +301,6 @@
             _verificationModel.Username = state.LocalAdministratorUsername ?? string.Empty;
             _sqlReady = !string.IsNullOrWhiteSpace(state.SqlConnectionString)
                 && await SqlAvailability.IsAvailableAsync();
-
-            if (_sqlReady)
-            {
-                await DatabaseInitializer.InitializeAsync();
-                var savedDirectorySettings = await ActiveDirectorySettings.GetAsync();
-                if (savedDirectorySettings is not null)
-                {
-                    _adModel.DomainDnsName = savedDirectorySettings.DomainDnsName;
-                    _adModel.LdapServer = savedDirectorySettings.LdapServer;
-                    _adModel.Port = savedDirectorySettings.Port;
-                    _adModel.UseLdaps = savedDirectorySettings.UseLdaps;
-                    _adModel.BaseDistinguishedName = savedDirectorySettings.BaseDistinguishedName;
-                    _adModel.ServiceAccountUsername = savedDirectorySettings.ServiceAccountUsername;
-                    _adModel.OrganizationalUnitAttribute = savedDirectorySettings.OrganizationalUnitAttribute;
-                    _adModel.UseWindowsIntegratedAuthentication = savedDirectorySettings.UseWindowsIntegratedAuthentication;
-                    _adModel.AllowUsernamePasswordFallback = savedDirectorySettings.AllowUsernamePasswordFallback;
-                    _adModel.AllowedGroupsText = string.Join(
-                        Environment.NewLine,
-                        savedDirectorySettings.AllowedGroups.Select(group => $"{group.Name}|{group.DistinguishedName}"));
-                    _adReady = true;
-                }
-
-                var savedOrganization = await OrganizationSettings.GetAsync();
-                if (savedOrganization is not null)
-                {
-                    _organizationModel.OrganizationName = savedOrganization.OrganizationName;
-                    _existingLogoBase64 = savedOrganization.LogoBase64;
-                    _existingLogoContentType = savedOrganization.LogoContentType;
-                    _organizationReady = true;
-                }
-
-                var savedSms = await SmsSettings.GetAsync();
-                if (savedSms is not null)
-                {
-                    _smsModel.Organization = savedSms.Organization;
-                    _smsModel.Username = savedSms.Username;
-                    _smsModel.SourceNumber = savedSms.SourceNumber;
-                    _smsModel.MaximumRetryCount = savedSms.MaximumRetryCount;
-                    _smsModel.RetryIntervalSeconds = savedSms.RetryIntervalSeconds;
-                    _smsModel.StatusPollingIntervalSeconds = savedSms.StatusPollingIntervalSeconds;
-                    _smsModel.MaximumStatusPollingAttempts = savedSms.MaximumStatusPollingAttempts;
-                    _smsModel.ReminderLeadMinutes = savedSms.ReminderLeadMinutes;
-                    _smsReady = true;
-                }
-            }
         }
         catch (Exception exception)
         {
@@ -354,6 +309,53 @@
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// پس از تأیید مدیر، Migrationها و تنظیمات ذخیره‌شده را بارگذاری می‌کند.
+    /// </summary>
+    private async Task LoadExistingSettingsAsync()
+    {
+        var savedDirectorySettings = await ActiveDirectorySettings.GetAsync();
+        if (savedDirectorySettings is not null)
+        {
+            _adModel.DomainDnsName = savedDirectorySettings.DomainDnsName;
+            _adModel.LdapServer = savedDirectorySettings.LdapServer;
+            _adModel.Port = savedDirectorySettings.Port;
+            _adModel.UseLdaps = savedDirectorySettings.UseLdaps;
+            _adModel.BaseDistinguishedName = savedDirectorySettings.BaseDistinguishedName;
+            _adModel.ServiceAccountUsername = savedDirectorySettings.ServiceAccountUsername;
+            _adModel.OrganizationalUnitAttribute = savedDirectorySettings.OrganizationalUnitAttribute;
+            _adModel.UseWindowsIntegratedAuthentication = savedDirectorySettings.UseWindowsIntegratedAuthentication;
+            _adModel.AllowUsernamePasswordFallback = savedDirectorySettings.AllowUsernamePasswordFallback;
+            _adModel.AllowedGroupsText = string.Join(
+                Environment.NewLine,
+                savedDirectorySettings.AllowedGroups.Select(group => $"{group.Name}|{group.DistinguishedName}"));
+            _adReady = savedDirectorySettings.IsConnectionVerified;
+        }
+
+        var savedOrganization = await OrganizationSettings.GetAsync();
+        if (savedOrganization is not null)
+        {
+            _organizationModel.OrganizationName = savedOrganization.OrganizationName;
+            _existingLogoBase64 = savedOrganization.LogoBase64;
+            _existingLogoContentType = savedOrganization.LogoContentType;
+            _organizationReady = true;
+        }
+
+        var savedSms = await SmsSettings.GetAsync();
+        if (savedSms is not null)
+        {
+            _smsModel.Organization = savedSms.Organization;
+            _smsModel.Username = savedSms.Username;
+            _smsModel.SourceNumber = savedSms.SourceNumber;
+            _smsModel.MaximumRetryCount = savedSms.MaximumRetryCount;
+            _smsModel.RetryIntervalSeconds = savedSms.RetryIntervalSeconds;
+            _smsModel.StatusPollingIntervalSeconds = savedSms.StatusPollingIntervalSeconds;
+            _smsModel.MaximumStatusPollingAttempts = savedSms.MaximumStatusPollingAttempts;
+            _smsModel.ReminderLeadMinutes = savedSms.ReminderLeadMinutes;
+            _smsReady = true;
         }
     }
 
@@ -412,6 +414,20 @@
             if (!_administratorVerified)
             {
                 throw new UnauthorizedAccessException("نام کاربری یا رمز عبور مدیر محلی صحیح نیست.");
+            }
+
+            if (_sqlReady)
+            {
+                try
+                {
+                    await DatabaseInitializer.InitializeAsync();
+                    await LoadExistingSettingsAsync();
+                }
+                catch
+                {
+                    _sqlReady = false;
+                    throw;
+                }
             }
 
             _message = "هویت مدیر تأیید شد.";
@@ -513,8 +529,11 @@
                 AllowedGroups = groups
             };
 
+            configuration.IsConnectionVerified = false;
             await ActiveDirectorySettings.SaveAsync(configuration);
             await ActiveDirectoryTester.TestAsync(configuration);
+            configuration.IsConnectionVerified = true;
+            await ActiveDirectorySettings.SaveAsync(configuration);
             _adReady = true;
             _adModel.ServiceAccountPassword = string.Empty;
             _message = "اتصال Active Directory تأیید شد. اکنون مشخصات سازمان را ثبت کنید.";
