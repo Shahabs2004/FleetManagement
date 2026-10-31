@@ -402,26 +402,27 @@ public sealed class MissionManagementService(
         var end = proposedEnd ?? current.PlannedEndAtUtc;
         var blockingStatuses = new[] { MissionStatus.Confirmed, MissionStatus.Running };
 
-        return await db.Missions.AnyAsync(existing =>
-            existing.Id != current.Id
-            && blockingStatuses.Contains(existing.Status)
-            && (
-                (existing.DriverId == driverId
-                    && current.PlannedStartAtUtc < existing.PlannedEndAtUtc.Add(gap)
-                    && end.Add(gap) > existing.PlannedStartAtUtc)
-                || (existing.VehicleId == vehicleId
-                    && current.PlannedStartAtUtc < existing.PlannedEndAtUtc.Add(gap)
-                    && end.Add(gap) > existing.PlannedStartAtUtc)
-            ),
-            cancellationToken);
+        var candidates = await db.Missions
+            .Where(existing =>
+                existing.Id != current.Id
+                && blockingStatuses.Contains(existing.Status)
+                && (existing.DriverId == driverId || existing.VehicleId == vehicleId))
+            .ToListAsync(cancellationToken);
+
+        // محاسبه بازه‌ها در حافظه انجام می‌شود تا ترجمه DateTimeOffset.Add(TimeSpan) به SQL وابسته نباشد.
+        return candidates.Any(existing =>
+            current.PlannedStartAtUtc < existing.PlannedEndAtUtc.Add(gap)
+            && end.Add(gap) > existing.PlannedStartAtUtc);
     }
 
-    private static Task<Mission> GetMissionAsync(
+    private static async Task<Mission> GetMissionAsync(
         FleetDbContext db,
         Guid missionId,
         CancellationToken cancellationToken)
     {
-        return db.Missions.SingleOrDefaultAsync(mission => mission.Id == missionId, cancellationToken)
+        return await db.Missions.SingleOrDefaultAsync(
+            mission => mission.Id == missionId,
+            cancellationToken)
             ?? throw new KeyNotFoundException("مأموریت موردنظر پیدا نشد.");
     }
 
