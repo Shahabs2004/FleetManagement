@@ -320,6 +320,51 @@ public sealed class MissionManagementService(
             cancellationToken: cancellationToken);
     }
 
+    /// <summary>
+    /// شروع خودکار مأموریت‌های تأییدشده و پایان خودکار مأموریت‌های در حال اجرا.
+    /// </summary>
+    public async Task<int> ProcessDueMissionsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+        var dueMissions = await db.Missions
+            .Where(mission =>
+                (mission.Status == MissionStatus.Confirmed && mission.PlannedStartAtUtc <= now)
+                || (mission.Status == MissionStatus.Running && mission.PlannedEndAtUtc <= now))
+            .ToListAsync(cancellationToken);
+
+        foreach (var mission in dueMissions)
+        {
+            if (mission.Status == MissionStatus.Confirmed)
+            {
+                mission.StartAutomatically(now);
+            }
+            else if (mission.Status == MissionStatus.Running)
+            {
+                mission.CompleteAutomatically();
+            }
+        }
+
+        if (dueMissions.Count == 0)
+        {
+            return 0;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        foreach (var mission in dueMissions)
+        {
+            await RecordMissionAuditAsync(
+                "system",
+                mission.Status == MissionStatus.Running ? "AutoStart" : "AutoComplete",
+                mission,
+                "Success",
+                cancellationToken);
+        }
+
+        return dueMissions.Count;
+    }
+
     /// <summary>جست‌وجوی مأموریت‌ها؛ درخواست‌کننده فقط سوابق خود را دریافت می‌کند.</summary>
     public async Task<IReadOnlyList<Mission>> SearchAsync(
         string? requesterUsername = null,
