@@ -111,6 +111,11 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
                 .HasMaxLength(200)
                 .HasColumnType("nvarchar(200)");
 
+            entity.Property<string>("DirectoryOrganizationalUnit")
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnType("nvarchar(200)");
+
             entity.Property<bool>("IsOrganizationalUnitManuallyOverridden")
                 .HasColumnType("bit");
 
