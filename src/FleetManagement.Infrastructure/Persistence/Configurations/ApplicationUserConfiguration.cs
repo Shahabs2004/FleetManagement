@@ -20,6 +20,7 @@ public sealed class ApplicationUserConfiguration : IEntityTypeConfiguration<Appl
 
         builder.Property(user => user.Username)
             .HasMaxLength(64)
+            .UseCollation("Latin1_General_100_CI_AS")
             .IsRequired();
 
         builder.Property(user => user.FirstName)
