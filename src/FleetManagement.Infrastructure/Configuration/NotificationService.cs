@@ -10,7 +10,8 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// </summary>
 public sealed class NotificationService(
     IDbContextFactory<FleetDbContext> dbContextFactory,
-    INotificationPublisher publisher)
+    INotificationPublisher publisher,
+    ILogger<NotificationService> logger)
 {
     /// <summary>ثبت اعلان برای یک کاربر و انتشار آن به نشست‌های فعال.</summary>
     public async Task<Guid> CreateAsync(
@@ -34,17 +35,29 @@ public sealed class NotificationService(
         db.UserNotifications.Add(notification);
         await db.SaveChangesAsync(cancellationToken);
 
-        await publisher.PublishAsync(
-            recipientUsername,
-            new NotificationPush(
-                notification.Id,
-                notification.Title,
-                notification.Message,
-                notification.EventKey,
-                notification.ReferenceType,
-                notification.ReferenceId,
-                notification.CreatedAtUtc),
-            cancellationToken);
+        try
+        {
+            await publisher.PublishAsync(
+                recipientUsername,
+                new NotificationPush(
+                    notification.Id,
+                    notification.Title,
+                    notification.Message,
+                    notification.EventKey,
+                    notification.ReferenceType,
+                    notification.ReferenceId,
+                    notification.CreatedAtUtc),
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            // اعلان در SQL ثبت شده است؛ اختلال انتشار لحظه‌ای نباید عملیات اصلی را ناموفق کند.
+            logger.LogWarning(exception, "انتشار لحظه‌ای اعلان برای کاربر {Username} انجام نشد.", recipientUsername);
+        }
 
         return notification.Id;
     }
