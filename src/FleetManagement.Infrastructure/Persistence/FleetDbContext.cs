@@ -4,6 +4,7 @@ using FleetManagement.Domain.Vehicles;
 using FleetManagement.Domain.Users;
 using FleetManagement.Domain.Sessions;
 using FleetManagement.Domain.Auditing;
+using FleetManagement.Domain.Missions;
 using Microsoft.EntityFrameworkCore;
 
 namespace FleetManagement.Infrastructure.Persistence;
@@ -14,6 +15,9 @@ namespace FleetManagement.Infrastructure.Persistence;
 public sealed class FleetDbContext(DbContextOptions<FleetDbContext> options)
     : DbContext(options)
 {
+    /// <summary>درخواست‌ها و مأموریت‌های ثبت‌شده.</summary>
+    public DbSet<Mission> Missions => Set<Mission>();
+
     /// <summary>مجموعه رانندگان سامانه.</summary>
     public DbSet<Driver> Drivers => Set<Driver>();
 
