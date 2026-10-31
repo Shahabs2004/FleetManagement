@@ -357,6 +357,27 @@ public sealed class Mission : Entity
         StatusBeforeWithdrawal = null;
     }
 
+    /// <summary>
+    /// بستن خودکار درخواست انصرافی که تا پایان برنامه‌ریزی‌شده مأموریت تعیین تکلیف نشده است.
+    /// </summary>
+    public void AutoCloseExpiredWithdrawal(DateTimeOffset nowUtc)
+    {
+        EnsureStatus(MissionStatus.WithdrawalPending);
+        if (nowUtc < PlannedEndAtUtc)
+        {
+            throw new InvalidOperationException("زمان پایان برنامه‌ریزی‌شده هنوز فرا نرسیده است.");
+        }
+
+        if (StatusBeforeWithdrawal == MissionStatus.Running)
+        {
+            ActualEndAtUtc = nowUtc;
+        }
+
+        DecisionReason = "درخواست انصراف تا پایان زمان برنامه‌ریزی‌شده تعیین تکلیف نشد.";
+        Status = MissionStatus.Cancelled;
+        StatusBeforeWithdrawal = null;
+    }
+
     /// <summary>لغو مأموریت با علت اجباری.</summary>
     public void Cancel(string reason, DateTimeOffset nowUtc)
     {
