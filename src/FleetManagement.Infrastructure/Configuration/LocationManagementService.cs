@@ -10,7 +10,8 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// </summary>
 public sealed class LocationManagementService(
     IDbContextFactory<FleetDbContext> dbContextFactory,
-    AuditLogService auditLog)
+    AuditLogService auditLog,
+    NotificationService notificationService)
 {
     /// <summary>دریافت مکان‌های تأییدشده برای انتخاب در فرم مأموریت.</summary>
     public async Task<IReadOnlyList<Location>> GetApprovedAsync(CancellationToken cancellationToken = default)
@@ -65,6 +66,14 @@ public sealed class LocationManagementService(
             proposer, "Propose", "Location", location.Id.ToString(), "Success",
             afterJson: JsonSerializer.Serialize(new { location.Name, location.Status }),
             cancellationToken: cancellationToken);
+        await notificationService.CreateForRolesAsync(
+            ["SystemAdministrator"],
+            "پیشنهاد مکان جدید",
+            $"مکان «{location.Name}» برای بررسی مدیر سامانه پیشنهاد شد.",
+            "LocationProposed",
+            "Location",
+            location.Id.ToString(),
+            cancellationToken);
 
         return location.Id;
     }
