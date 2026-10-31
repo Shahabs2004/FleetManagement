@@ -41,6 +41,7 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<MissionManagementService>();
         services.AddHostedService<MissionLifecycleHostedService>();
         services.AddScoped<LocationManagementService>();
+        services.AddScoped<NotificationService>();
         services.AddHostedService<SessionExpiryHostedService>();
         services.AddScoped<OrganizationSettingsService>();
         services.AddScoped<SmsSettingsService>();
