@@ -327,3 +327,127 @@ h1 {
         padding: 22px;
     }
 }
+
+
+/* بخش‌های صفحه مدیریت نقش‌ها و مجوزها */
+.admin-panel {
+    width: min(100%, 1100px);
+    margin: 24px auto;
+    padding: 30px;
+    border: 1px solid #dce6df;
+    border-radius: 18px;
+    background: #fff;
+}
+
+.admin-panel h1 {
+    color: #173c32;
+}
+
+.admin-section {
+    margin: 26px 0;
+    padding: 20px;
+    border: 1px solid #e2eae5;
+    border-radius: 12px;
+    background: #fbfcfb;
+}
+
+.admin-section h2 {
+    margin-top: 0;
+    color: #245346;
+    font-size: 1.1rem;
+}
+
+.admin-section h3 {
+    color: #245346;
+    font-size: 1rem;
+}
+
+.admin-section textarea {
+    width: 100%;
+    min-height: 130px;
+    padding: 12px;
+    border: 1px solid #d6e0d9;
+    border-radius: 9px;
+    direction: ltr;
+    text-align: left;
+    font-family: Consolas, monospace;
+    resize: vertical;
+}
+
+.admin-section input:not([type="checkbox"]) {
+    width: 100%;
+    min-height: 42px;
+    margin: 5px 0 12px;
+    padding: 8px 10px;
+    border: 1px solid #d6e0d9;
+    border-radius: 8px;
+    font: inherit;
+}
+
+.role-list {
+    display: grid;
+    gap: 10px;
+    margin: 14px 0 24px;
+}
+
+.role-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px;
+    border: 1px solid #e2eae5;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.role-row p {
+    margin: 5px 0 0;
+    color: #65766e;
+}
+
+.role-key {
+    margin-inline-start: 10px;
+    color: #6e7c74;
+    direction: ltr;
+    unicode-bidi: isolate;
+    font-size: .85rem;
+}
+
+.role-system {
+    color: #245346;
+    font-size: .85rem;
+    white-space: nowrap;
+}
+
+.compact-button {
+    width: auto;
+    min-width: 90px;
+    margin: 0;
+    padding: 6px 12px;
+}
+
+.admin-navigation {
+    display: flex;
+    gap: 14px;
+    padding: 10px 24px;
+    border-bottom: 1px solid #e2eae5;
+    background: #fff;
+}
+
+.admin-navigation a {
+    color: #245346;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+@media (max-width: 700px) {
+    .admin-panel {
+        padding: 18px;
+    }
+
+    .role-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
