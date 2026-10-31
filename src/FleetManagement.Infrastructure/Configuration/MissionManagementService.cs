@@ -323,6 +323,54 @@ public sealed class MissionManagementService(
         var mission = await GetMissionAsync(db, missionId, cancellationToken);
         var before = new { mission.OdometerStartKm, mission.OdometerEndKm };
 
+        if (mission.VehicleId.HasValue && startKm.HasValue)
+        {
+            var previousEnd = await db.Missions
+                .Where(item => item.Id != mission.Id
+                    && item.VehicleId == mission.VehicleId
+                    && item.OdometerEndKm.HasValue
+                    && (item.ActualEndAtUtc ?? item.PlannedEndAtUtc) <= mission.PlannedStartAtUtc)
+                .OrderByDescending(item => item.ActualEndAtUtc ?? item.PlannedEndAtUtc)
+                .Select(item => item.OdometerEndKm)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (previousEnd.HasValue && startKm.Value < previousEnd.Value)
+            {
+                throw new InvalidOperationException("کیلومترشمار شروع از آخرین مقدار ثبت‌شده برای این خودرو کمتر است.");
+            }
+
+            var nextStart = await db.Missions
+                .Where(item => item.Id != mission.Id
+                    && item.VehicleId == mission.VehicleId
+                    && item.OdometerStartKm.HasValue
+                    && item.PlannedStartAtUtc >= mission.PlannedEndAtUtc)
+                .OrderBy(item => item.PlannedStartAtUtc)
+                .Select(item => item.OdometerStartKm)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (nextStart.HasValue && startKm.Value > nextStart.Value)
+            {
+                throw new InvalidOperationException("اصلاح کیلومترشمار شروع با پیوستگی مأموریت بعدی سازگار نیست.");
+            }
+        }
+
+        if (mission.VehicleId.HasValue && endKm.HasValue)
+        {
+            var nextStart = await db.Missions
+                .Where(item => item.Id != mission.Id
+                    && item.VehicleId == mission.VehicleId
+                    && item.OdometerStartKm.HasValue
+                    && item.PlannedStartAtUtc >= mission.PlannedEndAtUtc)
+                .OrderBy(item => item.PlannedStartAtUtc)
+                .Select(item => item.OdometerStartKm)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (nextStart.HasValue && endKm.Value > nextStart.Value)
+            {
+                throw new InvalidOperationException("کیلومترشمار پایان از مقدار شروع مأموریت بعدی بیشتر است.");
+            }
+        }
+
         if (startKm.HasValue)
         {
             mission.SetOdometerStart(startKm.Value);
