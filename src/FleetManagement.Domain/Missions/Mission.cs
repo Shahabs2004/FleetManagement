@@ -500,7 +500,9 @@ public sealed class Mission : Entity
         DateTimeOffset plannedEndAtUtc,
         Guid driverId,
         Guid vehicleId,
+        string requesterName,
         string requesterPhoneSnapshot,
+        string requesterOrganizationalUnit,
         string requestingGroup,
         string? description,
         int? passengerCount,
@@ -551,7 +553,9 @@ public sealed class Mission : Entity
         PlannedEndAtUtc = plannedEndAtUtc;
         DriverId = driverId;
         VehicleId = vehicleId;
+        RequesterName = Required(requesterName, 200, nameof(requesterName));
         RequesterPhoneSnapshot = Required(requesterPhoneSnapshot, 20, nameof(requesterPhoneSnapshot));
+        RequesterOrganizationalUnit = Required(requesterOrganizationalUnit, 200, nameof(requesterOrganizationalUnit));
         RequestingGroup = Required(requestingGroup, 200, nameof(requestingGroup));
         Description = Optional(description, 2000);
         PassengerCount = passengerCount;
