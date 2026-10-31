@@ -34,7 +34,8 @@ public sealed class DirectoryUserProvisioningService(
                 directoryUser.FirstName,
                 directoryUser.LastName,
                 directoryUser.OrganizationalUnit,
-                directoryUser.DistinguishedName);
+                directoryUser.DistinguishedName,
+                directoryUser.AllowedGroups.Select(group => group.DistinguishedName));
 
             dbContext.ApplicationUsers.Add(user);
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -51,7 +52,8 @@ public sealed class DirectoryUserProvisioningService(
             directoryUser.FirstName,
             directoryUser.LastName,
             directoryUser.OrganizationalUnit,
-            directoryUser.DistinguishedName);
+            directoryUser.DistinguishedName,
+            directoryUser.AllowedGroups.Select(group => group.DistinguishedName));
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
