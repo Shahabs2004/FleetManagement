@@ -1,3 +1,4 @@
+using FleetManagement.Domain.Configuration;
 using FleetManagement.Domain.Drivers;
 using FleetManagement.Domain.Vehicles;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +16,9 @@ public sealed class FleetDbContext(DbContextOptions<FleetDbContext> options)
 
     /// <summary>مجموعه خودروهای سامانه.</summary>
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
+
+    /// <summary>مجموعه تنظیمات عمومی و ماژولی سامانه.</summary>
+    public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
 
     /// <summary>
     /// پیکربندی نگاشت‌ها و محدودیت‌های عمومی مدل داده.
