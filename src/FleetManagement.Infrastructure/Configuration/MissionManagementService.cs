@@ -1004,6 +1004,13 @@ public sealed class MissionManagementService(
         return dueMissions.Count;
     }
 
+    /// <summary>دریافت یک مأموریت با شناسه برای نمایش جزئیات و چاپ دستور.</summary>
+    public async Task<Mission> GetByIdAsync(Guid missionId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await GetMissionAsync(db, missionId, cancellationToken);
+    }
+
     /// <summary>جست‌وجوی مأموریت‌ها؛ درخواست‌کننده فقط سوابق خود را دریافت می‌کند.</summary>
     public async Task<IReadOnlyList<Mission>> SearchAsync(
         string? requesterUsername = null,
