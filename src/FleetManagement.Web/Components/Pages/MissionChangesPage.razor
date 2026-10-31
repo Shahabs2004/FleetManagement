@@ -318,13 +318,13 @@
                 throw new InvalidOperationException("گروه انتخاب‌شده در گروه‌های مجاز حساب شما نیست.");
             }
 
-            var passengerCount = string.IsNullOrWhiteSpace(_passengers)
+            int? passengerCount = string.IsNullOrWhiteSpace(_passengers)
                 ? null
                 : int.TryParse(_passengers, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedPassengers)
                     ? parsedPassengers
                     : throw new InvalidOperationException("تعداد مسافران معتبر نیست.");
 
-            var odometer = string.IsNullOrWhiteSpace(_odometerStart)
+            long? odometer = string.IsNullOrWhiteSpace(_odometerStart)
                 ? null
                 : long.TryParse(_odometerStart, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedOdometer)
                     ? parsedOdometer
