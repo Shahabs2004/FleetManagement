@@ -14,6 +14,9 @@ public sealed class AuthorizationConfiguration
     /// <summary>نقش‌های تکمیلی که مدیر سامانه به کاربران داده است.</summary>
     public List<ManualUserRoleMapping> ManualUserRoles { get; set; } = [];
 
+    /// <summary>مجوزهای مستقیم هر کاربر مستقل از نقش‌های او.</summary>
+    public List<ManualUserPermissionMapping> ManualUserPermissions { get; set; } = [];
+
     /// <summary>
     /// ساخت نقش‌های پایه و مجوزهای پیش‌فرض با اصل حداقل دسترسی.
     /// </summary>
