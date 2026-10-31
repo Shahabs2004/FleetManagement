@@ -356,7 +356,7 @@ public sealed class MissionManagementService(
         {
             await RecordMissionAuditAsync(
                 "system",
-                mission.Status == MissionStatus.Running ? "AutoStart" : "AutoComplete",
+                mission.ActualEndAtUtc.HasValue ? "AutoComplete" : "AutoStart",
                 mission,
                 "Success",
                 cancellationToken);
