@@ -217,7 +217,7 @@
     }
 
     /// <summary>بازکردن پنجره چاپ مرورگر برای ذخیره گزارش به‌صورت PDF.</summary>
-    private ValueTask PrintReportAsync() => JS.InvokeVoidAsync("window.print");
+    private async Task PrintReportAsync() => await JS.InvokeVoidAsync("window.print");
 
     /// <summary>ساخت گزارش با فیلترهای انتخاب‌شده.</summary>
     private async Task BuildReportAsync()
