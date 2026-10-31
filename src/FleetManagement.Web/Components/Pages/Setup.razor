@@ -7,6 +7,9 @@
 @inject BootstrapSetupService BootstrapSetup
 @inject SqlConnectionSetupService SqlSetup
 @inject SqlDatabaseInitializer DatabaseInitializer
+@inject FleetManagement.Infrastructure.Bootstrap.SqlAvailabilityService SqlAvailability
+@inject FleetManagement.Infrastructure.Configuration.ActiveDirectorySettingsService ActiveDirectorySettings
+@inject FleetManagement.Infrastructure.Configuration.ActiveDirectoryConnectionTester ActiveDirectoryTester
 @inject ILogger<Setup> Logger
 
 <PageTitle>راه‌اندازی سامانه</PageTitle>
@@ -76,10 +79,10 @@
             </EditForm>
         </div>
     }
-    else
+    else if (!_sqlReady)
     {
         <div class="setup-step">
-            <div class="step-caption">گام ۲ از ۲ · اتصال و ایجاد پایگاه داده SQL Server</div>
+            <div class="step-caption">گام ۲ از ۳ · اتصال و ایجاد پایگاه داده SQL Server</div>
             <p>حساب SQL باید مجوز اتصال به master و ایجاد پایگاه داده را داشته باشد.</p>
 
             <EditForm Model="_sqlModel" OnValidSubmit="ConfigureSqlAsync">
@@ -109,6 +112,65 @@
             </EditForm>
         </div>
     }
+    else
+    {
+        <div class="setup-step">
+            <div class="step-caption">گام ۳ از ۳ · تنظیم Active Directory</div>
+            <p>اطلاعات اتصال دایرکتوری و گروه‌های مجاز را وارد کنید. اگر AD موقتاً در دسترس نیست، می‌توانید این مرحله را رد کنید و بعداً تنظیمات را تکمیل کنید.</p>
+
+            <EditForm Model="_adModel" OnValidSubmit="SaveAndTestActiveDirectoryAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <label for="ad-domain">نام DNS دامنه</label>
+                <InputText id="ad-domain" @bind-Value="_adModel.DomainDnsName" placeholder="مثلاً corp.example.local" />
+
+                <label for="ad-server">سرور LDAP</label>
+                <InputText id="ad-server" @bind-Value="_adModel.LdapServer" />
+
+                <label for="ad-port">درگاه LDAP</label>
+                <InputNumber id="ad-port" @bind-Value="_adModel.Port" />
+
+                <label class="checkbox-line">
+                    <InputCheckbox @bind-Value="_adModel.UseLdaps" />
+                    استفاده از LDAPS امن
+                </label>
+
+                <label for="ad-base">Base Distinguished Name</label>
+                <InputText id="ad-base" @bind-Value="_adModel.BaseDistinguishedName" placeholder="DC=corp,DC=example,DC=local" />
+
+                <label for="ad-service-user">نام کاربری حساب سرویس AD</label>
+                <InputText id="ad-service-user" @bind-Value="_adModel.ServiceAccountUsername" />
+
+                <label for="ad-service-password">رمز حساب سرویس AD</label>
+                <InputText id="ad-service-password" type="password" @bind-Value="_adModel.ServiceAccountPassword" autocomplete="new-password" />
+
+                <label for="ad-ou-attribute">ویژگی واحد سازمانی در AD</label>
+                <InputText id="ad-ou-attribute" @bind-Value="_adModel.OrganizationalUnitAttribute" />
+
+                <label for="ad-groups">گروه‌های مجاز، هر خط به شکل نام گروه|Distinguished Name</label>
+                <InputTextArea id="ad-groups" @bind-Value="_adModel.AllowedGroupsText" />
+
+                <label class="checkbox-line">
+                    <InputCheckbox @bind-Value="_adModel.UseWindowsIntegratedAuthentication" />
+                    ورود یکپارچه ویندوز
+                </label>
+
+                <label class="checkbox-line">
+                    <InputCheckbox @bind-Value="_adModel.AllowUsernamePasswordFallback" />
+                    ورود جایگزین با نام کاربری و رمز AD
+                </label>
+
+                <button type="submit" class="primary-button" disabled="@_isBusy">
+                    @(_isBusy ? "در حال آزمون اتصال AD..." : "ذخیره تنظیمات و آزمون اتصال AD")
+                </button>
+            </EditForm>
+
+            <button type="button" class="secondary-button" @onclick="SkipActiveDirectoryAsync" disabled="@_isBusy">
+                فعلاً رد کردن تنظیم AD
+            </button>
+        </div>
+    }
 
     @if (!string.IsNullOrWhiteSpace(_message))
     {
@@ -123,6 +185,7 @@
     private bool _isBusy;
     private bool _hasLocalAdministrator;
     private bool _administratorVerified;
+    private bool _sqlReady;
     private bool _setupCompleted;
     private bool _isError;
     private string? _message;
@@ -130,6 +193,7 @@
     private readonly AdministratorModel _administratorModel = new();
     private readonly VerificationModel _verificationModel = new();
     private readonly SqlModel _sqlModel = new();
+    private readonly ActiveDirectoryModel _adModel = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -139,6 +203,29 @@
             _hasLocalAdministrator = state.HasLocalAdministrator;
             _setupCompleted = state.SetupCompleted;
             _verificationModel.Username = state.LocalAdministratorUsername ?? string.Empty;
+            _sqlReady = !string.IsNullOrWhiteSpace(state.SqlConnectionString)
+                && await SqlAvailability.IsAvailableAsync();
+
+            if (_sqlReady)
+            {
+                await DatabaseInitializer.InitializeAsync();
+                var savedDirectorySettings = await ActiveDirectorySettings.GetAsync();
+                if (savedDirectorySettings is not null)
+                {
+                    _adModel.DomainDnsName = savedDirectorySettings.DomainDnsName;
+                    _adModel.LdapServer = savedDirectorySettings.LdapServer;
+                    _adModel.Port = savedDirectorySettings.Port;
+                    _adModel.UseLdaps = savedDirectorySettings.UseLdaps;
+                    _adModel.BaseDistinguishedName = savedDirectorySettings.BaseDistinguishedName;
+                    _adModel.ServiceAccountUsername = savedDirectorySettings.ServiceAccountUsername;
+                    _adModel.OrganizationalUnitAttribute = savedDirectorySettings.OrganizationalUnitAttribute;
+                    _adModel.UseWindowsIntegratedAuthentication = savedDirectorySettings.UseWindowsIntegratedAuthentication;
+                    _adModel.AllowUsernamePasswordFallback = savedDirectorySettings.AllowUsernamePasswordFallback;
+                    _adModel.AllowedGroupsText = string.Join(
+                        Environment.NewLine,
+                        savedDirectorySettings.AllowedGroups.Select(group => $"{group.Name}|{group.DistinguishedName}"));
+                }
+            }
         }
         catch (Exception exception)
         {
@@ -237,12 +324,11 @@
                 _sqlModel.TrustServerCertificate);
 
             await DatabaseInitializer.InitializeAsync();
-            await BootstrapSetup.CompleteSetupAsync();
 
-            _setupCompleted = true;
+            _sqlReady = true;
             _sqlModel.Password = string.Empty;
             _verificationModel.Password = string.Empty;
-            _message = "اتصال SQL برقرار شد، جداول ایجاد شدند و راه‌اندازی اولیه تکمیل شد.";
+            _message = "اتصال SQL برقرار شد و جداول پایه ایجاد شدند. اکنون تنظیم Active Directory را تکمیل کنید.";
         }
         catch (Exception exception)
         {
@@ -252,6 +338,84 @@
         {
             // رمز SQL پس از هر تلاش از حافظه مدل فرم پاک می‌شود.
             _sqlModel.Password = string.Empty;
+            _isBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// ذخیره تنظیمات AD، آزمون اتصال و تکمیل ویزارد در صورت موفقیت.
+    /// </summary>
+    private async Task SaveAndTestActiveDirectoryAsync()
+    {
+        _isBusy = true;
+        _message = null;
+
+        try
+        {
+            var groups = _adModel.AllowedGroupsText
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(line => line.Split('|', 2, StringSplitOptions.TrimEntries))
+                .Where(parts => parts.Length == 2)
+                .Select(parts => new FleetManagement.Infrastructure.Configuration.ActiveDirectoryGroup
+                {
+                    Name = parts[0],
+                    DistinguishedName = parts[1]
+                })
+                .ToList();
+
+            var configuration = new FleetManagement.Infrastructure.Configuration.ActiveDirectoryConfiguration
+            {
+                DomainDnsName = _adModel.DomainDnsName,
+                LdapServer = _adModel.LdapServer,
+                Port = _adModel.Port,
+                UseLdaps = _adModel.UseLdaps,
+                BaseDistinguishedName = _adModel.BaseDistinguishedName,
+                ServiceAccountUsername = _adModel.ServiceAccountUsername,
+                ServiceAccountPassword = _adModel.ServiceAccountPassword,
+                OrganizationalUnitAttribute = _adModel.OrganizationalUnitAttribute,
+                UseWindowsIntegratedAuthentication = _adModel.UseWindowsIntegratedAuthentication,
+                AllowUsernamePasswordFallback = _adModel.AllowUsernamePasswordFallback,
+                AllowedGroups = groups
+            };
+
+            await ActiveDirectorySettings.SaveAsync(configuration);
+            await ActiveDirectoryTester.TestAsync(configuration);
+            await BootstrapSetup.CompleteSetupAsync();
+
+            _setupCompleted = true;
+            _adModel.ServiceAccountPassword = string.Empty;
+            _message = "اتصال Active Directory تأیید شد و راه‌اندازی اولیه تکمیل شد.";
+        }
+        catch (Exception exception)
+        {
+            ShowUnexpectedError(exception, "ذخیره یا آزمون Active Directory");
+        }
+        finally
+        {
+            _adModel.ServiceAccountPassword = string.Empty;
+            _isBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// تکمیل راه‌اندازی با AD غیرفعال یا موقتاً در دسترس‌نبودن آن.
+    /// ورود کاربران عادی تا تنظیم موفق AD مسدود خواهد بود.
+    /// </summary>
+    private async Task SkipActiveDirectoryAsync()
+    {
+        _isBusy = true;
+        try
+        {
+            await BootstrapSetup.CompleteSetupAsync();
+            _setupCompleted = true;
+            _message = "راه‌اندازی با AD ناقص تکمیل شد. ورود کاربران عادی تا پیکربندی AD غیرفعال خواهد بود.";
+        }
+        catch (Exception exception)
+        {
+            ShowUnexpectedError(exception, "تکمیل راه‌اندازی بدون AD");
+        }
+        finally
+        {
             _isBusy = false;
         }
     }
@@ -318,4 +482,36 @@
 
         public bool TrustServerCertificate { get; set; }
     }
+
+    /// <summary>
+    /// داده‌های فرم اتصال Active Directory.
+    /// </summary>
+    private sealed class ActiveDirectoryModel
+    {
+        [Required(ErrorMessage = "نام DNS دامنه الزامی است.")]
+        public string DomainDnsName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "سرور LDAP الزامی است.")]
+        public string LdapServer { get; set; } = string.Empty;
+
+        [Range(1, 65535, ErrorMessage = "درگاه LDAP معتبر نیست.")]
+        public int Port { get; set; } = 636;
+
+        public bool UseLdaps { get; set; } = true;
+
+        [Required(ErrorMessage = "Base DN الزامی است.")]
+        public string BaseDistinguishedName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "نام حساب سرویس الزامی است.")]
+        public string ServiceAccountUsername { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "رمز حساب سرویس الزامی است.")]
+        public string ServiceAccountPassword { get; set; } = string.Empty;
+
+        public string OrganizationalUnitAttribute { get; set; } = "department";
+        public bool UseWindowsIntegratedAuthentication { get; set; } = true;
+        public bool AllowUsernamePasswordFallback { get; set; } = true;
+        public string AllowedGroupsText { get; set; } = string.Empty;
+    }
+
 }
