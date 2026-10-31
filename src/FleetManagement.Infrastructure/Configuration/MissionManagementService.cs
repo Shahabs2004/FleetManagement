@@ -425,6 +425,14 @@ public sealed class MissionManagementService(
                 mission.Destination
             }),
             cancellationToken: cancellationToken);
+        await notificationService.CreateForRolesAsync(
+            ["FleetManager", "Operator"],
+            "درخواست مأموریت جدید",
+            $"درخواست {mission.MissionNumber} توسط {mission.RequesterName} ثبت شد و در انتظار بررسی است.",
+            "MissionRequestCreated",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
 
         return mission.Id;
     }
@@ -600,6 +608,14 @@ public sealed class MissionManagementService(
         mission.RequestWithdrawal(reason);
         await db.SaveChangesAsync(cancellationToken);
         await RecordMissionAuditAsync(requesterUsername, "RequestWithdrawal", mission, "Success", cancellationToken, reason);
+        await notificationService.CreateForRolesAsync(
+            ["FleetManager", "Operator"],
+            "درخواست انصراف مأموریت",
+            $"برای مأموریت {mission.MissionNumber} درخواست انصراف ثبت شده است.",
+            "MissionWithdrawalRequested",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
     }
 
     /// <summary>تأیید درخواست انصراف و آزادسازی منابع.</summary>
@@ -946,6 +962,14 @@ public sealed class MissionManagementService(
                 second.OdometerStartKm
             }),
             cancellationToken: cancellationToken);
+        await notificationService.CreateForRolesAsync(
+            ["FleetManager", "Operator"],
+            "مأموریت تقسیم شد",
+            $"مأموریت {first.MissionNumber} به دو مأموریت مستقل تقسیم شد. شماره بخش دوم: {second.MissionNumber}.",
+            "MissionSplit",
+            "Mission",
+            first.Id.ToString(),
+            cancellationToken);
 
         return second.Id;
     }
@@ -999,6 +1023,17 @@ public sealed class MissionManagementService(
                 item.Mission,
                 "Success",
                 cancellationToken);
+            if (item.Action == "AutoComplete")
+            {
+                await notificationService.CreateForRolesAsync(
+                    ["Operator"],
+                    "مأموریت پایان یافت",
+                    $"مأموریت {item.Mission.MissionNumber} به پایان برنامه‌ریزی‌شده رسید.",
+                    "MissionCompleted",
+                    "Mission",
+                    item.Mission.Id.ToString(),
+                    cancellationToken);
+            }
         }
 
         return dueMissions.Count;
