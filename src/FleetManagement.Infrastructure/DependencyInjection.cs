@@ -1,5 +1,4 @@
-using FleetManagement.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
+using FleetManagement.Infrastructure.Bootstrap;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -11,25 +10,14 @@ namespace FleetManagement.Infrastructure;
 public static class DependencyInjection
 {
     /// <summary>
-    /// سرویس‌های زیرساختی را به ظرف تزریق وابستگی اضافه می‌کند.
+    /// سرویس‌های زیرساختی و راه‌اندازی را ثبت می‌کند.
     /// </summary>
     public static IServiceCollection AddFleetInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // در اجرای نخست ممکن است هنوز SQL تنظیم نشده باشد؛ در این حالت سایت باید بالا بیاید
-        // تا مدیر محلی بتواند ویزارد راه‌اندازی را تکمیل کند.
-        var connectionString = configuration.GetConnectionString("FleetManagement");
-
-        if (!string.IsNullOrWhiteSpace(connectionString))
-        {
-            // در Blazor Interactive Server عمر Circuit ممکن است طولانی باشد؛
-            // برای هر عملیات داده، DbContext تازه از Factory ساخته می‌شود.
-            services.AddDbContextFactory<FleetDbContext>(options =>
-                options.UseSqlServer(
-                    connectionString,
-                    sqlOptions => sqlOptions.EnableRetryOnFailure()));
-        }
+        // در اجرای نخست اتصال SQL وجود ندارد؛ سایت باید برای نمایش ویزارد بالا بیاید.
+        services.AddFleetBootstrap();
 
         return services;
     }
