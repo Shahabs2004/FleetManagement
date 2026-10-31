@@ -31,7 +31,8 @@ public sealed class AuthorizationSettingsService(ISystemSettingsStore settingsSt
             "SystemAdministrator",
             "FleetManager",
             "Operator",
-            "Viewer"
+            "Viewer",
+            "Requester"
         };
 
         var roleKeys = configuration.Roles
