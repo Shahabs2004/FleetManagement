@@ -1,18 +1,15 @@
 using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
-using FleetManagement.Infrastructure.Persistence;
 
 namespace FleetManagement.Infrastructure.Bootstrap;
 
 /// <summary>
-/// اعتبارسنجی اتصال SQL Server و ثبت اطلاعات حداقلی آن برای راه‌اندازی و بازیابی.
+/// اعتبارسنجی دسترسی SQL Server، ایجاد پایگاه داده و ثبت اتصال اضطراری.
 /// </summary>
-public sealed class SqlConnectionSetupService(
-    IBootstrapStateStore stateStore,
-    IDbContextFactory<FleetDbContext> dbContextFactory)
+public sealed class SqlConnectionSetupService(IBootstrapStateStore stateStore)
 {
     /// <summary>
-    /// اتصال SQL را آزمایش می‌کند و در صورت موفقیت رشته اتصال را در فایل bootstrap محافظت‌شده ذخیره می‌کند.
+    /// اتصال به سرور را آزمایش می‌کند، پایگاه داده را در صورت نبود ایجاد می‌کند
+    /// و رشته اتصال نهایی را در فایل bootstrap محافظت‌شده ذخیره می‌کند.
     /// </summary>
     public async Task TestAndSaveAsync(
         string server,
@@ -30,7 +27,7 @@ public sealed class SqlConnectionSetupService(
         var builder = new SqlConnectionStringBuilder
         {
             DataSource = server.Trim(),
-            InitialCatalog = database.Trim(),
+            InitialCatalog = "master",
             UserID = username.Trim(),
             Password = password,
             IntegratedSecurity = false,
@@ -40,7 +37,27 @@ public sealed class SqlConnectionSetupService(
             ApplicationName = "FleetManagement"
         };
 
-        // آزمون اتصال قبل از ذخیره، برای جلوگیری از ثبت اطلاعات اشتباه.
+        // اتصال به master برای امکان ایجاد پایگاه داده‌ای که هنوز وجود ندارد.
+        await using (var connection = new SqlConnection(builder.ConnectionString))
+        {
+            await connection.OpenAsync(cancellationToken);
+
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                IF DB_ID(@databaseName) IS NULL
+                BEGIN
+                    DECLARE @createDatabaseSql nvarchar(max) =
+                        N'CREATE DATABASE ' + QUOTENAME(@databaseName);
+                    EXEC(@createDatabaseSql);
+                END;
+                """;
+            command.Parameters.AddWithValue("@databaseName", database.Trim());
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        // پس از ایجاد، اتصال به پایگاه داده هدف نیز آزمایش می‌شود.
+        builder.InitialCatalog = database.Trim();
+
         await using (var connection = new SqlConnection(builder.ConnectionString))
         {
             await connection.OpenAsync(cancellationToken);
@@ -53,7 +70,5 @@ public sealed class SqlConnectionSetupService(
         var state = await stateStore.ReadAsync(cancellationToken);
         state.SqlConnectionString = builder.ConnectionString;
         await stateStore.WriteAsync(state, cancellationToken);
-
-        // این مرحله فقط اتصال را ذخیره می‌کند؛ ایجاد ساختار جداول در مرحله Migration اجرا می‌شود.
     }
 }
