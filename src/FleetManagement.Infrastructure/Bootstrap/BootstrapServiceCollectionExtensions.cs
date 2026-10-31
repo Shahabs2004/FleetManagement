@@ -34,6 +34,8 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<DirectoryUserProvisioningService>();
         services.AddScoped<AuthorizationSettingsService>();
         services.AddScoped<AuthorizationResolutionService>();
+        services.AddScoped<UserSessionService>();
+        services.AddHostedService<SessionExpiryHostedService>();
         services.AddScoped<OrganizationSettingsService>();
         services.AddScoped<SmsSettingsService>();
         services.AddSingleton<ActiveDirectoryConnectionTester>();
