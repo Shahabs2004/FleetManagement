@@ -175,6 +175,63 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
             entity.ToTable("UserSessions");
         });
 
+        modelBuilder.Entity("FleetManagement.Domain.Auditing.AuditEntry", entity =>
+        {
+            entity.Property<Guid>("Id")
+                .ValueGeneratedOnAdd()
+                .HasColumnType("uniqueidentifier");
+
+            entity.Property<string>("ActorUsername")
+                .IsRequired()
+                .HasMaxLength(64)
+                .HasColumnType("nvarchar(64)");
+
+            entity.Property<string>("Action")
+                .IsRequired()
+                .HasMaxLength(80)
+                .HasColumnType("nvarchar(80)");
+
+            entity.Property<string>("EntityType")
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnType("nvarchar(100)");
+
+            entity.Property<string>("EntityId")
+                .HasMaxLength(100)
+                .HasColumnType("nvarchar(100)");
+
+            entity.Property<DateTimeOffset>("OccurredAtUtc")
+                .HasColumnType("datetimeoffset");
+
+            entity.Property<string>("Outcome")
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasColumnType("nvarchar(40)");
+
+            entity.Property<string>("Reason")
+                .HasMaxLength(1000)
+                .HasColumnType("nvarchar(1000)");
+
+            entity.Property<string>("BeforeJson")
+                .HasMaxLength(12000)
+                .HasColumnType("nvarchar(12000)");
+
+            entity.Property<string>("AfterJson")
+                .HasMaxLength(12000)
+                .HasColumnType("nvarchar(12000)");
+
+            entity.Property<string>("ClientIpAddress")
+                .HasMaxLength(45)
+                .HasColumnType("nvarchar(45)");
+
+            entity.HasKey("Id");
+            entity.HasIndex("OccurredAtUtc");
+            entity.HasIndex("EntityType", "EntityId");
+            entity.HasIndex("ActorUsername", "OccurredAtUtc");
+            entity.HasIndex("Action", "Outcome");
+            entity.ToTable("AuditEntries");
+        });
+
         modelBuilder.Entity("FleetManagement.Domain.Configuration.SystemSetting", entity =>
         {
             entity.Property<Guid>("Id")
