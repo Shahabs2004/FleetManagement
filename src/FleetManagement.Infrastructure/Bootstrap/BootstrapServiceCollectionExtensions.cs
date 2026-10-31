@@ -31,6 +31,7 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<ISystemSettingsStore, SqlSystemSettingsStore>();
         services.AddScoped<ActiveDirectorySettingsService>();
         services.AddScoped<ActiveDirectoryAuthenticator>();
+        services.AddScoped<DirectoryUserProvisioningService>();
         services.AddScoped<OrganizationSettingsService>();
         services.AddScoped<SmsSettingsService>();
         services.AddSingleton<ActiveDirectoryConnectionTester>();
