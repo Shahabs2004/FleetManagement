@@ -36,7 +36,7 @@
     else if (!_hasLocalAdministrator)
     {
         <div class="setup-step">
-            <div class="step-caption">گام ۱ از ۲ · ایجاد مدیر محلی اضطراری</div>
+            <div class="step-caption">گام ۱ از ۳ · ایجاد مدیر محلی اضطراری</div>
             <p>کد یک‌بارمصرف را از فایل محدودشده روی Windows Server دریافت کنید.</p>
 
             <EditForm Model="_administratorModel" OnValidSubmit="CreateAdministratorAsync">
@@ -62,7 +62,7 @@
     else if (!_administratorVerified)
     {
         <div class="setup-step">
-            <div class="step-caption">گام ۲ از ۲ · تأیید مدیر محلی و تنظیم SQL</div>
+            <div class="step-caption">گام ۲ از ۳ · تأیید مدیر محلی</div>
             <p>حساب مدیر محلی ایجاد شده است. برای ادامه، هویت مدیر را دوباره تأیید کنید.</p>
 
             <EditForm Model="_verificationModel" OnValidSubmit="VerifyAdministratorAsync">
@@ -135,6 +135,10 @@
                     <InputCheckbox @bind-Value="_adModel.UseLdaps" />
                     استفاده از LDAPS امن
                 </label>
+                @if (!_adModel.UseLdaps)
+                {
+                    <div class="setup-error">هشدار: در حالت LDAP بدون TLS، اطلاعات حساب سرویس ممکن است در مسیر شبکه رمزنگاری نشوند. استفاده از LDAPS توصیه می‌شود.</div>
+                }
 
                 <label for="ad-base">Base Distinguished Name</label>
                 <InputText id="ad-base" @bind-Value="_adModel.BaseDistinguishedName" placeholder="DC=corp,DC=example,DC=local" />
@@ -363,6 +367,21 @@
                 })
                 .ToList();
 
+            if (groups.Count == 0)
+            {
+                throw new InvalidOperationException("حداقل یک گروه مجاز AD باید معرفی شود.");
+            }
+
+            var savedConfiguration = await ActiveDirectorySettings.GetAsync();
+            var serviceAccountPassword = string.IsNullOrWhiteSpace(_adModel.ServiceAccountPassword)
+                ? savedConfiguration?.ServiceAccountPassword ?? string.Empty
+                : _adModel.ServiceAccountPassword;
+
+            if (string.IsNullOrWhiteSpace(serviceAccountPassword))
+            {
+                throw new InvalidOperationException("رمز حساب سرویس AD الزامی است.");
+            }
+
             var configuration = new FleetManagement.Infrastructure.Configuration.ActiveDirectoryConfiguration
             {
                 DomainDnsName = _adModel.DomainDnsName,
@@ -371,7 +390,7 @@
                 UseLdaps = _adModel.UseLdaps,
                 BaseDistinguishedName = _adModel.BaseDistinguishedName,
                 ServiceAccountUsername = _adModel.ServiceAccountUsername,
-                ServiceAccountPassword = _adModel.ServiceAccountPassword,
+                ServiceAccountPassword = serviceAccountPassword,
                 OrganizationalUnitAttribute = _adModel.OrganizationalUnitAttribute,
                 UseWindowsIntegratedAuthentication = _adModel.UseWindowsIntegratedAuthentication,
                 AllowUsernamePasswordFallback = _adModel.AllowUsernamePasswordFallback,
@@ -505,7 +524,6 @@
         [Required(ErrorMessage = "نام حساب سرویس الزامی است.")]
         public string ServiceAccountUsername { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "رمز حساب سرویس الزامی است.")]
         public string ServiceAccountPassword { get; set; } = string.Empty;
 
         public string OrganizationalUnitAttribute { get; set; } = "department";
