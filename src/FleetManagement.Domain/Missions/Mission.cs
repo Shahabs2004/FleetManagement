@@ -532,6 +532,11 @@ public sealed class Mission : Entity
             throw new ArgumentException("زمان پایان جدید نمی‌تواند پیش از شروع واقعی مأموریت باشد.");
         }
 
+        if (Status == MissionStatus.Running && plannedStartAtUtc > DateTimeOffset.UtcNow)
+        {
+            throw new ArgumentException("زمان شروع مأموریت در حال اجرا نمی‌تواند به آینده منتقل شود.");
+        }
+
         if (passengerCount is < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(passengerCount));
