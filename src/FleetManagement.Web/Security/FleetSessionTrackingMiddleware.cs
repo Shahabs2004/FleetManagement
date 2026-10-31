@@ -1,0 +1,38 @@
+using System.Security.Claims;
+using FleetManagement.Infrastructure.Configuration;
+
+namespace FleetManagement.Web.Security;
+
+/// <summary>
+/// ثبت دوره‌ای فعالیت نشست کاربر برای محاسبه زمان بیکاری.
+/// </summary>
+public sealed class FleetSessionTrackingMiddleware(
+    RequestDelegate next)
+{
+    /// <summary>
+    /// در صورت احراز هویت، آخرین فعالیت نشست را با فاصله کنترل‌شده ثبت می‌کند.
+    /// </summary>
+    public async Task InvokeAsync(
+        HttpContext context,
+        SessionActivityTracker activityTracker,
+        UserSessionService sessionService)
+    {
+        var rawSessionId = context.User.FindFirstValue("fleet:session-id");
+
+        if (context.User.Identity?.IsAuthenticated == true
+            && Guid.TryParse(rawSessionId, out var sessionId)
+            && activityTracker.ShouldTouch(sessionId))
+        {
+            try
+            {
+                await sessionService.TouchAsync(sessionId, context.RequestAborted);
+            }
+            catch (Exception)
+            {
+                // خرابی ثبت سابقه نباید درخواست عملیاتی کاربر را متوقف کند.
+            }
+        }
+
+        await next(context);
+    }
+}
