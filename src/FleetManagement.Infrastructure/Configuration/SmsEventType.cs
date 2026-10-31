@@ -1,4 +1,4 @@
-namespace FleetManagement.Infrastructure.Configuration;
+namespace FleetManagement.Domain.Notifications;
 
 /// <summary>
 /// رویدادهایی که طبق تنظیمات سامانه می‌توانند پیامک ایجاد کنند.
