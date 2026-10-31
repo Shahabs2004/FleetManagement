@@ -251,7 +251,6 @@ public static class FleetAuthenticationEndpoints
             DirectoryAuthenticationStatus.AccountDisabled => "account-disabled",
             DirectoryAuthenticationStatus.AccountLocked => "account-locked",
             DirectoryAuthenticationStatus.AccountExpired => "account-expired",
-            DirectoryAuthenticationStatus.AccountLocked => "account-locked",
             DirectoryAuthenticationStatus.NotInAllowedGroup => "not-allowed",
             DirectoryAuthenticationStatus.DirectoryUnavailable => "directory-unavailable",
             DirectoryAuthenticationStatus.AuthenticationMethodDisabled => "method-disabled",
