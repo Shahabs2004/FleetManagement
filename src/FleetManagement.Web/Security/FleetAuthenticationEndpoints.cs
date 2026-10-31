@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FleetManagement.Infrastructure.Configuration;
 using FleetManagement.Infrastructure.Bootstrap;
+using FleetManagement.Domain.Sessions;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -34,6 +35,7 @@ public static class FleetAuthenticationEndpoints
         ActiveDirectoryAuthenticator authenticator,
         DirectoryUserProvisioningService userProvisioning,
         AuthorizationResolutionService authorizationResolver,
+        UserSessionService sessionService,
         ILoggerFactory loggerFactory)
     {
         if (!await ValidateAntiforgeryAsync(context, antiforgery))
@@ -54,6 +56,13 @@ public static class FleetAuthenticationEndpoints
 
             if (!result.Succeeded || result.User is null)
             {
+                await sessionService.RecordFailedLoginAsync(
+                    username,
+                    UserSessionLoginMethod.DirectoryPassword,
+                    result.Status.ToString(),
+                    context.Connection.RemoteIpAddress?.ToString(),
+                    context.RequestAborted);
+
                 return Results.Redirect($"/login?error={MapError(result.Status)}");
             }
 
@@ -63,6 +72,13 @@ public static class FleetAuthenticationEndpoints
 
             if (!provisionedUser.CanSignIn)
             {
+                await sessionService.RecordFailedLoginAsync(
+                    username,
+                    UserSessionLoginMethod.DirectoryPassword,
+                    "ApplicationDisabled",
+                    context.Connection.RemoteIpAddress?.ToString(),
+                    context.RequestAborted);
+
                 return Results.Redirect("/login?error=app-disabled");
             }
 
@@ -70,11 +86,18 @@ public static class FleetAuthenticationEndpoints
                 result.User,
                 context.RequestAborted);
 
+            var sessionId = await sessionService.RecordSuccessfulLoginAsync(
+                result.User.Username,
+                UserSessionLoginMethod.DirectoryPassword,
+                context.Connection.RemoteIpAddress?.ToString(),
+                context.RequestAborted);
+
             await IssueApplicationCookieAsync(
                 context,
                 result.User,
                 provisionedUser.UserId,
-                authorization);
+                authorization,
+                sessionId);
             return Results.Redirect("/");
         }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
@@ -103,7 +126,8 @@ public static class FleetAuthenticationEndpoints
         HttpContext context,
         IAntiforgery antiforgery,
         IBootstrapStateStore stateStore,
-        BootstrapSetupService setupService)
+        BootstrapSetupService setupService,
+        UserSessionService sessionService)
     {
         if (!await ValidateAntiforgeryAsync(context, antiforgery))
         {
@@ -129,8 +153,21 @@ public static class FleetAuthenticationEndpoints
 
             if (!isValid)
             {
+                await sessionService.RecordFailedLoginAsync(
+                    username,
+                    UserSessionLoginMethod.LocalEmergencyAdministrator,
+                    "InvalidLocalAdministratorCredentials",
+                    context.Connection.RemoteIpAddress?.ToString(),
+                    context.RequestAborted);
+
                 return Results.Redirect("/login?error=local-admin-invalid");
             }
+
+            var sessionId = await sessionService.RecordSuccessfulLoginAsync(
+                username,
+                UserSessionLoginMethod.LocalEmergencyAdministrator,
+                context.Connection.RemoteIpAddress?.ToString(),
+                context.RequestAborted);
 
             var claims = new List<Claim>
             {
@@ -139,6 +176,7 @@ public static class FleetAuthenticationEndpoints
                 new("fleet:username", username),
                 new("fleet:auth-source", "local-emergency"),
                 new("fleet:session-start", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()),
+                new("fleet:session-id", sessionId.ToString()),
                 new(ClaimTypes.Role, "SystemAdministrator"),
                 new("fleet:permission", "*")
             };
@@ -204,6 +242,13 @@ public static class FleetAuthenticationEndpoints
 
             if (!result.Succeeded || result.User is null)
             {
+                await sessionService.RecordFailedLoginAsync(
+                    identity.Name ?? string.Empty,
+                    UserSessionLoginMethod.WindowsIntegrated,
+                    result.Status.ToString(),
+                    context.Connection.RemoteIpAddress?.ToString(),
+                    context.RequestAborted);
+
                 return Results.Redirect($"/login?error={MapError(result.Status)}");
             }
 
@@ -213,6 +258,13 @@ public static class FleetAuthenticationEndpoints
 
             if (!provisionedUser.CanSignIn)
             {
+                await sessionService.RecordFailedLoginAsync(
+                    result.User.Username,
+                    UserSessionLoginMethod.WindowsIntegrated,
+                    "ApplicationDisabled",
+                    context.Connection.RemoteIpAddress?.ToString(),
+                    context.RequestAborted);
+
                 return Results.Redirect("/login?error=app-disabled");
             }
 
@@ -220,11 +272,18 @@ public static class FleetAuthenticationEndpoints
                 result.User,
                 context.RequestAborted);
 
+            var sessionId = await sessionService.RecordSuccessfulLoginAsync(
+                result.User.Username,
+                UserSessionLoginMethod.WindowsIntegrated,
+                context.Connection.RemoteIpAddress?.ToString(),
+                context.RequestAborted);
+
             await IssueApplicationCookieAsync(
                 context,
                 result.User,
                 provisionedUser.UserId,
-                authorization);
+                authorization,
+                sessionId);
 
             return Results.Redirect("/");
         }
@@ -245,7 +304,8 @@ public static class FleetAuthenticationEndpoints
         HttpContext context,
         DirectoryUserProfile user,
         Guid applicationUserId,
-        AuthorizationResolution authorization)
+        AuthorizationResolution authorization,
+        Guid sessionId)
     {
         var claims = new List<Claim>
         {
@@ -259,7 +319,8 @@ public static class FleetAuthenticationEndpoints
             new("fleet:username", user.Username),
             new("fleet:organizational-unit", user.OrganizationalUnit),
             new("fleet:directory-dn", user.DistinguishedName),
-            new("fleet:session-start", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString())
+            new("fleet:session-start", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()),
+            new("fleet:session-id", sessionId.ToString())
         };
 
         foreach (var group in user.AllowedGroups)
@@ -308,11 +369,24 @@ public static class FleetAuthenticationEndpoints
     /// </summary>
     private static async Task<IResult> SignOutAsync(
         HttpContext context,
-        IAntiforgery antiforgery)
+        IAntiforgery antiforgery,
+        UserSessionService sessionService,
+        SessionActivityTracker activityTracker)
     {
         if (!await ValidateAntiforgeryAsync(context, antiforgery))
         {
             return Results.BadRequest("درخواست معتبر نیست.");
+        }
+
+        var rawSessionId = context.User.FindFirstValue("fleet:session-id");
+        if (Guid.TryParse(rawSessionId, out var sessionId))
+        {
+            await sessionService.EndSessionAsync(
+                sessionId,
+                UserSessionStatus.LoggedOut,
+                context.RequestAborted);
+
+            activityTracker.Forget(sessionId);
         }
 
         await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
