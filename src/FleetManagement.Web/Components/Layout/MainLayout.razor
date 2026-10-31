@@ -12,10 +12,15 @@
         </div>
     </header>
 
-    <AuthorizeView Roles="SystemAdministrator">
+    <AuthorizeView>
         <Authorized>
-            <nav class="admin-navigation" aria-label="مدیریت سامانه">
-                <a href="/admin/security">نقش‌ها و مجوزها</a>
+            <nav class="admin-navigation" aria-label="ناوبری سامانه">
+                <AuthorizeView Roles="SystemAdministrator">
+                    <Authorized>
+                        <a href="/admin/security">نقش‌ها و مجوزها</a>
+                    </Authorized>
+                </AuthorizeView>
+                <a href="/logout">خروج</a>
             </nav>
         </Authorized>
     </AuthorizeView>
