@@ -13,10 +13,10 @@
     </header>
 
     <AuthorizeView>
-        <Authorized>
+        <Authorized Context="authenticatedContext">
             <nav class="admin-navigation" aria-label="ناوبری سامانه">
                 <AuthorizeView Roles="SystemAdministrator">
-                    <Authorized>
+                    <Authorized Context="administratorContext">
                         <a href="/admin/security">نقش‌ها و مجوزها</a>
                     </Authorized>
                 </AuthorizeView>
