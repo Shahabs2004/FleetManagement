@@ -52,7 +52,7 @@ public sealed class MissionReportExportService
     {
         var rows = new List<object?[]>
         {
-            ["راننده", "مسافت (کیلومتر)", "تعداد مأموریت", "ساعت مأموریت"]
+            new object?[] { "راننده", "مسافت (کیلومتر)", "تعداد مأموریت", "ساعت مأموریت" }
         };
 
         rows.AddRange(report.Drivers.Select(row => new object?[]
@@ -68,7 +68,7 @@ public sealed class MissionReportExportService
 
     private static IReadOnlyList<object?[]> BuildVehicleRows(MissionReportResult report)
     {
-        var rows = new List<object?[]> { ["خودرو", "مسافت (کیلومتر)", "تعداد مأموریت"] };
+        var rows = new List<object?[]> { new object?[] { "خودرو", "مسافت (کیلومتر)", "تعداد مأموریت" } };
         rows.AddRange(report.Vehicles.Select(row => new object?[]
         {
             row.VehicleName,
@@ -80,7 +80,7 @@ public sealed class MissionReportExportService
 
     private static IReadOnlyList<object?[]> BuildMonthlyRows(MissionReportResult report)
     {
-        var rows = new List<object?[]> { ["راننده", "سال جلالی", "ماه", "مسافت (کیلومتر)"] };
+        var rows = new List<object?[]> { new object?[] { "راننده", "سال جلالی", "ماه", "مسافت (کیلومتر)" } };
         rows.AddRange(report.MonthlyDriverMileage.Select(row => new object?[]
         {
             row.DriverName,
@@ -93,7 +93,7 @@ public sealed class MissionReportExportService
 
     private static IReadOnlyList<object?[]> BuildCancelledRows(MissionReportResult report)
     {
-        var rows = new List<object?[]> { ["شماره مأموریت", "عنوان", "درخواست‌کننده", "علت لغو", "زمان ثبت"] };
+        var rows = new List<object?[]> { new object?[] { "شماره مأموریت", "عنوان", "درخواست‌کننده", "علت لغو", "زمان ثبت" } };
         rows.AddRange(report.CancelledMissions.Select(row => new object?[]
         {
             row.MissionNumber,
