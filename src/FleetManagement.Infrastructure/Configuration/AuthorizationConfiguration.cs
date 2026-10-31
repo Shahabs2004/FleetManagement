@@ -47,6 +47,7 @@ public sealed class AuthorizationConfiguration
                         new() { Permission = "missions.*" },
                         new() { Permission = "reports.view" },
                         new() { Permission = "reports.export" },
+                        new() { Permission = "notifications.view" },
                         new() { Permission = "dashboard.view" }
                     ]
                 },
