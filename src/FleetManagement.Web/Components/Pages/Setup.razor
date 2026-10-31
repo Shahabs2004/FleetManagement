@@ -553,22 +553,12 @@
     /// تکمیل راه‌اندازی با AD غیرفعال یا موقتاً در دسترس‌نبودن آن.
     /// ورود کاربران عادی تا تنظیم موفق AD مسدود خواهد بود.
     /// </summary>
-    private async Task SkipActiveDirectoryAsync()
+    private Task SkipActiveDirectoryAsync()
     {
-        _isBusy = true;
-        try
-        {
-            _adReady = true;
-            _message = "مرحله AD رد شد. ورود کاربران عادی تا پیکربندی AD غیرفعال خواهد بود. اکنون مشخصات سازمان را ثبت کنید.";
-        }
-        catch (Exception exception)
-        {
-            ShowUnexpectedError(exception, "تکمیل راه‌اندازی بدون AD");
-        }
-        finally
-        {
-            _isBusy = false;
-        }
+        _adReady = true;
+        _message = "مرحله AD رد شد. ورود کاربران عادی تا پیکربندی AD غیرفعال خواهد بود. اکنون مشخصات سازمان را ثبت کنید.";
+        _isError = false;
+        return Task.CompletedTask;
     }
 
     /// <summary>
