@@ -1,3 +1,5 @@
+using FleetManagement.Application.Configuration;
+using FleetManagement.Infrastructure.Configuration;
 using FleetManagement.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +26,9 @@ public static class BootstrapServiceCollectionExtensions
         // اتصال از فایل محلی محافظت‌شده خوانده می‌شود تا پس از تکمیل ویزارد نیاز به Restart نباشد.
         services.AddSingleton<IDbContextFactory<FleetDbContext>>(
             provider => provider.GetRequiredService<BootstrapDbContextFactory>());
+
+        // تنظیمات عملیاتی در جدول SQL نگهداری می‌شوند.
+        services.AddScoped<ISystemSettingsStore, SqlSystemSettingsStore>();
 
         return services;
     }
