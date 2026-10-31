@@ -216,3 +216,34 @@ h1 {
     color: #a13f35;
     font-size: 13px;
 }
+
+.setup-panel textarea {
+    width: 100%;
+    min-height: 110px;
+    padding: 10px 12px;
+    border: 1px solid #d7e1da;
+    border-radius: 9px;
+    color: #18332d;
+    background: #fbfcfb;
+    font: inherit;
+    direction: ltr;
+    text-align: left;
+    resize: vertical;
+}
+
+.secondary-button {
+    width: 100%;
+    min-height: 42px;
+    margin-top: 12px;
+    border: 1px solid #cbd8cf;
+    border-radius: 10px;
+    color: #245346;
+    background: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+.secondary-button:disabled {
+    opacity: .6;
+    cursor: wait;
+}
