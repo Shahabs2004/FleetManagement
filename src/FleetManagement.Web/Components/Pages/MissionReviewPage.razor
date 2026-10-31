@@ -225,6 +225,46 @@
             </article>
         }
     }
+
+    <h2>درخواست‌های تغییر مأموریت</h2>
+    @if (_changeRequests.Count == 0)
+    {
+        <div class="setup-info">درخواست تغییر در انتظار بررسی وجود ندارد.</div>
+    }
+    else
+    {
+        @foreach (var change in _changeRequests)
+        {
+            <article class="mission-review-card" @key="change.Id">
+                <div class="mission-review-heading">
+                    <strong>درخواست تغییر برای مأموریت <span dir="ltr">@change.MissionId</span></strong>
+                    <span>@GetChangeStatus(change.Status)</span>
+                </div>
+                <p><b>درخواست‌کننده:</b> @change.RequesterUsername</p>
+                <p><b>علت:</b> @change.Reason</p>
+                <details>
+                    <summary>مشاهده مقادیر پیشنهادی</summary>
+                    <pre dir="ltr">@change.ProposedValuesJson</pre>
+                </details>
+                @if (change.Status == MissionChangeRequestStatus.Pending)
+                {
+                    <button type="button" class="primary-button" @onclick="() => StartChangeReviewAsync(change.Id)" disabled="@_busy">شروع بررسی و قفل درخواست</button>
+                }
+                else if (change.Status == MissionChangeRequestStatus.UnderReview
+                    && string.Equals(change.ReviewerUsername, _actor, StringComparison.OrdinalIgnoreCase))
+                {
+                    <div class="driver-actions">
+                        <button type="button" class="primary-button" @onclick="() => ApproveChangeAsync(change.Id)" disabled="@_busy">تأیید و اعمال یکپارچه</button>
+                        <button type="button" class="secondary-button" @onclick="() => RejectChangeAsync(change.Id)" disabled="@_busy">رد درخواست تغییر</button>
+                    </div>
+                }
+                else if (change.Status == MissionChangeRequestStatus.UnderReview)
+                {
+                    <p>این درخواست توسط @change.ReviewerUsername در حال بررسی است.</p>
+                }
+            </article>
+        }
+    }
 </section>
 
 @code {
@@ -234,7 +274,9 @@
     private string _reason = string.Empty;
     private string _message = string.Empty;
     private string _error = string.Empty;
+    private string _actor = string.Empty;
     private IReadOnlyList<Mission> _missions = [];
+    private IReadOnlyList<MissionChangeRequest> _changeRequests = [];
     private IReadOnlyList<Driver> _drivers = [];
     private IReadOnlyList<Vehicle> _vehicles = [];
     private readonly Dictionary<Guid, string> _driverSelection = [];
@@ -265,7 +307,11 @@
                 ? (MissionStatus)raw
                 : null;
 
+            _actor = await GetActorAsync();
             _missions = await MissionService.SearchAsync(status: status, take: 500);
+            _changeRequests = (await MissionService.GetChangeRequestsAsync(take: 500))
+                .Where(item => item.Status is MissionChangeRequestStatus.Pending or MissionChangeRequestStatus.UnderReview)
+                .ToList();
             _drivers = await DriverService.SearchAsync();
             _vehicles = await VehicleService.SearchAsync();
 
@@ -429,6 +475,39 @@
         var utc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), zone);
         return new DateTimeOffset(utc, TimeSpan.Zero);
     }
+
+    /// <summary>شروع بررسی درخواست تغییر و قفل‌کردن آن برای بازبین جاری.</summary>
+    private Task StartChangeReviewAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        await MissionService.StartChangeReviewAsync(id, actor);
+        _message = "بررسی درخواست تغییر آغاز شد و برای بازبین جاری قفل شد.";
+    }, "شروع بررسی تغییر مأموریت");
+
+    /// <summary>تأیید و اعمال یکپارچه مقادیر پیشنهادی.</summary>
+    private Task ApproveChangeAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        await MissionService.ApproveChangeAsync(id, actor);
+        _message = "تغییرات مأموریت به‌صورت یکپارچه اعمال شد.";
+    }, "تأیید تغییر مأموریت");
+
+    /// <summary>رد درخواست تغییر با علت اجباری.</summary>
+    private Task RejectChangeAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        EnsureReason();
+        await MissionService.RejectChangeAsync(id, actor, _reason);
+        _reason = string.Empty;
+        _message = "درخواست تغییر رد شد و اطلاعات قبلی مأموریت حفظ شد.";
+    }, "رد تغییر مأموریت");
+
+    /// <summary>عنوان فارسی وضعیت درخواست تغییر.</summary>
+    private static string GetChangeStatus(MissionChangeRequestStatus status) => status switch
+    {
+        MissionChangeRequestStatus.Pending => "در انتظار بررسی",
+        MissionChangeRequestStatus.UnderReview => "در حال بررسی",
+        MissionChangeRequestStatus.Approved => "تأیید شده",
+        MissionChangeRequestStatus.Rejected => "رد شده",
+        _ => "نامشخص"
+    };
 
     /// <summary>شروع بررسی درخواست.</summary>
     private Task StartReviewAsync(Guid id) => ExecuteAsync(async actor =>
