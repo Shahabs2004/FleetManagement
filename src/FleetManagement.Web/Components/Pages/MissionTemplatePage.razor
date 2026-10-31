@@ -1,0 +1,140 @@
+@page "/admin/mission-template"
+@rendermode InteractiveServer
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "SystemAdministrator")]
+@using FleetManagement.Infrastructure.Configuration
+@using Microsoft.AspNetCore.Components.Authorization
+@inject MissionOrderTemplateService TemplateService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<MissionTemplatePage> Logger
+
+<PageTitle>الگوی دستور مأموریت</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">تنظیمات چاپ</div>
+    <h1>الگوی دستور مأموریت</h1>
+    <p>الگوی چاپ برای برگه A4 عمودی استفاده می‌شود. امضاها به‌صورت دستی روی نسخه چاپی انجام می‌شوند.</p>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="setup-info">@_message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="setup-error">@_error</div>
+    }
+
+    <div class="driver-editor">
+        <div class="driver-form-grid">
+            <div>
+                <label>عنوان سربرگ</label>
+                <input @bind="_headerTitle" maxlength="100" />
+            </div>
+            <div>
+                <label>نام سازمان</label>
+                <input @bind="_organizationName" maxlength="200" />
+            </div>
+            <div>
+                <label>عنوان امضای درخواست‌کننده</label>
+                <input @bind="_requesterSignature" maxlength="100" />
+            </div>
+            <div>
+                <label>عنوان امضای مسئول ناوگان</label>
+                <input @bind="_operatorSignature" maxlength="100" />
+            </div>
+            <div>
+                <label>عنوان امضای مقام تأییدکننده</label>
+                <input @bind="_approverSignature" maxlength="100" />
+            </div>
+            <div>
+                <label>عنوان امضای راننده</label>
+                <input @bind="_driverSignature" maxlength="100" />
+            </div>
+        </div>
+        <div class="mission-route-editor">
+            <label>متن مقدمه</label>
+            <textarea @bind="_introText" rows="3" maxlength="1000"></textarea>
+            <label>متن پایانی</label>
+            <textarea @bind="_footerText" rows="3" maxlength="1000"></textarea>
+        </div>
+        <div class="driver-actions">
+            <button type="button" class="primary-button" @onclick="SaveAsync" disabled="@_busy">ذخیره الگو</button>
+        </div>
+    </div>
+</section>
+
+@code {
+    private bool _busy;
+    private string _headerTitle = "دستور مأموریت";
+    private string _organizationName = string.Empty;
+    private string _introText = string.Empty;
+    private string _footerText = string.Empty;
+    private string _requesterSignature = "امضای درخواست‌کننده";
+    private string _operatorSignature = "امضای مسئول ناوگان";
+    private string _approverSignature = "امضای مقام تأییدکننده";
+    private string _driverSignature = "امضای راننده";
+    private string _actor = "unknown";
+    private string _message = string.Empty;
+    private string _error = string.Empty;
+
+    /// <summary>بارگذاری الگوی ذخیره‌شده.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            _actor = auth.User.FindFirst("fleet:username")?.Value ?? auth.User.Identity?.Name ?? "unknown";
+            var template = await TemplateService.GetAsync();
+            _headerTitle = template.HeaderTitle;
+            _organizationName = template.OrganizationName;
+            _introText = template.IntroText;
+            _footerText = template.FooterText;
+            _requesterSignature = template.RequesterSignatureLabel;
+            _operatorSignature = template.OperatorSignatureLabel;
+            _approverSignature = template.ApproverSignatureLabel;
+            _driverSignature = template.DriverSignatureLabel;
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception);
+        }
+    }
+
+    /// <summary>ذخیره الگوی جدید دستور مأموریت.</summary>
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        _error = string.Empty;
+        try
+        {
+            await TemplateService.SaveAsync(new MissionOrderTemplateConfiguration
+            {
+                HeaderTitle = _headerTitle,
+                OrganizationName = _organizationName,
+                IntroText = _introText,
+                FooterText = _footerText,
+                RequesterSignatureLabel = _requesterSignature,
+                OperatorSignatureLabel = _operatorSignature,
+                ApproverSignatureLabel = _approverSignature,
+                DriverSignatureLabel = _driverSignature
+            }, _actor);
+
+            _message = "الگوی دستور مأموریت ذخیره شد.";
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>ثبت خطا با شناسه پیگیری.</summary>
+    private void ReportError(Exception exception)
+    {
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "ذخیره الگوی دستور مأموریت ناموفق بود. شناسه پیگیری: {TrackingId}", trackingId);
+        _error = $"ذخیره الگو انجام نشد. شناسه پیگیری: {trackingId}";
+    }
+}
