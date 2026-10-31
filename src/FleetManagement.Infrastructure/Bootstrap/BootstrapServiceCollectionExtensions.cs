@@ -40,6 +40,7 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<DriverManagementService>();
         services.AddScoped<VehicleManagementService>();
         services.AddScoped<MissionManagementService>();
+        services.AddScoped<MissionOrderTemplateService>();
         services.AddHostedService<MissionLifecycleHostedService>();
         services.AddScoped<LocationManagementService>();
         services.AddScoped<NotificationService>();
