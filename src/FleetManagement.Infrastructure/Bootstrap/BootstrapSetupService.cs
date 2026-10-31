@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace FleetManagement.Infrastructure.Bootstrap;
@@ -9,21 +11,35 @@ namespace FleetManagement.Infrastructure.Bootstrap;
 /// </summary>
 public sealed class BootstrapSetupService(
     IBootstrapStateStore stateStore,
+    IConfiguration configuration,
+    IWebHostEnvironment environment,
     ILogger<BootstrapSetupService> logger)
 {
     private static readonly TimeSpan SetupCodeLifetime = TimeSpan.FromHours(24);
 
+    private readonly string _setupCodePath =
+        configuration["Bootstrap:SetupCodePath"]
+        ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "FleetManagement",
+            "setup-code.txt");
+
     /// <summary>
     /// در اولین اجرا کد راه‌اندازی را تولید می‌کند.
-    /// کد خام فقط یک بار در گزارش محلی سرور نوشته می‌شود؛
-    /// مقدار ذخیره‌شده در فایل bootstrap صرفاً هش کد است.
+    /// کد خام در فایل موقت با دسترسی محدود ذخیره می‌شود؛ فایل پس از ساخت مدیر حذف می‌شود.
     /// </summary>
     public async Task EnsureSetupCodeAsync(CancellationToken cancellationToken = default)
     {
         var state = await stateStore.ReadAsync(cancellationToken);
 
-        if (state.SetupCompleted
-            || !string.IsNullOrWhiteSpace(state.SetupCodeHash))
+        if (state.SetupCompleted)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(state.SetupCodeHash)
+            && state.SetupCodeExpiresAtUtc > DateTimeOffset.UtcNow
+            && File.Exists(_setupCodePath))
         {
             return;
         }
@@ -38,10 +54,16 @@ public sealed class BootstrapSetupService(
 
         await stateStore.WriteAsync(state, cancellationToken);
 
-        // این پیام فقط در گزارش محلی سرور ثبت می‌شود؛ هرگز به پاسخ HTTP یا UI ارسال نمی‌شود.
+        var directory = Path.GetDirectoryName(_setupCodePath)
+            ?? throw new InvalidOperationException("مسیر فایل کد راه‌اندازی معتبر نیست.");
+
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(_setupCodePath, setupCode, cancellationToken);
+
+        // فقط مسیر فایل ثبت می‌شود؛ خود کد در گزارش‌های برنامه نوشته نمی‌شود.
         logger.LogWarning(
-            "کد یک‌بارمصرف راه‌اندازی Fleet Management ایجاد شد. آن را فقط از گزارش محلی محافظت‌شده سرور دریافت کنید: {SetupCode}",
-            setupCode);
+            "کد اولیه راه‌اندازی ایجاد شد. مدیر فنی باید آن را از فایل محدودشده {SetupCodePath} دریافت کند.",
+            _setupCodePath);
     }
 
     /// <summary>
@@ -77,9 +99,7 @@ public sealed class BootstrapSetupService(
         if (string.IsNullOrWhiteSpace(state.SetupCodeHash)
             || state.SetupCodeExpiresAtUtc is null
             || state.SetupCodeExpiresAtUtc <= DateTimeOffset.UtcNow
-            || !CryptographicOperations.FixedTimeEquals(
-                Convert.FromHexString(state.SetupCodeHash),
-                Convert.FromHexString(HashSetupCode(setupCode))))
+            || !FixedTimeSetupCodeEquals(state.SetupCodeHash, setupCode))
         {
             throw new UnauthorizedAccessException("کد راه‌اندازی نامعتبر یا منقضی شده است.");
         }
@@ -89,12 +109,16 @@ public sealed class BootstrapSetupService(
         state.LocalAdministratorUsername = username.Trim();
         state.LocalAdministratorPasswordHash = passwordHash.Hash;
         state.LocalAdministratorPasswordSalt = passwordHash.Salt;
-
-        // کد راه‌اندازی پس از ایجاد مدیر محلی غیرقابل استفاده می‌شود.
         state.SetupCodeHash = null;
         state.SetupCodeExpiresAtUtc = null;
 
         await stateStore.WriteAsync(state, cancellationToken);
+
+        // حذف کد خام بلافاصله پس از استفاده موفق.
+        if (File.Exists(_setupCodePath))
+        {
+            File.Delete(_setupCodePath);
+        }
     }
 
     /// <summary>
@@ -147,5 +171,19 @@ public sealed class BootstrapSetupService(
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(setupCode));
         return Convert.ToHexString(bytes);
+    }
+
+    private static bool FixedTimeSetupCodeEquals(string expectedHash, string suppliedCode)
+    {
+        try
+        {
+            var expected = Convert.FromHexString(expectedHash);
+            var actual = Convert.FromHexString(HashSetupCode(suppliedCode));
+            return CryptographicOperations.FixedTimeEquals(expected, actual);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 }
