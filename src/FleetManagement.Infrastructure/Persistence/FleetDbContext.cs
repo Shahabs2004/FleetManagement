@@ -3,6 +3,7 @@ using FleetManagement.Domain.Drivers;
 using FleetManagement.Domain.Vehicles;
 using FleetManagement.Domain.Users;
 using FleetManagement.Domain.Sessions;
+using FleetManagement.Domain.Auditing;
 using Microsoft.EntityFrameworkCore;
 
 namespace FleetManagement.Infrastructure.Persistence;
@@ -24,6 +25,9 @@ public sealed class FleetDbContext(DbContextOptions<FleetDbContext> options)
 
     /// <summary>سابقه دائمی ورود، خروج و تلاش‌های ناموفق کاربران.</summary>
     public DbSet<UserSession> UserSessions => Set<UserSession>();
+
+    /// <summary>رویدادهای دائمی ممیزی عملیات مهم سامانه.</summary>
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
     /// <summary>مجموعه تنظیمات عمومی و ماژولی سامانه.</summary>
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
