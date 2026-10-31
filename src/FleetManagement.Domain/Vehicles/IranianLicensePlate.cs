@@ -23,7 +23,9 @@ public static partial class IranianLicensePlate
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
         var builder = new StringBuilder(value.Length);
 
-        foreach (var character in value.Trim())
+        var normalizedInput = value.Trim().Replace("ایران", string.Empty, StringComparison.OrdinalIgnoreCase);
+
+        foreach (var character in normalizedInput)
         {
             if (char.IsWhiteSpace(character) || character is '-' or 'ـ')
             {
@@ -71,6 +73,6 @@ public static partial class IranianLicensePlate
     }
 
     /// <summary>الگوی ساختار پلاک ملی خودرو.</summary>
-    [GeneratedRegex(@"^\d{2}[ابپتثجچحخدذرزژسشصضطظعغفقکگلمنوهی]\d{3}\d{2}$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^\d{2}(?:الف|[ابپتثجچحخدذرزژسشصضطظعغفقکگلمنوهی])\d{3}\d{2}$", RegexOptions.CultureInvariant)]
     private static partial Regex PlatePattern();
 }
