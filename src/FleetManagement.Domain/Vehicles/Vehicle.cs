@@ -45,7 +45,7 @@ public sealed class Vehicle : Entity
     {
         Brand = RequiredText(brand, nameof(brand));
         Model = RequiredText(model, nameof(model));
-        LicensePlate = RequiredText(licensePlate, nameof(licensePlate));
+        LicensePlate = IranianLicensePlate.Normalize(licensePlate);
     }
 
     /// <summary>
