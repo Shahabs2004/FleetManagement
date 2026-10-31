@@ -918,3 +918,181 @@ h1 {
         break-after: avoid;
     }
 }
+
+
+/* قالب چاپ دستور مأموریت A4 */
+.mission-print-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin: 16px auto;
+    max-width: 210mm;
+}
+
+.mission-print-toolbar .primary-button {
+    width: auto;
+    margin: 0;
+}
+
+.mission-order-paper {
+    box-sizing: border-box;
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto 24px;
+    padding: 14mm;
+    background: #fff;
+    color: #172b22;
+    box-shadow: 0 4px 24px rgb(20 50 35 / 12%);
+    font-family: Tahoma, Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.8;
+}
+
+.mission-order-header {
+    display: grid;
+    grid-template-columns: 28mm 1fr 38mm;
+    align-items: center;
+    gap: 8mm;
+    text-align: center;
+}
+
+.mission-order-header h1 {
+    margin: 0;
+    color: #245346;
+    font-size: 20pt;
+}
+
+.mission-order-header h2 {
+    margin: 4px 0;
+    color: #4d6558;
+    font-size: 12pt;
+}
+
+.mission-order-header p {
+    margin: 4px 0;
+}
+
+.mission-order-logo {
+    max-width: 26mm;
+    max-height: 26mm;
+    object-fit: contain;
+}
+
+.mission-order-number {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 8px;
+    border: 1px solid #c5ad6a;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.mission-order-number strong {
+    color: #245346;
+}
+
+.mission-order-number span {
+    font-weight: 700;
+    font-size: 13pt;
+}
+
+.mission-order-divider {
+    height: 2px;
+    margin: 8mm 0 5mm;
+    background: #c5ad6a;
+}
+
+.mission-order-paper h3 {
+    margin: 6mm 0 3mm;
+    color: #245346;
+    font-size: 12pt;
+}
+
+.mission-order-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.mission-order-table th,
+.mission-order-table td {
+    padding: 7px 9px;
+    border: 1px solid #b8c7bd;
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+.mission-order-table th {
+    width: 18%;
+    background: #f0f5f1;
+    color: #245346;
+}
+
+.mission-order-route {
+    margin: 0;
+    padding-right: 24px;
+}
+
+.mission-order-route li {
+    margin: 5px 0;
+}
+
+.mission-order-purpose,
+.mission-order-description,
+.mission-order-footer-text {
+    min-height: 10mm;
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+.mission-order-signatures {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12mm 8mm;
+    margin-top: 18mm;
+}
+
+.mission-order-signatures > div {
+    display: flex;
+    min-height: 28mm;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border: 1px solid #b8c7bd;
+    text-align: center;
+}
+
+.mission-order-signatures span {
+    color: #6c7d72;
+    font-size: 9pt;
+}
+
+.mission-order-footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 12mm;
+    padding-top: 4mm;
+    border-top: 1px solid #b8c7bd;
+    color: #617368;
+    font-size: 8.5pt;
+}
+
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 0;
+    }
+
+    .mission-print-toolbar {
+        display: none !important;
+    }
+
+    .mission-order-paper {
+        width: 210mm;
+        min-height: 297mm;
+        margin: 0;
+        padding: 14mm;
+        box-shadow: none;
+        break-after: avoid;
+    }
+}
