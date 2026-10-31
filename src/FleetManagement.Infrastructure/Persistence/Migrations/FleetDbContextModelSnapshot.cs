@@ -84,6 +84,56 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
             entity.ToTable("Vehicles");
         });
 
+        modelBuilder.Entity("FleetManagement.Domain.Users.ApplicationUser", entity =>
+        {
+            entity.Property<Guid>("Id")
+                .ValueGeneratedOnAdd()
+                .HasColumnType("uniqueidentifier");
+
+            entity.Property<string>("Username")
+                .IsRequired()
+                .HasMaxLength(64)
+                .UseCollation("Latin1_General_100_CI_AS")
+                .HasColumnType("nvarchar(64)");
+
+            entity.Property<string>("FirstName")
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnType("nvarchar(100)");
+
+            entity.Property<string>("LastName")
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnType("nvarchar(100)");
+
+            entity.Property<string>("OrganizationalUnit")
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnType("nvarchar(200)");
+
+            entity.Property<bool>("IsOrganizationalUnitManuallyOverridden")
+                .HasColumnType("bit");
+
+            entity.Property<string>("DirectoryDistinguishedName")
+                .IsRequired()
+                .HasMaxLength(2048)
+                .HasColumnType("nvarchar(2048)");
+
+            entity.Property<bool>("IsDisabled")
+                .HasColumnType("bit");
+
+            entity.Property<DateTimeOffset>("CreatedAtUtc")
+                .HasColumnType("datetimeoffset");
+
+            entity.Property<DateTimeOffset>("LastDirectorySyncAtUtc")
+                .HasColumnType("datetimeoffset");
+
+            entity.HasKey("Id");
+            entity.HasIndex("DirectoryDistinguishedName").IsUnique();
+            entity.HasIndex("Username").IsUnique();
+            entity.ToTable("ApplicationUsers");
+        });
+
         modelBuilder.Entity("FleetManagement.Domain.Configuration.SystemSetting", entity =>
         {
             entity.Property<Guid>("Id")
