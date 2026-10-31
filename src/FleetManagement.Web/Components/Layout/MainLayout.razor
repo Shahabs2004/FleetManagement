@@ -20,6 +20,11 @@
                         <a href="/admin/security">نقش‌ها و مجوزها</a>
                     </Authorized>
                 </AuthorizeView>
+                <AuthorizeView Policy="Permission:security.sessions.view">
+                    <Authorized Context="sessionPermissionContext">
+                        <a href="/admin/sessions">سوابق ورود</a>
+                    </Authorized>
+                </AuthorizeView>
                 <a href="/logout">خروج</a>
             </nav>
         </Authorized>
