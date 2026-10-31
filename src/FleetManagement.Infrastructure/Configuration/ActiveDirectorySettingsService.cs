@@ -8,6 +8,7 @@ namespace FleetManagement.Infrastructure.Configuration;
 public sealed class ActiveDirectorySettingsService(ISystemSettingsStore settingsStore)
 {
     private const string SettingKey = "Directory.ActiveDirectory";
+    private const string SkippedSettingKey = "Directory.ActiveDirectory.SetupSkipped";
 
     /// <summary>خواندن تنظیمات فعلی AD.</summary>
     public Task<ActiveDirectoryConfiguration?> GetAsync(
@@ -18,8 +19,20 @@ public sealed class ActiveDirectorySettingsService(ISystemSettingsStore settings
             cancellationToken);
     }
 
+    /// <summary>بررسی اینکه کاربر در ویزارد از پیکربندی AD عبور کرده است.</summary>
+    public async Task<bool> IsSkippedAsync(CancellationToken cancellationToken = default)
+    {
+        return await settingsStore.GetAsync<bool>(SkippedSettingKey, cancellationToken);
+    }
+
+    /// <summary>ثبت عبور موقت از مرحله AD؛ ورود عادی تا پیکربندی واقعی مسدود می‌ماند.</summary>
+    public Task MarkSkippedAsync(CancellationToken cancellationToken = default)
+    {
+        return settingsStore.SetAsync(SkippedSettingKey, true, cancellationToken);
+    }
+
     /// <summary>اعتبارسنجی اولیه و ذخیره تنظیمات AD.</summary>
-    public Task SaveAsync(
+    public async Task SaveAsync(
         ActiveDirectoryConfiguration configuration,
         CancellationToken cancellationToken = default)
     {
@@ -48,9 +61,14 @@ public sealed class ActiveDirectorySettingsService(ISystemSettingsStore settings
                 nameof(configuration));
         }
 
-        return settingsStore.SetAsync(
+        await settingsStore.SetAsync(
             SettingKey,
             configuration,
+            cancellationToken);
+
+        await settingsStore.SetAsync(
+            SkippedSettingKey,
+            false,
             cancellationToken);
     }
 }
