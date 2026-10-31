@@ -20,6 +20,9 @@ public sealed class FleetDbContext(DbContextOptions<FleetDbContext> options)
     /// <summary>فهرست مکان‌های مشترک و پیشنهادهای تأییدنشده.</summary>
     public DbSet<Location> Locations => Set<Location>();
 
+    /// <summary>درخواست‌های تغییر مأموریت پس از تأیید.</summary>
+    public DbSet<MissionChangeRequest> MissionChangeRequests => Set<MissionChangeRequest>();
+
     /// <summary>درخواست‌ها و مأموریت‌های ثبت‌شده.</summary>
     public DbSet<Mission> Missions => Set<Mission>();
 
