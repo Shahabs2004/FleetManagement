@@ -23,10 +23,17 @@ public sealed class SessionExpiryHostedService(
             try
             {
                 using var scope = scopeFactory.CreateScope();
-                var sessionService = scope.ServiceProvider
-                    .GetRequiredService<UserSessionService>();
+                var availability = scope.ServiceProvider
+                    .GetRequiredService<SqlAvailabilityService>();
 
-                await sessionService.ExpireStaleSessionsAsync(stoppingToken);
+                // در قطعی SQL، سرویس پس‌زمینه منتظر بازیابی می‌ماند و خطای تکراری تولید نمی‌کند.
+                if (await availability.IsAvailableAsync())
+                {
+                    var sessionService = scope.ServiceProvider
+                        .GetRequiredService<UserSessionService>();
+
+                    await sessionService.ExpireStaleSessionsAsync(stoppingToken);
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
