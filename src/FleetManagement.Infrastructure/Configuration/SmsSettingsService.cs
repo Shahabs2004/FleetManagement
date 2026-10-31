@@ -25,6 +25,29 @@ public sealed class SmsSettingsService(ISystemSettingsStore settingsStore)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
+        ArgumentException.ThrowIfNullOrWhiteSpace(configuration.Organization);
+        ArgumentException.ThrowIfNullOrWhiteSpace(configuration.Username);
+        ArgumentException.ThrowIfNullOrWhiteSpace(configuration.Password);
+        ArgumentException.ThrowIfNullOrWhiteSpace(configuration.SourceNumber);
+
+        if (configuration.SourceNumber.Length > 20)
+        {
+            throw new ArgumentException("شماره فرستنده معتبر نیست.", nameof(configuration));
+        }
+
+        if (configuration.EventTemplates.Count == 0)
+        {
+            configuration.EventTemplates = SmsProviderConfiguration.CreateDefault().EventTemplates;
+        }
+
+        if (configuration.EventTemplates.Any(template =>
+                !Enum.IsDefined(template.EventType)
+                || !Enum.IsDefined(template.RecipientRule)
+                || (template.IsEnabled && string.IsNullOrWhiteSpace(template.Template))))
+        {
+            throw new ArgumentException("تنظیم یکی از قالب‌های پیامکی معتبر نیست.", nameof(configuration));
+        }
+
         if (configuration.MaximumRetryCount is < 0 or > 20
             || configuration.RetryIntervalSeconds is < 5 or > 86400
             || configuration.StatusPollingIntervalSeconds is < 5 or > 86400
