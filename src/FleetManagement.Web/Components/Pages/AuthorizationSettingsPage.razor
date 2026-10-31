@@ -77,6 +77,12 @@
         </div>
 
         <div class="admin-section">
+            <h2>مجوزهای مستقیم کاربران</h2>
+            <p>هر خط به شکل نام کاربری دامنه|کلید مجوز|Grant یا Deny باشد. این مجوز مستقل از نقش‌های کاربر است و Deny بر تمام اعطاها اولویت دارد.</p>
+            <InputTextArea @bind-Value="_manualPermissionsText" />
+        </div>
+
+        <div class="admin-section">
             <h2>ماتریس مجوز نقش‌ها</h2>
             <p>هر خط به شکل کلید نقش|کلید مجوز|Grant یا Deny باشد. نمونه: FleetManager|missions.delete|Deny. مجوز * همه عملیات را پوشش می‌دهد و الگوی missions.* تمام عملیات ماژول مأموریت را شامل می‌شود.</p>
             <InputTextArea @bind-Value="_permissionsText" />
@@ -102,6 +108,7 @@
     private readonly NewRoleModel _newRole = new();
     private string _groupMappingsText = string.Empty;
     private string _manualRolesText = string.Empty;
+    private string _manualPermissionsText = string.Empty;
     private string _permissionsText = string.Empty;
 
     /// <summary>
@@ -138,6 +145,11 @@
             Environment.NewLine,
             _configuration.ManualUserRoles.Select(mapping =>
                 $"{mapping.Username}|{string.Join(",", mapping.RoleKeys)}"));
+
+        _manualPermissionsText = string.Join(
+            Environment.NewLine,
+            _configuration.ManualUserPermissions.SelectMany(mapping => mapping.Permissions.Select(permission =>
+                $"{mapping.Username}|{permission.Permission}|{permission.Effect}")));
 
         _permissionsText = string.Join(
             Environment.NewLine,
@@ -250,6 +262,37 @@
                 })
                 .ToList();
 
+            var manualPermissions = ParseLines(_manualPermissionsText)
+                .Select(line =>
+                {
+                    var parts = line.Split('|', StringSplitOptions.TrimEntries);
+                    if (parts.Length != 3
+                        || string.IsNullOrWhiteSpace(parts[0])
+                        || string.IsNullOrWhiteSpace(parts[1])
+                        || !Enum.TryParse<PermissionEffect>(parts[2], true, out var effect)
+                        || !Enum.IsDefined(effect))
+                    {
+                        throw new InvalidOperationException($"مجوز مستقیم کاربر نامعتبر است: {line}");
+                    }
+
+                    return new
+                    {
+                        Username = parts[0],
+                        Permission = new RolePermissionConfiguration
+                        {
+                            Permission = parts[1],
+                            Effect = effect
+                        }
+                    };
+                })
+                .GroupBy(item => item.Username, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new ManualUserPermissionMapping
+                {
+                    Username = group.Key,
+                    Permissions = group.Select(item => item.Permission).ToList()
+                })
+                .ToList();
+
             var permissionsByRole = _configuration.Roles.ToDictionary(
                 role => role.Key,
                 _ => new List<RolePermissionConfiguration>(),
@@ -283,6 +326,7 @@
 
             _configuration.GroupMappings = groupMappings;
             _configuration.ManualUserRoles = manualRoles;
+            _configuration.ManualUserPermissions = manualPermissions;
 
             foreach (var role in _configuration.Roles)
             {
