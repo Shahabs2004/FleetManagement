@@ -103,3 +103,116 @@ h1 {
     text-align: center;
     font-size: 12px;
 }
+
+/* چیدمان و فرم‌های ویزارد راه‌اندازی اولیه */
+.setup-panel {
+    width: min(760px, 100%);
+    margin: 0 auto;
+    padding: clamp(24px, 5vw, 44px);
+    border: 1px solid #e0e7e1;
+    border-radius: 22px;
+    background: #fff;
+    box-shadow: 0 12px 36px rgb(24 51 45 / 6%);
+}
+
+.setup-intro,
+.setup-step p {
+    color: #5b6c65;
+    line-height: 2;
+}
+
+.setup-step {
+    margin-top: 28px;
+    padding-top: 22px;
+    border-top: 1px solid #e6ece7;
+}
+
+.step-caption {
+    color: #94752c;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.setup-panel form {
+    display: grid;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.setup-panel label {
+    margin-top: 8px;
+    color: #294b40;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.setup-panel input:not([type="checkbox"]) {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 1px solid #d7e1da;
+    border-radius: 9px;
+    color: #18332d;
+    background: #fbfcfb;
+    font: inherit;
+    direction: rtl;
+}
+
+.setup-panel input:focus {
+    outline: 2px solid #d8bd75;
+    outline-offset: 1px;
+}
+
+.checkbox-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 400 !important;
+}
+
+.primary-button {
+    min-height: 46px;
+    margin-top: 18px;
+    border: 0;
+    border-radius: 10px;
+    color: #fff;
+    background: #16483d;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.primary-button:disabled {
+    opacity: .6;
+    cursor: wait;
+}
+
+.setup-success,
+.setup-info,
+.setup-error {
+    margin-top: 24px;
+    padding: 16px;
+    border-radius: 12px;
+    line-height: 1.9;
+}
+
+.setup-success {
+    color: #205a3d;
+    background: #edf7f0;
+}
+
+.setup-info {
+    color: #345a4b;
+    background: #eff5f1;
+}
+
+.setup-error {
+    color: #8a3434;
+    background: #fff1ef;
+}
+
+.validation-message,
+.validation-errors {
+    color: #a13f35;
+    font-size: 13px;
+}
