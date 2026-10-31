@@ -1,3 +1,5 @@
+using FleetManagement.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FleetManagement.Infrastructure.Bootstrap;
@@ -8,7 +10,7 @@ namespace FleetManagement.Infrastructure.Bootstrap;
 public static class BootstrapServiceCollectionExtensions
 {
     /// <summary>
-    /// سرویس‌های bootstrap را ثبت می‌کند.
+    /// سرویس‌های bootstrap و کارخانه اتصال پایگاه داده را ثبت می‌کند.
     /// </summary>
     public static IServiceCollection AddFleetBootstrap(this IServiceCollection services)
     {
@@ -16,6 +18,11 @@ public static class BootstrapServiceCollectionExtensions
         services.AddSingleton<BootstrapSetupService>();
         services.AddSingleton<SqlConnectionSetupService>();
         services.AddSingleton<SqlDatabaseInitializer>();
+        services.AddSingleton<BootstrapDbContextFactory>();
+
+        // اتصال از فایل محلی محافظت‌شده خوانده می‌شود تا پس از تکمیل ویزارد نیاز به Restart نباشد.
+        services.AddSingleton<IDbContextFactory<FleetDbContext>>(
+            provider => provider.GetRequiredService<BootstrapDbContextFactory>());
 
         return services;
     }
