@@ -35,6 +35,10 @@ public sealed class ApplicationUserConfiguration : IEntityTypeConfiguration<Appl
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(user => user.DirectoryOrganizationalUnit)
+            .HasMaxLength(200)
+            .IsRequired();
+
         builder.Property(user => user.IsOrganizationalUnitManuallyOverridden)
             .IsRequired();
 
