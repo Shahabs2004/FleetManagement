@@ -134,6 +134,22 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
             entity.ToTable("ApplicationUsers");
         });
 
+        modelBuilder.Entity("FleetManagement.Domain.Locations.Location", entity =>
+        {
+            entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uniqueidentifier");
+            entity.Property<string>("Name").IsRequired().HasMaxLength(200).HasColumnType("nvarchar(200)");
+            entity.Property<int>("Status").HasColumnType("int");
+            entity.Property<string>("ProposedBy").IsRequired().HasMaxLength(64).HasColumnType("nvarchar(64)");
+            entity.Property<string>("ReviewedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            entity.Property<string>("ReviewReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            entity.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<DateTimeOffset?>("ReviewedAtUtc").HasColumnType("datetimeoffset");
+            entity.HasKey("Id");
+            entity.HasIndex("Name");
+            entity.HasIndex("Status", "CreatedAtUtc");
+            entity.ToTable("Locations");
+        });
+
         modelBuilder.Entity("FleetManagement.Domain.Missions.Mission", entity =>
         {
             entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uniqueidentifier");
