@@ -15,6 +15,11 @@
     <AuthorizeView>
         <Authorized Context="authenticatedContext">
             <nav class="admin-navigation" aria-label="ناوبری سامانه">
+                <AuthorizeView Policy="Permission:vehicles.view">
+                    <Authorized Context="vehiclesPermissionContext">
+                        <a href="/vehicles">خودروها</a>
+                    </Authorized>
+                </AuthorizeView>
                 <AuthorizeView Policy="Permission:drivers.view">
                     <Authorized Context="driversPermissionContext">
                         <a href="/drivers">رانندگان</a>
