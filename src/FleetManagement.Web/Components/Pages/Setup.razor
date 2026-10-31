@@ -354,7 +354,12 @@
             _adModel.AllowedGroupsText = string.Join(
                 Environment.NewLine,
                 savedDirectorySettings.AllowedGroups.Select(group => $"{group.Name}|{group.DistinguishedName}"));
-            _adReady = savedDirectorySettings.IsConnectionVerified;
+            _adReady = savedDirectorySettings.IsConnectionVerified
+                || await ActiveDirectorySettings.IsSkippedAsync();
+        }
+        else
+        {
+            _adReady = await ActiveDirectorySettings.IsSkippedAsync();
         }
 
         var savedOrganization = await OrganizationSettings.GetAsync();
@@ -378,6 +383,10 @@
             _smsModel.MaximumStatusPollingAttempts = savedSms.MaximumStatusPollingAttempts;
             _smsModel.ReminderLeadMinutes = savedSms.ReminderLeadMinutes;
             _smsReady = true;
+        }
+        else
+        {
+            _smsReady = await SmsSettings.IsSkippedAsync();
         }
     }
 
@@ -575,12 +584,24 @@
     /// تکمیل راه‌اندازی با AD غیرفعال یا موقتاً در دسترس‌نبودن آن.
     /// ورود کاربران عادی تا تنظیم موفق AD مسدود خواهد بود.
     /// </summary>
-    private Task SkipActiveDirectoryAsync()
+    private async Task SkipActiveDirectoryAsync()
     {
-        _adReady = true;
-        _message = "مرحله AD رد شد. ورود کاربران عادی تا پیکربندی AD غیرفعال خواهد بود. اکنون مشخصات سازمان را ثبت کنید.";
-        _isError = false;
-        return Task.CompletedTask;
+        _isBusy = true;
+        try
+        {
+            await ActiveDirectorySettings.MarkSkippedAsync();
+            _adReady = true;
+            _message = "مرحله AD رد شد. ورود کاربران عادی تا پیکربندی AD غیرفعال خواهد بود. اکنون مشخصات سازمان را ثبت کنید.";
+            _isError = false;
+        }
+        catch (Exception exception)
+        {
+            ShowUnexpectedError(exception, "ثبت عبور از مرحله AD");
+        }
+        finally
+        {
+            _isBusy = false;
+        }
     }
 
     /// <summary>
@@ -742,10 +763,30 @@
             throw new UnauthorizedAccessException("فقط مدیر فنی می‌تواند از مرحله پیامک عبور کند.");
         }
 
-        _smsReady = true;
-        _message = "تنظیم پیامک رد شد؛ سامانه بدون ارسال پیامک راه‌اندازی خواهد شد.";
-        _isError = false;
-        return Task.CompletedTask;
+        return MarkSmsSkippedAsync();
+    }
+
+    /// <summary>
+    /// ثبت ماندگار عبور مدیر فنی از تنظیم پیامک.
+    /// </summary>
+    private async Task MarkSmsSkippedAsync()
+    {
+        _isBusy = true;
+        try
+        {
+            await SmsSettings.MarkSkippedAsync();
+            _smsReady = true;
+            _message = "تنظیم پیامک رد شد؛ سامانه بدون ارسال پیامک راه‌اندازی خواهد شد.";
+            _isError = false;
+        }
+        catch (Exception exception)
+        {
+            ShowUnexpectedError(exception, "ثبت عبور از مرحله پیامک");
+        }
+        finally
+        {
+            _isBusy = false;
+        }
     }
 
     /// <summary>
@@ -756,6 +797,11 @@
         _isBusy = true;
         try
         {
+            if (!_administratorVerified || !_sqlReady || !_adReady || !_organizationReady || !_smsReady)
+            {
+                throw new InvalidOperationException("همه مراحل ضروری راه‌اندازی باید تکمیل یا به‌صورت مجاز رد شده باشند.");
+            }
+
             await BootstrapSetup.CompleteSetupAsync();
             _setupCompleted = true;
             _message = "راه‌اندازی اولیه تکمیل شد و مسیر ویزارد قفل شد.";
