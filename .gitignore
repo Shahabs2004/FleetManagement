@@ -1,0 +1,37 @@
+# خروجی‌های ساخت
+**/bin/
+**/obj/
+.artifacts/
+
+# تنظیمات محلی و محرمانه
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/secrets.json
+.env
+.env.*
+!.env.example
+
+# فایل‌های محیط توسعه
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# گواهی‌ها و کلیدها
+*.pfx
+*.p12
+*.key
+*.pem
+
+# پایگاه داده و نسخه پشتیبان
+*.mdf
+*.ldf
+*.bak
+*.trn
+
+# گزارش‌ها
+*.log
+logs/
