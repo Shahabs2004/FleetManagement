@@ -202,6 +202,27 @@ public sealed class MissionManagementService(
         await RecordMissionAuditAsync(actor, "Cancel", mission, "Success", cancellationToken, reason);
     }
 
+    /// <summary>خاتمه زودهنگام مأموریت با آزادسازی فوری منابع.</summary>
+    public async Task EndEarlyAsync(
+        Guid missionId,
+        DateTimeOffset endedAtUtc,
+        string reason,
+        string actor,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var mission = await GetMissionAsync(db, missionId, cancellationToken);
+        var before = new { mission.Status, mission.PlannedEndAtUtc, mission.ActualEndAtUtc };
+        mission.EndEarly(endedAtUtc, reason);
+        await db.SaveChangesAsync(cancellationToken);
+
+        await auditLog.RecordAsync(
+            actor, "EndEarly", "Mission", mission.Id.ToString(), "Success", reason,
+            beforeJson: JsonSerializer.Serialize(before),
+            afterJson: JsonSerializer.Serialize(new { mission.Status, mission.ActualEndAtUtc }),
+            cancellationToken: cancellationToken);
+    }
+
     /// <summary>درخواست انصراف توسط درخواست‌کننده.</summary>
     public async Task RequestWithdrawalAsync(
         Guid missionId,
