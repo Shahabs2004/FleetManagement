@@ -15,7 +15,8 @@ public sealed class FleetSessionTrackingMiddleware(
     public async Task InvokeAsync(
         HttpContext context,
         SessionActivityTracker activityTracker,
-        UserSessionService sessionService)
+        UserSessionService sessionService,
+        ILogger<FleetSessionTrackingMiddleware> logger)
     {
         var rawSessionId = context.User.FindFirstValue("fleet:session-id");
 
@@ -27,9 +28,10 @@ public sealed class FleetSessionTrackingMiddleware(
             {
                 await sessionService.TouchAsync(sessionId, context.RequestAborted);
             }
-            catch (Exception)
+            catch (Exception exception)
             {
                 // خرابی ثبت سابقه نباید درخواست عملیاتی کاربر را متوقف کند.
+                logger.LogWarning(exception, "ثبت آخرین فعالیت نشست کاربر انجام نشد.");
             }
         }
 
