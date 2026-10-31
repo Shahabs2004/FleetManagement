@@ -43,6 +43,11 @@
                         <a href="/admin/security">نقش‌ها و مجوزها</a>
                     </Authorized>
                 </AuthorizeView>
+                <AuthorizeView Policy="Permission:reports.view">
+                    <Authorized Context="reportsPermissionContext">
+                        <a href="/reports/missions">گزارش عملکرد</a>
+                    </Authorized>
+                </AuthorizeView>
                 <AuthorizeView Policy="Permission:security.audit.view">
                     <Authorized Context="auditPermissionContext">
                         <a href="/admin/audit">گزارش ممیزی</a>
