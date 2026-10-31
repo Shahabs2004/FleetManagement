@@ -330,18 +330,27 @@ public sealed class MissionManagementService(
         var dueMissions = await db.Missions
             .Where(mission =>
                 (mission.Status == MissionStatus.Confirmed && mission.PlannedStartAtUtc <= now)
-                || (mission.Status == MissionStatus.Running && mission.PlannedEndAtUtc <= now))
+                || ((mission.Status == MissionStatus.Running || mission.Status == MissionStatus.WithdrawalPending)
+                    && mission.PlannedEndAtUtc <= now))
             .ToListAsync(cancellationToken);
 
+        var auditActions = new List<(Mission Mission, string Action)>();
         foreach (var mission in dueMissions)
         {
             if (mission.Status == MissionStatus.Confirmed)
             {
                 mission.StartAutomatically(now);
+                auditActions.Add((mission, "AutoStart"));
             }
             else if (mission.Status == MissionStatus.Running)
             {
                 mission.CompleteAutomatically();
+                auditActions.Add((mission, "AutoComplete"));
+            }
+            else if (mission.Status == MissionStatus.WithdrawalPending)
+            {
+                mission.AutoCloseExpiredWithdrawal(now);
+                auditActions.Add((mission, "AutoCloseWithdrawal"));
             }
         }
 
@@ -352,12 +361,12 @@ public sealed class MissionManagementService(
 
         await db.SaveChangesAsync(cancellationToken);
 
-        foreach (var mission in dueMissions)
+        foreach (var item in auditActions)
         {
             await RecordMissionAuditAsync(
                 "system",
-                mission.ActualEndAtUtc.HasValue ? "AutoComplete" : "AutoStart",
-                mission,
+                item.Action,
+                item.Mission,
                 "Success",
                 cancellationToken);
         }
@@ -446,7 +455,12 @@ public sealed class MissionManagementService(
         DateTimeOffset? proposedEnd = null)
     {
         var end = proposedEnd ?? current.PlannedEndAtUtc;
-        var blockingStatuses = new[] { MissionStatus.Confirmed, MissionStatus.Running };
+        var blockingStatuses = new[]
+        {
+            MissionStatus.Confirmed,
+            MissionStatus.Running,
+            MissionStatus.WithdrawalPending
+        };
 
         var candidates = await db.Missions
             .Where(existing =>
