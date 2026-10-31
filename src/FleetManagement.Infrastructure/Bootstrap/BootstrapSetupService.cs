@@ -122,15 +122,8 @@ public sealed class BootstrapSetupService(
         state.LocalAdministratorPasswordSalt = passwordHash.Salt;
         state.SetupCodeHash = null;
         state.SetupCodeExpiresAtUtc = null;
-        state.TechnicalAdministratorCodeHash = null;
-        state.TechnicalAdministratorCodeExpiresAtUtc = null;
 
         await stateStore.WriteAsync(state, cancellationToken);
-
-        if (File.Exists(_technicalAdministratorCodePath))
-        {
-            File.Delete(_technicalAdministratorCodePath);
-        }
 
         // حذف کد خام بلافاصله پس از استفاده موفق.
         if (File.Exists(_setupCodePath))
@@ -254,6 +247,8 @@ public sealed class BootstrapSetupService(
         state.SetupCompleted = true;
         state.SetupCodeHash = null;
         state.SetupCodeExpiresAtUtc = null;
+        state.TechnicalAdministratorCodeHash = null;
+        state.TechnicalAdministratorCodeExpiresAtUtc = null;
 
         await stateStore.WriteAsync(state, cancellationToken);
     }
