@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FleetManagement.Infrastructure.Configuration;
+using FleetManagement.Infrastructure.Bootstrap;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
