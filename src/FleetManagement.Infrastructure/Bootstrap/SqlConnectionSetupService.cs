@@ -24,6 +24,14 @@ public sealed class SqlConnectionSetupService(IBootstrapStateStore stateStore)
         ArgumentException.ThrowIfNullOrWhiteSpace(username);
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
 
+        var databaseName = database.Trim();
+
+        if (databaseName.Length > 128
+            || databaseName.IndexOfAny(['/', '\\', '\'', '"', '[', ']']) >= 0)
+        {
+            throw new ArgumentException("نام پایگاه داده معتبر نیست.", nameof(database));
+        }
+
         var builder = new SqlConnectionStringBuilder
         {
             DataSource = server.Trim(),
@@ -51,12 +59,12 @@ public sealed class SqlConnectionSetupService(IBootstrapStateStore stateStore)
                     EXEC(@createDatabaseSql);
                 END;
                 """;
-            command.Parameters.AddWithValue("@databaseName", database.Trim());
+            command.Parameters.AddWithValue("@databaseName", databaseName);
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
         // پس از ایجاد، اتصال به پایگاه داده هدف نیز آزمایش می‌شود.
-        builder.InitialCatalog = database.Trim();
+        builder.InitialCatalog = databaseName;
 
         await using (var connection = new SqlConnection(builder.ConnectionString))
         {
