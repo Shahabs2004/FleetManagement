@@ -31,6 +31,7 @@ public static class FleetAuthenticationEndpoints
         HttpContext context,
         IAntiforgery antiforgery,
         ActiveDirectoryAuthenticator authenticator,
+        DirectoryUserProvisioningService userProvisioning,
         ILoggerFactory loggerFactory)
     {
         if (!await ValidateAntiforgeryAsync(context, antiforgery))
@@ -54,7 +55,16 @@ public static class FleetAuthenticationEndpoints
                 return Results.Redirect($"/login?error={MapError(result.Status)}");
             }
 
-            await IssueApplicationCookieAsync(context, result.User);
+            var provisionedUser = await userProvisioning.SynchronizeAsync(
+                result.User,
+                context.RequestAborted);
+
+            if (!provisionedUser.CanSignIn)
+            {
+                return Results.Redirect("/login?error=app-disabled");
+            }
+
+            await IssueApplicationCookieAsync(context, result.User, provisionedUser.UserId);
             return Results.Redirect("/");
         }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
@@ -83,6 +93,7 @@ public static class FleetAuthenticationEndpoints
         HttpContext context,
         IAntiforgery antiforgery,
         ActiveDirectoryAuthenticator authenticator,
+        DirectoryUserProvisioningService userProvisioning,
         ILoggerFactory loggerFactory)
     {
         if (!await ValidateAntiforgeryAsync(context, antiforgery))
@@ -121,7 +132,16 @@ public static class FleetAuthenticationEndpoints
                 return Results.Redirect($"/login?error={MapError(result.Status)}");
             }
 
-            await IssueApplicationCookieAsync(context, result.User);
+            var provisionedUser = await userProvisioning.SynchronizeAsync(
+                result.User,
+                context.RequestAborted);
+
+            if (!provisionedUser.CanSignIn)
+            {
+                return Results.Redirect("/login?error=app-disabled");
+            }
+
+            await IssueApplicationCookieAsync(context, result.User, provisionedUser.UserId);
             return Results.Redirect("/");
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -139,11 +159,13 @@ public static class FleetAuthenticationEndpoints
     /// </summary>
     private static async Task IssueApplicationCookieAsync(
         HttpContext context,
-        DirectoryUserProfile user)
+        DirectoryUserProfile user,
+        Guid applicationUserId)
     {
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.Username),
+            new("fleet:user-id", applicationUserId.ToString()),
             new(ClaimTypes.Name, string.IsNullOrWhiteSpace(user.DisplayName)
                 ? user.Username
                 : user.DisplayName),
@@ -229,6 +251,7 @@ public static class FleetAuthenticationEndpoints
             DirectoryAuthenticationStatus.AccountDisabled => "account-disabled",
             DirectoryAuthenticationStatus.AccountLocked => "account-locked",
             DirectoryAuthenticationStatus.AccountExpired => "account-expired",
+            DirectoryAuthenticationStatus.AccountLocked => "account-locked",
             DirectoryAuthenticationStatus.NotInAllowedGroup => "not-allowed",
             DirectoryAuthenticationStatus.DirectoryUnavailable => "directory-unavailable",
             DirectoryAuthenticationStatus.AuthenticationMethodDisabled => "method-disabled",
