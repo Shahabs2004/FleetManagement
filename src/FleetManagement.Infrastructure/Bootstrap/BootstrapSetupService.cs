@@ -20,6 +20,13 @@ public sealed class BootstrapSetupService(
 
     private static readonly ConcurrentDictionary<string, LoginAttemptState> LoginAttempts = new();
 
+    private readonly string _technicalAdministratorCodePath =
+        configuration["Bootstrap:TechnicalAdministratorCodePath"]
+        ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "FleetManagement",
+            "technical-administrator-code.txt");
+
     private readonly string _setupCodePath =
         configuration["Bootstrap:SetupCodePath"]
         ?? Path.Combine(
@@ -39,6 +46,8 @@ public sealed class BootstrapSetupService(
         {
             return;
         }
+
+        await EnsureTechnicalAdministratorCodeAsync(state, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(state.SetupCodeHash)
             && state.SetupCodeExpiresAtUtc > DateTimeOffset.UtcNow
@@ -113,8 +122,15 @@ public sealed class BootstrapSetupService(
         state.LocalAdministratorPasswordSalt = passwordHash.Salt;
         state.SetupCodeHash = null;
         state.SetupCodeExpiresAtUtc = null;
+        state.TechnicalAdministratorCodeHash = null;
+        state.TechnicalAdministratorCodeExpiresAtUtc = null;
 
         await stateStore.WriteAsync(state, cancellationToken);
+
+        if (File.Exists(_technicalAdministratorCodePath))
+        {
+            File.Delete(_technicalAdministratorCodePath);
+        }
 
         // حذف کد خام بلافاصله پس از استفاده موفق.
         if (File.Exists(_setupCodePath))
@@ -161,6 +177,64 @@ public sealed class BootstrapSetupService(
 
         RegisterFailedAttempt(attemptKey);
         return false;
+    }
+
+    /// <summary>
+    /// تولید کد مستقل مدیر فنی برای دسترسی به تنظیمات پیامک در ویزارد.
+    /// </summary>
+    private async Task EnsureTechnicalAdministratorCodeAsync(
+        BootstrapState state,
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(state.TechnicalAdministratorCodeHash)
+            && state.TechnicalAdministratorCodeExpiresAtUtc > DateTimeOffset.UtcNow
+            && File.Exists(_technicalAdministratorCodePath))
+        {
+            return;
+        }
+
+        var code = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+
+        state.TechnicalAdministratorCodeHash = HashSetupCode(code);
+        state.TechnicalAdministratorCodeExpiresAtUtc = DateTimeOffset.UtcNow.Add(SetupCodeLifetime);
+        await stateStore.WriteAsync(state, cancellationToken);
+
+        var directory = Path.GetDirectoryName(_technicalAdministratorCodePath)
+            ?? throw new InvalidOperationException("مسیر فایل کد مدیر فنی معتبر نیست.");
+
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(_technicalAdministratorCodePath, code, cancellationToken);
+
+        logger.LogWarning(
+            "کد دسترسی اولیه مدیر فنی ایجاد شد. کد را فقط در اختیار مدیر فنی قرار دهید. مسیر فایل: {TechnicalAdministratorCodePath}",
+            _technicalAdministratorCodePath);
+    }
+
+    /// <summary>
+    /// تأیید کد مستقل مدیر فنی پیش از نمایش تنظیمات پیامک.
+    /// </summary>
+    public async Task<bool> VerifyTechnicalAdministratorAccessAsync(
+        string suppliedCode,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(suppliedCode);
+
+        var state = await stateStore.ReadAsync(cancellationToken);
+
+        if (state.SetupCompleted
+            || string.IsNullOrWhiteSpace(state.TechnicalAdministratorCodeHash)
+            || state.TechnicalAdministratorCodeExpiresAtUtc is null
+            || state.TechnicalAdministratorCodeExpiresAtUtc <= DateTimeOffset.UtcNow)
+        {
+            return false;
+        }
+
+        return FixedTimeSetupCodeEquals(
+            state.TechnicalAdministratorCodeHash,
+            suppliedCode.Trim());
     }
 
     /// <summary>
