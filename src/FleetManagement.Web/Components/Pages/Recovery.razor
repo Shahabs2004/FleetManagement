@@ -22,7 +22,7 @@
     {
         <div class="setup-success">
             اتصال پایگاه داده بازیابی شد.
-            <button class="primary-button" @onclick="() => Navigation.NavigateTo("/", true)">بازگشت</button>
+            <button class="primary-button" @onclick="ReturnToHome">بازگشت</button>
         </div>
     }
     else if (!_verified)
@@ -100,6 +100,11 @@
             suppliedPassword = string.Empty;
             _busy = false;
         }
+    }
+
+    private void ReturnToHome()
+    {
+        Navigation.NavigateTo("/", forceLoad: true);
     }
 
     private async Task RestoreAsync()
