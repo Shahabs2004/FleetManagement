@@ -1,4 +1,5 @@
 using FleetManagement.Infrastructure;
+using FleetManagement.Infrastructure.Bootstrap;
 using FleetManagement.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,10 +9,17 @@ builder.Services
     .AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// ثبت وابستگی‌های زیرساختی؛ اتصال پایگاه داده پس از تکمیل ویزارد راه‌اندازی فعال می‌شود.
+// ثبت سرویس‌های زیرساختی؛ اتصال SQL پس از تکمیل ویزارد از فایل محافظت‌شده خوانده می‌شود.
 builder.Services.AddFleetInfrastructure(builder.Configuration);
 
 var app = builder.Build();
+
+// آماده‌سازی کد اولیه فقط در اولین اجرا؛ کد خام در فایل محلی محدودشده قرار می‌گیرد.
+using (var scope = app.Services.CreateScope())
+{
+    var bootstrapSetup = scope.ServiceProvider.GetRequiredService<BootstrapSetupService>();
+    await bootstrapSetup.EnsureSetupCodeAsync();
+}
 
 // پیکربندی خطاها متناسب با محیط اجرا
 if (!app.Environment.IsDevelopment())
