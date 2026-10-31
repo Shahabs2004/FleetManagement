@@ -21,8 +21,11 @@ public sealed class ApplicationUser : Entity
     /// <summary>نام خانوادگی کاربر که از AD همگام می‌شود.</summary>
     public string LastName { get; private set; } = string.Empty;
 
-    /// <summary>واحد سازمانی اصلی کاربر.</summary>
+    /// <summary>واحد سازمانی جاری کاربر که ممکن است به‌صورت دستی اصلاح شده باشد.</summary>
     public string OrganizationalUnit { get; private set; } = string.Empty;
+
+    /// <summary>آخرین واحد سازمانی دریافت‌شده از AD برای بازگشت از override دستی.</summary>
+    public string DirectoryOrganizationalUnit { get; private set; } = string.Empty;
 
     /// <summary>آیا واحد سازمانی توسط مدیر سامانه به‌صورت دستی تعیین شده است؟</summary>
     public bool IsOrganizationalUnitManuallyOverridden { get; private set; }
@@ -53,6 +56,7 @@ public sealed class ApplicationUser : Entity
         FirstName = OptionalText(firstName, 100);
         LastName = OptionalText(lastName, 100);
         OrganizationalUnit = OptionalText(organizationalUnit, 200);
+        DirectoryOrganizationalUnit = OptionalText(organizationalUnit, 200);
         DirectoryDistinguishedName = RequiredText(
             directoryDistinguishedName,
             nameof(directoryDistinguishedName),
@@ -78,9 +82,10 @@ public sealed class ApplicationUser : Entity
             nameof(directoryDistinguishedName),
             2048);
 
+        DirectoryOrganizationalUnit = OptionalText(organizationalUnit, 200);
         if (!IsOrganizationalUnitManuallyOverridden)
         {
-            OrganizationalUnit = OptionalText(organizationalUnit, 200);
+            OrganizationalUnit = DirectoryOrganizationalUnit;
         }
 
         LastDirectorySyncAtUtc = DateTimeOffset.UtcNow;
@@ -120,7 +125,8 @@ public sealed class ApplicationUser : Entity
     /// </summary>
     public void ClearOrganizationalUnitOverride(string directoryOrganizationalUnit)
     {
-        OrganizationalUnit = OptionalText(directoryOrganizationalUnit, 200);
+        DirectoryOrganizationalUnit = OptionalText(directoryOrganizationalUnit, 200);
+        OrganizationalUnit = DirectoryOrganizationalUnit;
         IsOrganizationalUnitManuallyOverridden = false;
     }
 
