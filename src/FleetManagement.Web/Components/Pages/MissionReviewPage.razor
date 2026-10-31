@@ -1,0 +1,305 @@
+@page "/admin/missions"
+@rendermode InteractiveServer
+@attribute [FleetPermission("missions.review")]
+@using FleetManagement.Domain.Missions
+@using FleetManagement.Domain.Drivers
+@using FleetManagement.Domain.Vehicles
+@using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Web.Security
+@using Microsoft.AspNetCore.Components.Authorization
+@inject MissionManagementService MissionService
+@inject DriverManagementService DriverService
+@inject VehicleManagementService VehicleService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<MissionReviewPage> Logger
+
+<PageTitle>بررسی درخواست‌های مأموریت</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">عملیات ناوگان</div>
+    <h1>بررسی و تخصیص مأموریت</h1>
+    <p>فقط درخواست‌های تأییدشده یا در حال اجرا منابع را در تعارض زمانی رزرو می‌کنند. تأیید هر درخواست، وضعیت راننده، خودرو و فاصله بین مأموریت‌ها را کنترل می‌کند.</p>
+
+    <div class="session-filters">
+        <div>
+            <label for="mission-filter">وضعیت درخواست</label>
+            <select id="mission-filter" @bind="_statusFilter">
+                <option value="">همه وضعیت‌ها</option>
+                <option value="@((int)MissionStatus.Pending)">در انتظار بررسی</option>
+                <option value="@((int)MissionStatus.UnderReview)">در حال بررسی</option>
+                <option value="@((int)MissionStatus.Confirmed)">تأیید شده</option>
+                <option value="@((int)MissionStatus.Running)">در حال اجرا</option>
+                <option value="@((int)MissionStatus.WithdrawalPending)">در انتظار تصمیم انصراف</option>
+                <option value="@((int)MissionStatus.Completed)">پایان‌یافته</option>
+                <option value="@((int)MissionStatus.Rejected)">ردشده</option>
+                <option value="@((int)MissionStatus.Cancelled)">لغوشده</option>
+            </select>
+        </div>
+        <div>
+            <label for="mission-decision-reason">علت تصمیم / لغو</label>
+            <input id="mission-decision-reason" @bind="_reason" maxlength="1000" placeholder="برای رد یا لغو الزامی است" />
+        </div>
+        <button type="button" class="primary-button" @onclick="LoadAsync" disabled="@_busy">جست‌وجو</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="setup-info">@_message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="setup-error">@_error</div>
+    }
+
+    @if (_loading)
+    {
+        <p>در حال دریافت درخواست‌ها...</p>
+    }
+    else if (_missions.Count == 0)
+    {
+        <div class="setup-info">درخواستی با وضعیت انتخاب‌شده وجود ندارد.</div>
+    }
+    else
+    {
+        @foreach (var mission in _missions)
+        {
+            <article class="mission-review-card" @key="mission.Id">
+                <div class="mission-review-heading">
+                    <strong>@mission.MissionNumber — @mission.Title</strong>
+                    <span>@GetStatusName(mission.Status)</span>
+                </div>
+                <div class="mission-review-grid">
+                    <div><b>درخواست‌کننده:</b> @mission.RequesterName (@mission.RequesterUsername)</div>
+                    <div><b>گروه:</b> @mission.RequestingGroup</div>
+                    <div><b>تلفن:</b> <span dir="ltr">@mission.RequesterPhoneSnapshot</span></div>
+                    <div><b>مسیر:</b> @mission.Origin ← @mission.Destination</div>
+                    <div><b>شروع:</b> @FormatTime(mission.PlannedStartAtUtc)</div>
+                    <div><b>پایان:</b> @FormatTime(mission.PlannedEndAtUtc)</div>
+                    <div><b>نوع:</b> @(mission.Type == MissionType.Freight ? "بار" : "مسافر")</div>
+                    <div><b>هدف:</b> @mission.Purpose</div>
+                </div>
+
+                @if (mission.Status is MissionStatus.Pending or MissionStatus.UnderReview)
+                {
+                    <div class="mission-assignment-grid">
+                        <div>
+                            <label>راننده</label>
+                            <select @bind="_driverSelection[mission.Id]">
+                                <option value="">انتخاب راننده</option>
+                                @foreach (var driver in _drivers)
+                                {
+                                    <option value="@driver.Id">@driver.FirstName @driver.LastName — @driver.MobilePhone</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label>خودرو</label>
+                            <select @bind="_vehicleSelection[mission.Id]">
+                                <option value="">انتخاب خودرو</option>
+                                @foreach (var vehicle in _vehicles)
+                                {
+                                    <option value="@vehicle.Id">@vehicle.Brand @vehicle.Model — @vehicle.LicensePlate</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="driver-actions">
+                        @if (mission.Status == MissionStatus.Pending)
+                        {
+                            <button type="button" class="secondary-button" @onclick="() => StartReviewAsync(mission.Id)" disabled="@_busy">شروع بررسی</button>
+                        }
+                        <button type="button" class="primary-button" @onclick="() => ApproveAsync(mission.Id)" disabled="@_busy">تأیید و تخصیص</button>
+                        <button type="button" class="secondary-button" @onclick="() => RejectAsync(mission.Id)" disabled="@_busy">رد درخواست</button>
+                    </div>
+                }
+                else if (mission.Status == MissionStatus.WithdrawalPending)
+                {
+                    <div class="driver-actions">
+                        <button type="button" class="primary-button" @onclick="() => ApproveWithdrawalAsync(mission.Id)" disabled="@_busy">تأیید انصراف</button>
+                        <button type="button" class="secondary-button" @onclick="() => RejectWithdrawalAsync(mission.Id)" disabled="@_busy">رد انصراف</button>
+                    </div>
+                }
+                else if (mission.Status is MissionStatus.Confirmed or MissionStatus.Running)
+                {
+                    <div class="driver-actions">
+                        <button type="button" class="secondary-button" @onclick="() => CancelAsync(mission.Id)" disabled="@_busy">لغو مأموریت</button>
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(mission.DecisionReason))
+                {
+                    <p class="mission-reason"><b>آخرین علت ثبت‌شده:</b> @mission.DecisionReason</p>
+                }
+            </article>
+        }
+    }
+</section>
+
+@code {
+    private bool _loading = true;
+    private bool _busy;
+    private string _statusFilter = string.Empty;
+    private string _reason = string.Empty;
+    private string _message = string.Empty;
+    private string _error = string.Empty;
+    private IReadOnlyList<Mission> _missions = [];
+    private IReadOnlyList<Driver> _drivers = [];
+    private IReadOnlyList<Vehicle> _vehicles = [];
+    private readonly Dictionary<Guid, string> _driverSelection = [];
+    private readonly Dictionary<Guid, string> _vehicleSelection = [];
+
+    /// <summary>بارگذاری مأموریت‌ها و منابع قابل تخصیص.</summary>
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    /// <summary>دریافت فهرست درخواست‌ها با فیلتر وضعیت.</summary>
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            MissionStatus? status = int.TryParse(_statusFilter, out var raw)
+                && Enum.IsDefined((MissionStatus)raw)
+                ? (MissionStatus)raw
+                : null;
+
+            _missions = await MissionService.SearchAsync(status: status, take: 500);
+            _drivers = await DriverService.SearchAsync();
+            _vehicles = await VehicleService.SearchAsync();
+
+            foreach (var mission in _missions)
+            {
+                _driverSelection.TryAdd(mission.Id, string.Empty);
+                _vehicleSelection.TryAdd(mission.Id, string.Empty);
+            }
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "دریافت درخواست‌های مأموریت");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>شروع بررسی درخواست.</summary>
+    private Task StartReviewAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        await MissionService.StartReviewAsync(id, actor);
+        _message = "بررسی درخواست آغاز شد.";
+    }, "شروع بررسی مأموریت");
+
+    /// <summary>تأیید درخواست و تخصیص راننده و خودرو.</summary>
+    private Task ApproveAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        if (!Guid.TryParse(_driverSelection.GetValueOrDefault(id), out var driverId)
+            || !Guid.TryParse(_vehicleSelection.GetValueOrDefault(id), out var vehicleId))
+        {
+            throw new InvalidOperationException("راننده و خودرو را انتخاب کنید.");
+        }
+
+        await MissionService.ApproveAsync(id, driverId, vehicleId, actor);
+        _message = "مأموریت تأیید و منابع تخصیص داده شد.";
+    }, "تأیید مأموریت");
+
+    /// <summary>رد درخواست با علت اجباری.</summary>
+    private Task RejectAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        EnsureReason();
+        await MissionService.RejectAsync(id, _reason, actor);
+        _message = "درخواست رد شد.";
+    }, "رد درخواست مأموریت");
+
+    /// <summary>لغو مأموریت تأییدشده یا در حال اجرا.</summary>
+    private Task CancelAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        EnsureReason();
+        await MissionService.CancelAsync(id, _reason, actor);
+        _message = "مأموریت لغو شد و منابع آزاد شدند.";
+    }, "لغو مأموریت");
+
+    /// <summary>تأیید درخواست انصراف.</summary>
+    private Task ApproveWithdrawalAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        await MissionService.ApproveWithdrawalAsync(id, actor);
+        _message = "درخواست انصراف تأیید شد.";
+    }, "تأیید انصراف");
+
+    /// <summary>رد درخواست انصراف با علت.</summary>
+    private Task RejectWithdrawalAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        EnsureReason();
+        await MissionService.RejectWithdrawalAsync(id, _reason, actor);
+        _message = "درخواست انصراف رد شد.";
+    }, "رد انصراف");
+
+    /// <summary>اجرای امن عملیات و بارگذاری مجدد فهرست.</summary>
+    private async Task ExecuteAsync(Func<string, Task> action, string operation)
+    {
+        _busy = true;
+        _error = string.Empty;
+        try
+        {
+            await action(await GetActorAsync());
+            _reason = string.Empty;
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, operation);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>الزام ثبت علت تصمیم.</summary>
+    private void EnsureReason()
+    {
+        if (string.IsNullOrWhiteSpace(_reason))
+        {
+            throw new InvalidOperationException("ثبت علت برای این عملیات الزامی است.");
+        }
+    }
+
+    /// <summary>استخراج عامل از هویت جاری.</summary>
+    private async Task<string> GetActorAsync()
+    {
+        var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        return auth.User.FindFirst("fleet:username")?.Value ?? auth.User.Identity?.Name ?? "unknown";
+    }
+
+    /// <summary>نمایش زمان جلالی تهران.</summary>
+    private static string FormatTime(DateTimeOffset value)
+    {
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+        var local = TimeZoneInfo.ConvertTime(value, zone);
+        var calendar = new System.Globalization.PersianCalendar();
+        return $"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} ساعت {local.Hour:00}";
+    }
+
+    /// <summary>عنوان فارسی وضعیت مأموریت.</summary>
+    private static string GetStatusName(MissionStatus status) => status switch
+    {
+        MissionStatus.Pending => "در انتظار بررسی",
+        MissionStatus.UnderReview => "در حال بررسی",
+        MissionStatus.Confirmed => "تأیید شده",
+        MissionStatus.Running => "در حال اجرا",
+        MissionStatus.Completed => "پایان‌یافته",
+        MissionStatus.Cancelled => "لغوشده",
+        MissionStatus.Rejected => "ردشده",
+        MissionStatus.WithdrawalPending => "در انتظار انصراف",
+        _ => "نامشخص"
+    };
+
+    /// <summary>ثبت خطا در لاگ و نمایش شناسه پیگیری.</summary>
+    private void ReportError(Exception exception, string operation)
+    {
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "{Operation} ناموفق بود. شناسه پیگیری: {TrackingId}", operation, trackingId);
+        _error = $"عملیات انجام نشد. شناسه پیگیری: {trackingId}";
+    }
+}
