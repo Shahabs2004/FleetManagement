@@ -34,6 +34,7 @@ public static class FleetAuthenticationEndpoints
         IAntiforgery antiforgery,
         ActiveDirectoryAuthenticator authenticator,
         DirectoryUserProvisioningService userProvisioning,
+        AuthorizationResolutionService authorizationResolver,
         ILoggerFactory loggerFactory)
     {
         if (!await ValidateAntiforgeryAsync(context, antiforgery))
@@ -66,7 +67,15 @@ public static class FleetAuthenticationEndpoints
                 return Results.Redirect("/login?error=app-disabled");
             }
 
-            await IssueApplicationCookieAsync(context, result.User, provisionedUser.UserId);
+            var authorization = await authorizationResolver.ResolveAsync(
+                result.User,
+                context.RequestAborted);
+
+            await IssueApplicationCookieAsync(
+                context,
+                result.User,
+                provisionedUser.UserId,
+                authorization);
             return Results.Redirect("/");
         }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
@@ -230,7 +239,8 @@ public static class FleetAuthenticationEndpoints
     private static async Task IssueApplicationCookieAsync(
         HttpContext context,
         DirectoryUserProfile user,
-        Guid applicationUserId)
+        Guid applicationUserId,
+        AuthorizationResolution authorization)
     {
         var claims = new List<Claim>
         {
@@ -253,8 +263,21 @@ public static class FleetAuthenticationEndpoints
             claims.Add(new Claim("fleet:ad-group-name", group.Name));
         }
 
-        // تا زمان تعریف نگاشت نقش‌های سازمانی، سطح دسترسی اولیه فقط مشاهده است.
-        claims.Add(new Claim(ClaimTypes.Role, "Viewer"));
+        // نقش‌ها و مجوزها از نگاشت گروه‌های AD و تخصیص‌های دستی دریافت می‌شوند.
+        foreach (var role in authorization.Roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
+
+        foreach (var permission in authorization.GrantedPermissions)
+        {
+            claims.Add(new Claim("fleet:permission", permission));
+        }
+
+        foreach (var permission in authorization.DeniedPermissions)
+        {
+            claims.Add(new Claim("fleet:permission-deny", permission));
+        }
 
         var identity = new ClaimsIdentity(
             claims,
