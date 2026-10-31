@@ -1,3 +1,5 @@
+using FleetManagement.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,9 +17,15 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // ثبت DbContext پس از تکمیل ویزارد و ذخیره تنظیم اتصال انجام می‌شود.
-        // در این مرحله برنامه باید بدون اتصال SQL نیز بتواند صفحه راه‌اندازی را نمایش دهد.
-        _ = configuration;
+        // در اجرای نخست ممکن است هنوز SQL تنظیم نشده باشد؛ در این حالت سایت باید بالا بیاید
+        // تا مدیر محلی بتواند ویزارد راه‌اندازی را تکمیل کند.
+        var connectionString = configuration.GetConnectionString("FleetManagement");
+
+        if (!string.IsNullOrWhiteSpace(connectionString))
+        {
+            services.AddDbContext<FleetDbContext>(options =>
+                options.UseSqlServer(connectionString));
+        }
 
         return services;
     }
