@@ -1,0 +1,25 @@
+name: ساخت و بررسی اولیه
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: دریافت سورس
+        uses: actions/checkout@v4
+
+      - name: نصب .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: بازیابی بسته‌ها
+        run: dotnet restore FleetManagement.sln
+
+      - name: ساخت نسخه
+        run: dotnet build FleetManagement.sln --configuration Release --no-restore
