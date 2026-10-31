@@ -30,9 +30,11 @@
                 {
                     <div class="role-row" @key="role.Key">
                         <div>
-                            <strong>@role.Name</strong>
+                            <label>نام نمایشی نقش</label>
+                            <InputText @bind-Value="role.Name" />
                             <span class="role-key">@role.Key</span>
-                            <p>@role.Description</p>
+                            <label>شرح نقش</label>
+                            <InputText @bind-Value="role.Description" />
                         </div>
                         @if (role.IsSystemRole)
                         {
@@ -206,11 +208,12 @@
                 .Select(role => role.Key)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            _configuration.GroupMappings = ParseLines(_groupMappingsText)
+            // ابتدا همه ورودی‌ها در متغیرهای موقت تجزیه می‌شوند تا خطای ورودی مدل جاری را ناقص نکند.
+            var groupMappings = ParseLines(_groupMappingsText)
                 .Select(line =>
                 {
                     var parts = line.Split('|', 2, StringSplitOptions.TrimEntries);
-                    if (parts.Length != 2 || !roleKeys.Contains(parts[1]))
+                    if (parts.Length != 2 || string.IsNullOrWhiteSpace(parts[0]) || !roleKeys.Contains(parts[1]))
                     {
                         throw new InvalidOperationException($"نگاشت گروه AD نامعتبر است: {line}");
                     }
@@ -223,11 +226,11 @@
                 })
                 .ToList();
 
-            _configuration.ManualUserRoles = ParseLines(_manualRolesText)
+            var manualRoles = ParseLines(_manualRolesText)
                 .Select(line =>
                 {
                     var parts = line.Split('|', 2, StringSplitOptions.TrimEntries);
-                    if (parts.Length != 2)
+                    if (parts.Length != 2 || string.IsNullOrWhiteSpace(parts[0]))
                     {
                         throw new InvalidOperationException($"تخصیص دستی نقش نامعتبر است: {line}");
                     }
@@ -246,37 +249,43 @@
                 })
                 .ToList();
 
-            foreach (var role in _configuration.Roles)
-            {
-                role.Permissions.Clear();
-            }
+            var permissionsByRole = _configuration.Roles.ToDictionary(
+                role => role.Key,
+                _ => new List<RolePermissionConfiguration>(),
+                StringComparer.OrdinalIgnoreCase);
 
             foreach (var line in ParseLines(_permissionsText))
             {
                 var parts = line.Split('|', StringSplitOptions.TrimEntries);
-                if (parts.Length != 3)
+                if (parts.Length != 3 || string.IsNullOrWhiteSpace(parts[1]))
                 {
                     throw new InvalidOperationException($"قاعده مجوز نامعتبر است: {line}");
                 }
 
-                var role = _configuration.Roles.SingleOrDefault(item =>
-                    string.Equals(item.Key, parts[0], StringComparison.OrdinalIgnoreCase));
-
-                if (role is null)
+                if (!permissionsByRole.TryGetValue(parts[0], out var rolePermissions))
                 {
                     throw new InvalidOperationException($"نقش {parts[0]} پیدا نشد.");
                 }
 
-                if (!Enum.TryParse<PermissionEffect>(parts[2], true, out var effect))
+                if (!Enum.TryParse<PermissionEffect>(parts[2], true, out var effect)
+                    || !Enum.IsDefined(effect))
                 {
                     throw new InvalidOperationException($"اثر مجوز باید Grant یا Deny باشد: {line}");
                 }
 
-                role.Permissions.Add(new RolePermissionConfiguration
+                rolePermissions.Add(new RolePermissionConfiguration
                 {
                     Permission = parts[1],
                     Effect = effect
                 });
+            }
+
+            _configuration.GroupMappings = groupMappings;
+            _configuration.ManualUserRoles = manualRoles;
+
+            foreach (var role in _configuration.Roles)
+            {
+                role.Permissions = permissionsByRole[role.Key];
             }
 
             await AuthorizationSettings.SaveAsync(_configuration);
