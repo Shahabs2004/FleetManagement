@@ -562,3 +562,56 @@ h1 {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+
+
+/* فرم ثبت و ویرایش رانندگان */
+.driver-editor {
+    margin: 22px 0;
+    padding: 18px;
+    border: 1px solid #dce7df;
+    border-radius: 12px;
+    background: #f8fbf8;
+}
+
+.driver-editor h2 {
+    margin-top: 0;
+    color: #245346;
+}
+
+.driver-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(160px, 1fr));
+    gap: 14px;
+}
+
+.driver-form-grid input,
+.driver-form-grid select {
+    width: 100%;
+    min-height: 42px;
+    margin-top: 6px;
+    padding: 8px 10px;
+    border: 1px solid #d6e0d9;
+    border-radius: 8px;
+    background: #fff;
+    font: inherit;
+}
+
+.driver-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.driver-actions .primary-button,
+.driver-actions .secondary-button,
+.session-table .secondary-button {
+    width: auto;
+    margin: 0;
+}
+
+@media (max-width: 760px) {
+    .driver-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
