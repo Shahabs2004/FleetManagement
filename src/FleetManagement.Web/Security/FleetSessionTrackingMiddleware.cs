@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using FleetManagement.Infrastructure.Configuration;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace FleetManagement.Web.Security;
 
@@ -26,7 +28,14 @@ public sealed class FleetSessionTrackingMiddleware(
         {
             try
             {
-                await sessionService.TouchAsync(sessionId, context.RequestAborted);
+                var sessionIsActive = await sessionService.TouchAsync(sessionId, context.RequestAborted);
+                if (!sessionIsActive)
+                {
+                    activityTracker.Forget(sessionId);
+                    await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                    context.Response.Redirect("/login?error=session-expired");
+                    return;
+                }
             }
             catch (Exception exception)
             {
