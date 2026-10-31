@@ -172,6 +172,9 @@
 
             _hasLocalAdministrator = true;
             _verificationModel.Username = _administratorModel.Username;
+            _administratorModel.SetupCode = string.Empty;
+            _administratorModel.Password = string.Empty;
+            _administratorModel.ConfirmPassword = string.Empty;
             _message = "حساب مدیر محلی ساخته شد. برای ادامه، ورود مدیر را تأیید کنید.";
         }
         catch (Exception exception)
@@ -197,6 +200,7 @@
             _administratorVerified = await BootstrapSetup.VerifyLocalAdministratorAsync(
                 _verificationModel.Username,
                 _verificationModel.Password);
+            _verificationModel.Password = string.Empty;
 
             if (!_administratorVerified)
             {
@@ -236,6 +240,8 @@
             await BootstrapSetup.CompleteSetupAsync();
 
             _setupCompleted = true;
+            _sqlModel.Password = string.Empty;
+            _verificationModel.Password = string.Empty;
             _message = "اتصال SQL برقرار شد، جداول ایجاد شدند و راه‌اندازی اولیه تکمیل شد.";
         }
         catch (Exception exception)
@@ -244,6 +250,8 @@
         }
         finally
         {
+            // رمز SQL پس از هر تلاش از حافظه مدل فرم پاک می‌شود.
+            _sqlModel.Password = string.Empty;
             _isBusy = false;
         }
     }
