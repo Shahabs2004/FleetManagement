@@ -246,6 +246,14 @@ public sealed class MissionManagementService(
             beforeJson: JsonSerializer.Serialize(before),
             afterJson: JsonSerializer.Serialize(new { mission.Status, mission.ActualEndAtUtc }),
             cancellationToken: cancellationToken);
+        await notificationService.CreateAsync(
+            mission.RequesterUsername,
+            "مأموریت زودتر از موعد خاتمه یافت",
+            $"مأموریت {mission.MissionNumber} پیش از زمان برنامه‌ریزی‌شده خاتمه یافت.",
+            "MissionEndedEarly",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
     }
 
     /// <summary>لغو مستقیم درخواست تأییدنشده توسط درخواست‌کننده.</summary>
