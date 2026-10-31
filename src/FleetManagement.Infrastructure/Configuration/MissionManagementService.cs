@@ -322,6 +322,12 @@ public sealed class MissionManagementService(
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var mission = await GetMissionAsync(db, missionId, cancellationToken);
         var before = new { mission.OdometerStartKm, mission.OdometerEndKm };
+        if ((startKm.HasValue || endKm.HasValue) && !mission.VehicleId.HasValue)
+        {
+            throw new InvalidOperationException("ابتدا باید خودرو برای مأموریت تعیین شده باشد.");
+        }
+
+        var effectiveEndAtUtc = mission.ActualEndAtUtc ?? mission.PlannedEndAtUtc;
 
         if (mission.VehicleId.HasValue && startKm.HasValue)
         {
@@ -347,7 +353,7 @@ public sealed class MissionManagementService(
                 .Where(item => item.Id != mission.Id
                     && item.VehicleId == mission.VehicleId
                     && item.OdometerStartKm.HasValue
-                    && item.PlannedStartAtUtc >= mission.PlannedEndAtUtc)
+                    && item.PlannedStartAtUtc >= effectiveEndAtUtc)
                 .OrderBy(item => item.PlannedStartAtUtc)
                 .Select(item => item.OdometerStartKm)
                 .FirstOrDefaultAsync(cancellationToken);
