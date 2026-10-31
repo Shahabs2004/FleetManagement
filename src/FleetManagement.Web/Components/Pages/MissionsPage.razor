@@ -167,6 +167,10 @@
                             <td>@GetStatusName(mission.Status)</td>
                             <td>@mission.DecisionReason</td>
                             <td>
+                                @if (mission.Status is MissionStatus.Confirmed or MissionStatus.Running or MissionStatus.Completed or MissionStatus.Cancelled)
+                                {
+                                    <a class="secondary-button" href="@("/missions/" + mission.Id + "/print")">چاپ دستور</a>
+                                }
                                 @if (mission.Status == MissionStatus.Pending)
                                 {
                                     <button type="button" class="secondary-button" @onclick="() => CancelPendingAsync(mission.Id)" disabled="@_busy">لغو درخواست</button>
