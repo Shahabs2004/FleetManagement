@@ -16,6 +16,7 @@ builder.Services
 builder.Services.AddFleetInfrastructure(builder.Configuration);
 builder.Services.AddFleetAuthentication();
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<NotificationEventBus>();
 builder.Services.AddScoped<INotificationPublisher, SignalRNotificationPublisher>();
 
 var app = builder.Build();
