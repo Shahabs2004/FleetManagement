@@ -27,8 +27,10 @@ public static class BootstrapServiceCollectionExtensions
         services.AddSingleton<IDbContextFactory<FleetDbContext>>(
             provider => provider.GetRequiredService<BootstrapDbContextFactory>());
 
-        // تنظیمات عملیاتی در جدول SQL نگهداری می‌شوند.
+        // تنظیمات عملیاتی و دایرکتوری در جدول SQL نگهداری می‌شوند.
         services.AddScoped<ISystemSettingsStore, SqlSystemSettingsStore>();
+        services.AddScoped<ActiveDirectorySettingsService>();
+        services.AddSingleton<ActiveDirectoryConnectionTester>();
 
         return services;
     }
