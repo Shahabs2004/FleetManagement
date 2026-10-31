@@ -71,7 +71,7 @@
                             <td>@FormatTehranTime(session.LastActivityAtUtc)</td>
                             <td>@FormatTehranTime(session.EndedAtUtc)</td>
                             <td dir="ltr">@session.ClientIpAddress</td>
-                            <td>@session.Reason</td>
+                            <td>@GetReasonName(session.Reason)</td>
                         </tr>
                     }
                 </tbody>
@@ -184,6 +184,28 @@
                 destination[index] = digitIndex >= 0 ? persian[digitIndex] : source[index];
             }
         });
+    }
+
+    /// <summary>
+    /// تبدیل کدهای داخلی علت ورود ناموفق به توضیح فارسی.
+    /// </summary>
+    private static string GetReasonName(string? reason)
+    {
+        return reason switch
+        {
+            "InvalidCredentials" => "نام کاربری یا رمز عبور نامعتبر",
+            "AccountDisabled" => "حساب در دایرکتوری غیرفعال است",
+            "AccountLocked" => "حساب در دایرکتوری قفل شده است",
+            "AccountExpired" => "اعتبار حساب پایان یافته است",
+            "NotInAllowedGroup" => "عضویت در گروه مجاز وجود ندارد",
+            "DirectoryUnavailable" => "ارتباط با دایرکتوری برقرار نشده است",
+            "NotConfigured" => "دایرکتوری تنظیم نشده است",
+            "AuthenticationMethodDisabled" => "روش ورود غیرفعال است",
+            "ApplicationDisabled" => "حساب در سامانه غیرفعال است",
+            "InvalidLocalAdministratorCredentials" => "اطلاعات مدیر محلی نامعتبر است",
+            null or "" => "—",
+            _ => "سایر خطاها"
+        };
     }
 
     /// <summary>
