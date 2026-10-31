@@ -36,6 +36,7 @@ public static class FleetAuthenticationEndpoints
         DirectoryUserProvisioningService userProvisioning,
         AuthorizationResolutionService authorizationResolver,
         UserSessionService sessionService,
+        AuditLogService auditLog,
         ILoggerFactory loggerFactory)
     {
         if (!await ValidateAntiforgeryAsync(context, antiforgery))
@@ -62,6 +63,8 @@ public static class FleetAuthenticationEndpoints
                     result.Status.ToString(),
                     context.Connection.RemoteIpAddress?.ToString(),
                     context.RequestAborted);
+
+                await auditLog.RecordAsync(username, "LoginFailed", "Authentication", null, "Failed", result.Status.ToString(), clientIpAddress: context.Connection.RemoteIpAddress?.ToString(), cancellationToken: context.RequestAborted);
 
                 return Results.Redirect($"/login?error={MapError(result.Status)}");
             }
@@ -91,6 +94,8 @@ public static class FleetAuthenticationEndpoints
                 UserSessionLoginMethod.DirectoryPassword,
                 context.Connection.RemoteIpAddress?.ToString(),
                 context.RequestAborted);
+
+            await auditLog.RecordAsync(result.User.Username, "LoginSucceeded", "Authentication", sessionId.ToString(), "Success", "DirectoryPassword", clientIpAddress: context.Connection.RemoteIpAddress?.ToString(), cancellationToken: context.RequestAborted);
 
             await IssueApplicationCookieAsync(
                 context,
@@ -127,7 +132,8 @@ public static class FleetAuthenticationEndpoints
         IAntiforgery antiforgery,
         IBootstrapStateStore stateStore,
         BootstrapSetupService setupService,
-        UserSessionService sessionService)
+        UserSessionService sessionService,
+        AuditLogService auditLog)
     {
         if (!await ValidateAntiforgeryAsync(context, antiforgery))
         {
@@ -160,6 +166,8 @@ public static class FleetAuthenticationEndpoints
                     context.Connection.RemoteIpAddress?.ToString(),
                     context.RequestAborted);
 
+                await auditLog.RecordAsync(username, "LoginFailed", "Authentication", null, "Failed", "InvalidLocalAdministratorCredentials", clientIpAddress: context.Connection.RemoteIpAddress?.ToString(), cancellationToken: context.RequestAborted);
+
                 return Results.Redirect("/login?error=local-admin-invalid");
             }
 
@@ -168,6 +176,8 @@ public static class FleetAuthenticationEndpoints
                 UserSessionLoginMethod.LocalEmergencyAdministrator,
                 context.Connection.RemoteIpAddress?.ToString(),
                 context.RequestAborted);
+
+            await auditLog.RecordAsync(username, "LoginSucceeded", "Authentication", sessionId.ToString(), "Success", "LocalEmergencyAdministrator", clientIpAddress: context.Connection.RemoteIpAddress?.ToString(), cancellationToken: context.RequestAborted);
 
             var claims = new List<Claim>
             {
@@ -213,6 +223,7 @@ public static class FleetAuthenticationEndpoints
         DirectoryUserProvisioningService userProvisioning,
         AuthorizationResolutionService authorizationResolver,
         UserSessionService sessionService,
+        AuditLogService auditLog,
         ILoggerFactory loggerFactory)
     {
         if (!await ValidateAntiforgeryAsync(context, antiforgery))
@@ -278,6 +289,8 @@ public static class FleetAuthenticationEndpoints
                 UserSessionLoginMethod.WindowsIntegrated,
                 context.Connection.RemoteIpAddress?.ToString(),
                 context.RequestAborted);
+
+            await auditLog.RecordAsync(result.User.Username, "LoginSucceeded", "Authentication", sessionId.ToString(), "Success", "WindowsIntegrated", clientIpAddress: context.Connection.RemoteIpAddress?.ToString(), cancellationToken: context.RequestAborted);
 
             await IssueApplicationCookieAsync(
                 context,
