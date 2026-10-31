@@ -15,6 +15,7 @@
     <PackageReference Include="System.DirectoryServices.Protocols" Version="10.0.0" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
     <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
     <ProjectReference Include="..\FleetManagement.Application\FleetManagement.Application.csproj" />
     <ProjectReference Include="..\FleetManagement.Domain\FleetManagement.Domain.csproj" />
   </ItemGroup>
