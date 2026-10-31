@@ -215,9 +215,10 @@
                     تأیید مدیر محلی به‌تنهایی اجازه مشاهده یا تغییر اطلاعات محرمانه پیامک را نمی‌دهد.
                 </div>
 
-                <EditForm Model="_technicalAdministratorCode" OnValidSubmit="VerifyTechnicalAdministratorAsync">
+                <EditForm Model="_technicalAdministratorModel" OnValidSubmit="VerifyTechnicalAdministratorAsync">
+                    <DataAnnotationsValidator />
                     <label for="technical-admin-code">کد دسترسی مدیر فنی</label>
-                    <InputText id="technical-admin-code" @bind-Value="_technicalAdministratorCode" autocomplete="off" />
+                    <InputText id="technical-admin-code" @bind-Value="_technicalAdministratorModel.Code" autocomplete="off" />
                     <button type="submit" class="primary-button" disabled="@_isBusy">تأیید دسترسی مدیر فنی</button>
                 </EditForm>
             }
@@ -305,7 +306,7 @@
     private readonly ActiveDirectoryModel _adModel = new();
     private readonly OrganizationModel _organizationModel = new();
     private readonly SmsModel _smsModel = new();
-    private string _technicalAdministratorCode = string.Empty;
+    private readonly TechnicalAdministratorModel _technicalAdministratorModel = new();
     private string? _existingLogoBase64;
     private string? _existingLogoContentType;
     private string? _newLogoBase64;
@@ -658,9 +659,9 @@
         try
         {
             _technicalAdministratorVerified =
-                await BootstrapSetup.VerifyTechnicalAdministratorAccessAsync(_technicalAdministratorCode);
+                await BootstrapSetup.VerifyTechnicalAdministratorAccessAsync(_technicalAdministratorModel.Code);
 
-            _technicalAdministratorCode = string.Empty;
+            _technicalAdministratorModel.Code = string.Empty;
 
             if (!_technicalAdministratorVerified)
             {
@@ -672,7 +673,7 @@
         }
         catch (Exception exception)
         {
-            _technicalAdministratorCode = string.Empty;
+            _technicalAdministratorModel.Code = string.Empty;
             ShowUnexpectedError(exception, "تأیید دسترسی مدیر فنی");
         }
         finally
@@ -840,6 +841,15 @@
     {
         [Required(ErrorMessage = "نام سازمان الزامی است.")]
         public string OrganizationName { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// داده‌های فرم تأیید دسترسی مستقل مدیر فنی.
+    /// </summary>
+    private sealed class TechnicalAdministratorModel
+    {
+        [Required(ErrorMessage = "کد دسترسی مدیر فنی الزامی است.")]
+        public string Code { get; set; } = string.Empty;
     }
 
     /// <summary>
