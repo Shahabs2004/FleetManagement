@@ -18,6 +18,12 @@ public sealed class BootstrapState
     /// <summary>زمان انقضای کد راه‌اندازی بر اساس UTC.</summary>
     public DateTimeOffset? SetupCodeExpiresAtUtc { get; set; }
 
+    /// <summary>هش کد مستقل دسترسی مدیر فنی به تنظیمات حساس ویزارد.</summary>
+    public string? TechnicalAdministratorCodeHash { get; set; }
+
+    /// <summary>زمان انقضای کد دسترسی مدیر فنی بر اساس UTC.</summary>
+    public DateTimeOffset? TechnicalAdministratorCodeExpiresAtUtc { get; set; }
+
     /// <summary>نام کاربری مدیر محلی اضطراری.</summary>
     public string? LocalAdministratorUsername { get; set; }
 
