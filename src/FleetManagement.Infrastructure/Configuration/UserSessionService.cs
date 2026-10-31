@@ -95,7 +95,7 @@ public sealed class UserSessionService(IDbContextFactory<FleetDbContext> dbConte
     }
 
     /// <summary>به‌روزرسانی آخرین فعالیت نشست.</summary>
-    public async Task TouchAsync(
+    public async Task<bool> TouchAsync(
         Guid sessionId,
         CancellationToken cancellationToken = default)
     {
@@ -107,11 +107,22 @@ public sealed class UserSessionService(IDbContextFactory<FleetDbContext> dbConte
 
         if (session is null || session.Status != UserSessionStatus.Active)
         {
-            return;
+            return false;
         }
 
-        session.Touch(DateTimeOffset.UtcNow);
+        var now = DateTimeOffset.UtcNow;
+        if (session.ExpireIfNeeded(
+            now,
+            TimeSpan.FromMinutes(30),
+            TimeSpan.FromHours(8)))
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return false;
+        }
+
+        session.Touch(now);
         await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     /// <summary>
