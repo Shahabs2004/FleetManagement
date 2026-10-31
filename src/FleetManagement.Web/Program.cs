@@ -1,6 +1,7 @@
 using FleetManagement.Infrastructure;
 using FleetManagement.Infrastructure.Bootstrap;
 using FleetManagement.Web.Components;
+using FleetManagement.Web.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +12,7 @@ builder.Services
 
 // ثبت سرویس‌های زیرساختی؛ اتصال SQL پس از تکمیل ویزارد از فایل محافظت‌شده خوانده می‌شود.
 builder.Services.AddFleetInfrastructure(builder.Configuration);
+builder.Services.AddFleetAuthentication();
 
 var app = builder.Build();
 
@@ -30,7 +32,12 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
+
+// مسیرهای ورود و خروج با کنترل توکن ضد جعل ثبت می‌شوند.
+app.MapFleetAuthentication();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
