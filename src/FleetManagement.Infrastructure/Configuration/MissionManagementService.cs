@@ -66,6 +66,7 @@ public sealed class MissionManagementService(
     {
         ArgumentNullException.ThrowIfNull(proposal);
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var mission = await GetMissionAsync(db, missionId, cancellationToken);
 
         if (!string.Equals(mission.RequesterUsername, requesterUsername, StringComparison.OrdinalIgnoreCase))
@@ -93,6 +94,7 @@ public sealed class MissionManagementService(
         var changeRequest = new MissionChangeRequest(missionId, requesterUsername, reason, json);
         db.MissionChangeRequests.Add(changeRequest);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         await auditLog.RecordAsync(
             requesterUsername,
@@ -140,6 +142,7 @@ public sealed class MissionManagementService(
         CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var change = await db.MissionChangeRequests.SingleOrDefaultAsync(
             item => item.Id == changeRequestId,
             cancellationToken)
@@ -147,6 +150,7 @@ public sealed class MissionManagementService(
 
         change.StartReview(reviewer, DateTimeOffset.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         await auditLog.RecordAsync(
             reviewer, "StartChangeReview", "MissionChangeRequest", change.Id.ToString(), "Success",
@@ -321,6 +325,7 @@ public sealed class MissionManagementService(
         CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var change = await db.MissionChangeRequests.SingleOrDefaultAsync(
             item => item.Id == changeRequestId,
             cancellationToken)
@@ -328,6 +333,7 @@ public sealed class MissionManagementService(
 
         change.Reject(reviewer, reason, DateTimeOffset.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         var mission = await GetMissionAsync(db, change.MissionId, cancellationToken);
         await auditLog.RecordAsync(
