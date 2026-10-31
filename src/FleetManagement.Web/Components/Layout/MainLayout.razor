@@ -1,4 +1,7 @@
 @inherits LayoutComponentBase
+@inject FleetManagement.Infrastructure.Bootstrap.IBootstrapStateStore BootstrapStateStore
+@inject FleetManagement.Infrastructure.Bootstrap.SqlAvailabilityService SqlAvailability
+@inject NavigationManager Navigation
 
 <div class="app-shell">
     <header class="app-header">
@@ -17,3 +20,41 @@
         نسخه اولیه در حال توسعه
     </footer>
 </div>
+
+@code {
+    /// <summary>
+    /// در صورت ناتمام بودن راه‌اندازی یا قطعی SQL، فقط صفحه مجاز نمایش داده می‌شود.
+    /// </summary>
+    protected override async Task OnParametersSetAsync()
+    {
+        var currentPath = Navigation.ToBaseRelativePath(Navigation.Uri)
+            .Split('?', 2)[0]
+            .Trim('/')
+            .ToLowerInvariant();
+
+        var state = await BootstrapStateStore.ReadAsync();
+
+        if (!state.SetupCompleted)
+        {
+            if (currentPath != "setup")
+            {
+                Navigation.NavigateTo("/setup", replace: true);
+            }
+
+            return;
+        }
+
+        var sqlIsAvailable = await SqlAvailability.IsAvailableAsync();
+
+        if (!sqlIsAvailable && currentPath != "recovery")
+        {
+            Navigation.NavigateTo("/recovery", replace: true);
+            return;
+        }
+
+        if (sqlIsAvailable && currentPath is "setup" or "recovery")
+        {
+            Navigation.NavigateTo("/", replace: true);
+        }
+    }
+}
