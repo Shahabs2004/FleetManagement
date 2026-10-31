@@ -5,6 +5,7 @@ using FleetManagement.Domain.Users;
 using FleetManagement.Domain.Sessions;
 using FleetManagement.Domain.Auditing;
 using FleetManagement.Domain.Missions;
+using FleetManagement.Domain.Locations;
 using Microsoft.EntityFrameworkCore;
 
 namespace FleetManagement.Infrastructure.Persistence;
@@ -15,6 +16,9 @@ namespace FleetManagement.Infrastructure.Persistence;
 public sealed class FleetDbContext(DbContextOptions<FleetDbContext> options)
     : DbContext(options)
 {
+    /// <summary>فهرست مکان‌های مشترک و پیشنهادهای تأییدنشده.</summary>
+    public DbSet<Location> Locations => Set<Location>();
+
     /// <summary>درخواست‌ها و مأموریت‌های ثبت‌شده.</summary>
     public DbSet<Mission> Missions => Set<Mission>();
 
