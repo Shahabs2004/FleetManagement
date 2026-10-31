@@ -247,3 +247,83 @@ h1 {
     opacity: .6;
     cursor: wait;
 }
+
+
+/* چیدمان صفحه ورود سازمانی */
+.login-panel {
+    width: min(100%, 520px);
+    margin: 5vh auto;
+    padding: 34px;
+    border: 1px solid #dce6df;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 18px 55px rgba(20, 58, 47, .08);
+}
+
+.login-brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+.login-brand h1 {
+    margin: 4px 0;
+    color: #173c32;
+    font-size: 1.45rem;
+}
+
+.login-brand p,
+.login-footnote {
+    color: #65766e;
+    font-size: .9rem;
+}
+
+.login-form {
+    display: grid;
+    gap: 10px;
+}
+
+.login-panel input:not([type="hidden"]) {
+    width: 100%;
+    min-height: 44px;
+    padding: 9px 12px;
+    border: 1px solid #d6e0d9;
+    border-radius: 9px;
+    background: #fbfcfb;
+    font: inherit;
+}
+
+.login-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 22px 0;
+    color: #8a978f;
+}
+
+.login-divider::before,
+.login-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #e5ebe7;
+}
+
+.login-footnote {
+    margin-top: 24px;
+    text-align: center;
+}
+
+.login-redirect {
+    padding: 30px;
+    text-align: center;
+    color: #245346;
+}
+
+@media (max-width: 600px) {
+    .login-panel {
+        margin: 16px auto;
+        padding: 22px;
+    }
+}
