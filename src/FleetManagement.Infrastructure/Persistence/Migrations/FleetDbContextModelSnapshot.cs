@@ -83,5 +83,28 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
             entity.HasIndex("LicensePlate").IsUnique();
             entity.ToTable("Vehicles");
         });
+
+        modelBuilder.Entity("FleetManagement.Domain.Configuration.SystemSetting", entity =>
+        {
+            entity.Property<Guid>("Id")
+                .ValueGeneratedOnAdd()
+                .HasColumnType("uniqueidentifier");
+
+            entity.Property<string>("Key")
+                .IsRequired()
+                .HasMaxLength(128)
+                .HasColumnType("nvarchar(128)");
+
+            entity.Property<string>("Value")
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            entity.Property<DateTimeOffset>("UpdatedAtUtc")
+                .HasColumnType("datetimeoffset");
+
+            entity.HasKey("Id");
+            entity.HasIndex("Key").IsUnique();
+            entity.ToTable("SystemSettings");
+        });
     }
 }
