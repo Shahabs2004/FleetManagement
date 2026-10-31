@@ -784,9 +784,11 @@ public sealed class MissionManagementService(
         Guid vehicleId,
         TimeSpan gap,
         CancellationToken cancellationToken,
-        DateTimeOffset? proposedEnd = null)
+        DateTimeOffset? proposedEnd = null,
+        DateTimeOffset? proposedStart = null)
     {
         var end = proposedEnd ?? current.PlannedEndAtUtc;
+        var start = proposedStart ?? current.PlannedStartAtUtc;
         var blockingStatuses = new[]
         {
             MissionStatus.Confirmed,
@@ -803,7 +805,7 @@ public sealed class MissionManagementService(
 
         // محاسبه بازه‌ها در حافظه انجام می‌شود تا ترجمه DateTimeOffset.Add(TimeSpan) به SQL وابسته نباشد.
         return candidates.Any(existing =>
-            current.PlannedStartAtUtc < existing.PlannedEndAtUtc.Add(gap)
+            start < existing.PlannedEndAtUtc.Add(gap)
             && end.Add(gap) > existing.PlannedStartAtUtc);
     }
 
