@@ -34,3 +34,22 @@
 - اگر LDAPS خطا می‌دهد، زنجیره گواهی سرور LDAP و تطبیق نام DNS گواهی با نام سرور را بررسی کنید.
 - از غیرفعال‌کردن اعتبارسنجی گواهی TLS در محیط عملیاتی خودداری کنید.
 - خطاهای فنی در گزارش سرور ثبت می‌شوند؛ رمز عبور کاربر نباید در گزارش‌ها ثبت شود.
+
+## محافظت از فایل‌های bootstrap و کد مدیر فنی
+
+فایل‌های اولیه در مسیر زیر نگهداری می‌شوند:
+
+`C:\ProgramData\FleetManagement`
+
+فایل وضعیت bootstrap با DPAPI و محدوده LocalMachine محافظت می‌شود. فایل کد خام مدیر فنی فقط تا پایان ویزارد وجود دارد و پس از تکمیل، محتوای آن پاک می‌شود.
+
+پس از ایجاد Application Pool با نام نمونه `FleetManagement`، مجوزهای پوشه را از PowerShell با دسترسی Administrator محدود کنید. نام Application Pool را با نام واقعی جایگزین کنید:
+
+```powershell
+$path = "$env:ProgramData\FleetManagement"
+New-Item -ItemType Directory -Force -Path $path | Out-Null
+icacls $path /inheritance:r
+icacls $path /grant "SYSTEM:(OI)(CI)F" "BUILTIN\Administrators:(OI)(CI)F" "IIS APPPOOL\FleetManagement:(OI)(CI)M"
+```
+
+حساب Application Pool برای ایجاد، خواندن و به‌روزرسانی فایل‌ها به Modify نیاز دارد؛ کاربران عادی نباید به این پوشه دسترسی داشته باشند.
