@@ -12,6 +12,14 @@
         </div>
     </header>
 
+    <AuthorizeView Roles="SystemAdministrator">
+        <Authorized>
+            <nav class="admin-navigation" aria-label="مدیریت سامانه">
+                <a href="/admin/security">نقش‌ها و مجوزها</a>
+            </nav>
+        </Authorized>
+    </AuthorizeView>
+
     <main class="main-content">
         @Body
     </main>
