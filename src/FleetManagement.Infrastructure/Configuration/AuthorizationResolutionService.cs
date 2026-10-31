@@ -64,6 +64,23 @@ public sealed class AuthorizationResolutionService(
             }
         }
 
+        // مجوزهای مستقیم کاربر با مجوزهای نقش‌ها ترکیب می‌شوند؛ Deny همچنان اولویت دارد.
+        var directPermissions = configuration.ManualUserPermissions
+            .Where(mapping => string.Equals(
+                mapping.Username,
+                user.Username,
+                StringComparison.OrdinalIgnoreCase))
+            .SelectMany(mapping => mapping.Permissions);
+
+        foreach (var permission in directPermissions)
+        {
+            var target = permission.Effect == PermissionEffect.Deny
+                ? denied
+                : granted;
+
+            target.Add(permission.Permission);
+        }
+
         return new AuthorizationResolution
         {
             Roles = roleKeys,
