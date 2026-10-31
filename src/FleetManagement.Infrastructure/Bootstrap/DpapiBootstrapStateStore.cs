@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text.Json;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 
 namespace FleetManagement.Infrastructure.Bootstrap;
@@ -17,21 +16,19 @@ public sealed class DpapiBootstrapStateStore : IBootstrapStateStore
     private readonly string _filePath;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
-    public DpapiBootstrapStateStore(
-        IConfiguration configuration,
-        IWebHostEnvironment environment)
+    public DpapiBootstrapStateStore(IConfiguration configuration)
     {
         // مسیر پیش‌فرض در ProgramData و خارج از پوشه عمومی وب قرار دارد.
-        _filePath = configuration["Bootstrap:FilePath"]
-            ?? Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                "FleetManagement",
-                "bootstrap.dat");
+        var configuredPath = configuration["Bootstrap:FilePath"];
 
-        if (!Path.IsPathRooted(_filePath))
-        {
-            _filePath = Path.GetFullPath(Path.Combine(environment.ContentRootPath, _filePath));
-        }
+        var dataDirectory = Environment.GetFolderPath(
+            Environment.SpecialFolder.CommonApplicationData);
+
+        _filePath = string.IsNullOrWhiteSpace(configuredPath)
+            ? Path.Combine(dataDirectory, "FleetManagement", "bootstrap.dat")
+            : Path.IsPathRooted(configuredPath)
+                ? configuredPath
+                : Path.Combine(dataDirectory, configuredPath);
     }
 
     /// <inheritdoc />
