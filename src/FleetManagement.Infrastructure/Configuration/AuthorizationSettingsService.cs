@@ -40,10 +40,13 @@ public sealed class AuthorizationSettingsService(ISystemSettingsStore settingsSt
 
         foreach (var requiredRole in requiredSystemRoles)
         {
-            if (!roleKeys.Contains(requiredRole))
+            var systemRole = configuration.Roles.SingleOrDefault(role =>
+                string.Equals(role.Key, requiredRole, StringComparison.OrdinalIgnoreCase));
+
+            if (systemRole is null || !systemRole.IsSystemRole)
             {
                 throw new ArgumentException(
-                    $"نقش پایه {requiredRole} قابل حذف نیست.",
+                    $"نقش پایه {requiredRole} باید حفظ شود و قابل تبدیل به نقش عادی نیست.",
                     nameof(configuration));
             }
         }
