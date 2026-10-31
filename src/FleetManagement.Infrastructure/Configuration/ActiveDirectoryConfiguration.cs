@@ -36,6 +36,9 @@ public sealed class ActiveDirectoryConfiguration
     /// <summary>فعال بودن ورود جایگزین با نام کاربری و رمز عبور AD.</summary>
     public bool AllowUsernamePasswordFallback { get; set; } = true;
 
+    /// <summary>آیا آزمون اتصال حساب سرویس و Base DN با موفقیت انجام شده است؟</summary>
+    public bool IsConnectionVerified { get; set; }
+
     /// <summary>گروه‌های AD مجاز برای ورود به سامانه.</summary>
     public List<ActiveDirectoryGroup> AllowedGroups { get; set; } = [];
 }
