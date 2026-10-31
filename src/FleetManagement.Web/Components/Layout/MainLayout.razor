@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@using FleetManagement.Web.Components.Shared
 @inject FleetManagement.Infrastructure.Bootstrap.IBootstrapStateStore BootstrapStateStore
 @inject FleetManagement.Infrastructure.Bootstrap.SqlAvailabilityService SqlAvailability
 @inject NavigationManager Navigation
@@ -14,6 +15,7 @@
 
     <AuthorizeView>
         <Authorized Context="authenticatedContext">
+            <NotificationCenter />
             <nav class="admin-navigation" aria-label="ناوبری سامانه">
                 <AuthorizeView Policy="Permission:missions.review">
                     <Authorized Context="missionReviewPermissionContext">
