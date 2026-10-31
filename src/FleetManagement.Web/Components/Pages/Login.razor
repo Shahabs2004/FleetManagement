@@ -29,6 +29,13 @@
         </div>
     }
 
+    <form method="post" action="/auth/windows" class="login-form">
+        <input type="hidden" name="__RequestVerificationToken" value="@_requestToken" />
+        <button type="submit" class="primary-button">ورود یکپارچه با حساب ویندوز</button>
+    </form>
+
+    <div class="login-divider"><span>ورود جایگزین</span></div>
+
     <form method="post" action="/auth/ad" class="login-form">
         <input type="hidden" name="__RequestVerificationToken" value="@_requestToken" />
 
@@ -38,14 +45,7 @@
         <label for="password">رمز عبور دامنه</label>
         <input id="password" name="password" type="password" autocomplete="current-password" required />
 
-        <button type="submit" class="primary-button">ورود با نام کاربری و رمز دامنه</button>
-    </form>
-
-    <div class="login-divider"><span>یا</span></div>
-
-    <form method="post" action="/auth/windows">
-        <input type="hidden" name="__RequestVerificationToken" value="@_requestToken" />
-        <button type="submit" class="secondary-button">ورود یکپارچه با حساب ویندوز</button>
+        <button type="submit" class="secondary-button">ورود با نام کاربری و رمز دامنه</button>
     </form>
 
     <div class="login-divider"><span>ورود اضطراری مدیر محلی</span></div>
