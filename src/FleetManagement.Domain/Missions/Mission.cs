@@ -236,6 +236,11 @@ public sealed class Mission : Entity
     public void StartAutomatically(DateTimeOffset nowUtc)
     {
         EnsureStatus(MissionStatus.Confirmed);
+        if (nowUtc < PlannedStartAtUtc)
+        {
+            throw new InvalidOperationException("زمان شروع برنامه‌ریزی‌شده هنوز فرا نرسیده است.");
+        }
+
         if (DriverId is null || VehicleId is null)
         {
             throw new InvalidOperationException("برای شروع مأموریت راننده و خودرو باید تعیین شده باشند.");
@@ -264,7 +269,7 @@ public sealed class Mission : Entity
     {
         EnsureStatus(MissionStatus.Running);
         ValidateHour(endedAtUtc, nameof(endedAtUtc));
-        if (endedAtUtc <= ActualStartAtUtc)
+        if (ActualStartAtUtc.HasValue && endedAtUtc <= ActualStartAtUtc.Value)
         {
             throw new ArgumentException("زمان خاتمه باید بعد از شروع مأموریت باشد.");
         }
@@ -334,7 +339,7 @@ public sealed class Mission : Entity
     }
 
     /// <summary>تأیید انصراف و لغو مأموریت.</summary>
-    public void ApproveWithdrawal(string reviewer, DateTimeOffset nowUtc)
+    public void ApproveWithdrawal(DateTimeOffset nowUtc)
     {
         EnsureStatus(MissionStatus.WithdrawalPending);
         DecisionReason = Required(DecisionReason ?? "درخواست انصراف تأیید شد", 1000, nameof(DecisionReason));
