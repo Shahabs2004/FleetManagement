@@ -12,7 +12,8 @@ namespace FleetManagement.Infrastructure.Configuration;
 public sealed class NotificationService(
     IDbContextFactory<FleetDbContext> dbContextFactory,
     INotificationPublisher publisher,
-    ILogger<NotificationService> logger)
+    ILogger<NotificationService> logger,
+    UserNotificationRecipientResolver recipientResolver)
 {
     /// <summary>ثبت اعلان برای یک کاربر و انتشار آن به نشست‌های فعال.</summary>
     public async Task<Guid> CreateAsync(
@@ -61,6 +62,32 @@ public sealed class NotificationService(
         }
 
         return notification.Id;
+    }
+
+    /// <summary>ثبت و انتشار اعلان برای تمام کاربران دارای نقش‌های مشخص.</summary>
+    public async Task<int> CreateForRolesAsync(
+        IEnumerable<string> roleKeys,
+        string title,
+        string message,
+        string eventKey,
+        string? referenceType = null,
+        string? referenceId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var recipients = await recipientResolver.ResolveAsync(roleKeys, cancellationToken);
+        foreach (var username in recipients)
+        {
+            await CreateAsync(
+                username,
+                title,
+                message,
+                eventKey,
+                referenceType,
+                referenceId,
+                cancellationToken);
+        }
+
+        return recipients.Count;
     }
 
     /// <summary>دریافت اعلان‌های اخیر کاربر جاری.</summary>
