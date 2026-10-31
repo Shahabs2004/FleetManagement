@@ -32,6 +32,13 @@ public sealed class ActiveDirectorySettingsService(ISystemSettingsStore settings
                 "درگاه LDAP باید بین ۱ تا ۶۵۵۳۵ باشد.");
         }
 
+        if (configuration.AllowedGroups.Count == 0)
+        {
+            throw new ArgumentException(
+                "حداقل یک گروه مجاز AD باید تعریف شود.",
+                nameof(configuration));
+        }
+
         if (configuration.AllowedGroups.Any(group =>
                 string.IsNullOrWhiteSpace(group.Name)
                 || string.IsNullOrWhiteSpace(group.DistinguishedName)))
