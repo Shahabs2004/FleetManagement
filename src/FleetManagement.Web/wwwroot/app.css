@@ -1,0 +1,105 @@
+:root {
+    font-family: Tahoma, "Segoe UI", sans-serif;
+    color: #18332d;
+    background: #f4f6f3;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    min-width: 320px;
+    direction: rtl;
+    background: #f4f6f3;
+}
+
+.app-shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.app-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px clamp(20px, 5vw, 72px);
+    color: #fff;
+    background: #16483d;
+    box-shadow: 0 3px 16px rgb(18 48 40 / 12%);
+}
+
+.brand-mark {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 13px;
+    color: #16483d;
+    background: #d8bd75;
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.subtitle {
+    margin-top: 5px;
+    color: #d4e2dc;
+    font-size: 12px;
+}
+
+.main-content {
+    width: min(1100px, calc(100% - 40px));
+    margin: 52px auto;
+    flex: 1;
+}
+
+.welcome-panel {
+    padding: clamp(26px, 5vw, 52px);
+    border: 1px solid #e0e7e1;
+    border-radius: 22px;
+    background: #fff;
+    box-shadow: 0 12px 36px rgb(24 51 45 / 6%);
+}
+
+.eyebrow {
+    color: #94752c;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+h1 {
+    margin: 14px 0;
+    color: #16483d;
+    font-size: clamp(24px, 4vw, 36px);
+}
+
+.welcome-panel p {
+    max-width: 720px;
+    color: #5b6c65;
+    line-height: 2;
+}
+
+.status-line {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 28px;
+    color: #286a50;
+    font-size: 14px;
+}
+
+.status-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #3d9b69;
+}
+
+.app-footer {
+    padding: 18px;
+    color: #7c8983;
+    text-align: center;
+    font-size: 12px;
+}
