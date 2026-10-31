@@ -108,9 +108,11 @@ public sealed class ActiveDirectoryAuthenticator(
 
             var escapedUsername = EscapeFilterValue(username);
             var userFilter =
-                "(&(objectCategory=person)(objectClass=user)(sAMAccountName="
+                "(&(objectCategory=person)(objectClass=user)(|(sAMAccountName="
                 + escapedUsername
-                + "))";
+                + ")(userPrincipalName="
+                + escapedUsername
+                + ")))";
 
             var userRequest = new SearchRequest(
                 configuration.BaseDistinguishedName,
@@ -324,8 +326,8 @@ public sealed class ActiveDirectoryAuthenticator(
             return trimmed[(separatorIndex + 1)..];
         }
 
-        var upnSeparator = trimmed.IndexOf('@');
-        return upnSeparator > 0 ? trimmed[..upnSeparator] : trimmed;
+        // قالب UPN حفظ می‌شود تا جست‌وجو هم با sAMAccountName و هم userPrincipalName انجام شود.
+        return trimmed;
     }
 
     /// <summary>
