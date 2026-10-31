@@ -44,6 +44,7 @@ app.UseAntiforgery();
 
 // مسیرهای ورود و خروج با کنترل توکن ضد جعل ثبت می‌شوند.
 app.MapFleetAuthentication();
+app.MapMissionReportExport();
 app.MapHub<NotificationHub>("/hubs/notifications").RequireAuthorization();
 
 app.MapRazorComponents<App>()
