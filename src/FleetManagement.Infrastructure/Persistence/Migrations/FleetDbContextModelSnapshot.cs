@@ -134,6 +134,47 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
             entity.ToTable("ApplicationUsers");
         });
 
+        modelBuilder.Entity("FleetManagement.Domain.Sessions.UserSession", entity =>
+        {
+            entity.Property<Guid>("Id")
+                .ValueGeneratedOnAdd()
+                .HasColumnType("uniqueidentifier");
+
+            entity.Property<string>("Username")
+                .IsRequired()
+                .HasMaxLength(64)
+                .HasColumnType("nvarchar(64)");
+
+            entity.Property<int>("LoginMethod")
+                .HasColumnType("int");
+
+            entity.Property<int>("Status")
+                .HasColumnType("int");
+
+            entity.Property<DateTimeOffset>("LoginAtUtc")
+                .HasColumnType("datetimeoffset");
+
+            entity.Property<DateTimeOffset>("LastActivityAtUtc")
+                .HasColumnType("datetimeoffset");
+
+            entity.Property<DateTimeOffset?>("EndedAtUtc")
+                .HasColumnType("datetimeoffset");
+
+            entity.Property<string>("ClientIpAddress")
+                .HasMaxLength(45)
+                .HasColumnType("nvarchar(45)");
+
+            entity.Property<string>("Reason")
+                .HasMaxLength(300)
+                .HasColumnType("nvarchar(300)");
+
+            entity.HasKey("Id");
+            entity.HasIndex("LoginAtUtc");
+            entity.HasIndex("Status", "LastActivityAtUtc");
+            entity.HasIndex("Username");
+            entity.ToTable("UserSessions");
+        });
+
         modelBuilder.Entity("FleetManagement.Domain.Configuration.SystemSetting", entity =>
         {
             entity.Property<Guid>("Id")
