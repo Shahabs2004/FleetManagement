@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -12,7 +11,6 @@ namespace FleetManagement.Infrastructure.Bootstrap;
 public sealed class BootstrapSetupService(
     IBootstrapStateStore stateStore,
     IConfiguration configuration,
-    IWebHostEnvironment environment,
     ILogger<BootstrapSetupService> logger)
 {
     private static readonly TimeSpan SetupCodeLifetime = TimeSpan.FromHours(24);
@@ -51,7 +49,6 @@ public sealed class BootstrapSetupService(
 
         state.SetupCodeHash = HashSetupCode(setupCode);
         state.SetupCodeExpiresAtUtc = DateTimeOffset.UtcNow.Add(SetupCodeLifetime);
-
         await stateStore.WriteAsync(state, cancellationToken);
 
         var directory = Path.GetDirectoryName(_setupCodePath)
