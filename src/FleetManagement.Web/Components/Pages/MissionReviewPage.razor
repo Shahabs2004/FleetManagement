@@ -123,6 +123,11 @@
                 {
                     <div class="driver-actions">
                         <button type="button" class="secondary-button" @onclick="() => CancelAsync(mission.Id)" disabled="@_busy">لغو مأموریت</button>
+                        @if (mission.Status == MissionStatus.Running)
+                        {
+                            <button type="button" class="secondary-button" @onclick="() => OpenTimeAction(mission.Id, "extend", mission.PlannedEndAtUtc)">تمدید زمان</button>
+                            <button type="button" class="secondary-button" @onclick="() => OpenTimeAction(mission.Id, "early", mission.PlannedEndAtUtc)">خاتمه زودهنگام</button>
+                        }
                     </div>
                 }
 
@@ -132,6 +137,22 @@
                         <button type="button" class="secondary-button" @onclick="() => OpenSplit(mission)">تقسیم مأموریت</button>
                     </div>
                 }
+
+                @if (_timeActionMissionId == mission.Id)
+                {
+                    <section class="audit-detail">
+                        <h3>@(_timeActionKind == "extend" ? "تمدید مأموریت" : "خاتمه زودهنگام")</h3>
+                        <label>زمان جدید (به وقت تهران)</label>
+                        <input type="datetime-local" step="3600" value="@_timeActionLocal" @onchange="OnTimeActionChanged" />
+                        <div class="driver-actions">
+                            <button type="button" class="primary-button" @onclick="SaveTimeActionAsync" disabled="@_busy">ثبت</button>
+                            <button type="button" class="secondary-button" @onclick="() => _timeActionMissionId = null">انصراف</button>
+                        </div>
+                        <small>ثبت علت در کادر «علت تصمیم / لغو» بالای صفحه الزامی است.</small>
+                    </section>
+                }
+
+
 
                 @if (_splitMissionId == mission.Id)
                 {
@@ -226,6 +247,9 @@
     private string _splitStartOdometer = string.Empty;
     private string _splitExplanation = string.Empty;
     private MissionSplitReason _splitReason = MissionSplitReason.VehicleBreakdown;
+    private Guid? _timeActionMissionId;
+    private string _timeActionKind = string.Empty;
+    private string _timeActionLocal = string.Empty;
 
     /// <summary>بارگذاری مأموریت‌ها و منابع قابل تخصیص.</summary>
     protected override Task OnInitializedAsync() => LoadAsync();
@@ -258,6 +282,61 @@
         finally
         {
             _loading = false;
+        }
+    }
+
+    /// <summary>بازکردن فرم تمدید یا خاتمه زودهنگام.</summary>
+    private void OpenTimeAction(Guid missionId, string kind, DateTimeOffset initialValue)
+    {
+        _timeActionMissionId = missionId;
+        _timeActionKind = kind;
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+        var local = TimeZoneInfo.ConvertTime(initialValue, zone);
+        _timeActionLocal = local.ToString("yyyy-MM-dd'T'HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>دریافت زمان جدید از ورودی.</summary>
+    private void OnTimeActionChanged(ChangeEventArgs args)
+        => _timeActionLocal = args.Value?.ToString() ?? string.Empty;
+
+    /// <summary>ذخیره تمدید یا خاتمه زودهنگام.</summary>
+    private async Task SaveTimeActionAsync()
+    {
+        if (!_timeActionMissionId.HasValue || string.IsNullOrWhiteSpace(_reason))
+        {
+            _error = "علت تصمیم و زمان جدید را وارد کنید.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var newTime = ParseTehranLocalTime(_timeActionLocal);
+            var actor = await GetActorAsync();
+            if (_timeActionKind == "extend")
+            {
+                await MissionService.ExtendAsync(_timeActionMissionId.Value, newTime, _reason, actor);
+                _message = "زمان پایان مأموریت تمدید شد.";
+            }
+            else
+            {
+                await MissionService.EndEarlyAsync(_timeActionMissionId.Value, newTime, _reason, actor);
+                _message = "مأموریت زودتر از موعد خاتمه یافت و منابع آزاد شدند.";
+            }
+
+            _reason = string.Empty;
+            _timeActionMissionId = null;
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "ثبت تغییر زمان مأموریت");
+        }
+        finally
+        {
+            _busy = false;
         }
     }
 
