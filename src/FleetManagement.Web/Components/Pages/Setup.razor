@@ -1,0 +1,313 @@
+@page "/setup"
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@using FleetManagement.Infrastructure.Bootstrap
+@inject IBootstrapStateStore BootstrapStateStore
+@inject BootstrapSetupService BootstrapSetup
+@inject SqlConnectionSetupService SqlSetup
+@inject SqlDatabaseInitializer DatabaseInitializer
+@inject ILogger<Setup> Logger
+
+<PageTitle>راه‌اندازی سامانه</PageTitle>
+
+<section class="setup-panel">
+    <div class="eyebrow">راه‌اندازی اولیه</div>
+    <h1>آماده‌سازی سامانه مدیریت ناوگان</h1>
+    <p class="setup-intro">
+        این فرایند فقط برای اولین راه‌اندازی است. اطلاعات اتصال SQL در فایل محافظت‌شده سرور
+        نگهداری می‌شود تا در زمان قطعی پایگاه داده امکان بازیابی وجود داشته باشد.
+    </p>
+
+    @if (_isLoading)
+    {
+        <p>در حال بررسی وضعیت راه‌اندازی...</p>
+    }
+    else if (_setupCompleted)
+    {
+        <div class="setup-success">
+            <strong>راه‌اندازی اولیه با موفقیت تکمیل شد.</strong>
+            <p>کد اولیه باطل شده و مسیر راه‌اندازی قفل شده است. ورود عادی سامانه در مرحله بعدی توسعه فعال می‌شود.</p>
+        </div>
+    }
+    else if (!_hasLocalAdministrator)
+    {
+        <div class="setup-step">
+            <div class="step-caption">گام ۱ از ۲ · ایجاد مدیر محلی اضطراری</div>
+            <p>کد یک‌بارمصرف را از فایل محدودشده روی Windows Server دریافت کنید.</p>
+
+            <EditForm Model="_administratorModel" OnValidSubmit="CreateAdministratorAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <label for="setup-code">کد یک‌بارمصرف راه‌اندازی</label>
+                <InputText id="setup-code" @bind-Value="_administratorModel.SetupCode" autocomplete="off" />
+
+                <label for="admin-user">نام کاربری مدیر محلی</label>
+                <InputText id="admin-user" @bind-Value="_administratorModel.Username" autocomplete="username" />
+
+                <label for="admin-password">رمز عبور مدیر محلی</label>
+                <InputText id="admin-password" type="password" @bind-Value="_administratorModel.Password" autocomplete="new-password" />
+
+                <label for="admin-confirm">تکرار رمز عبور</label>
+                <InputText id="admin-confirm" type="password" @bind-Value="_administratorModel.ConfirmPassword" autocomplete="new-password" />
+
+                <button type="submit" class="primary-button" disabled="@_isBusy">ایجاد مدیر محلی</button>
+            </EditForm>
+        </div>
+    }
+    else if (!_administratorVerified)
+    {
+        <div class="setup-step">
+            <div class="step-caption">گام ۲ از ۲ · تأیید مدیر محلی و تنظیم SQL</div>
+            <p>حساب مدیر محلی ایجاد شده است. برای ادامه، هویت مدیر را دوباره تأیید کنید.</p>
+
+            <EditForm Model="_verificationModel" OnValidSubmit="VerifyAdministratorAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <label for="verify-user">نام کاربری مدیر محلی</label>
+                <InputText id="verify-user" @bind-Value="_verificationModel.Username" autocomplete="username" />
+
+                <label for="verify-password">رمز عبور مدیر محلی</label>
+                <InputText id="verify-password" type="password" @bind-Value="_verificationModel.Password" autocomplete="current-password" />
+
+                <button type="submit" class="primary-button" disabled="@_isBusy">تأیید و ادامه</button>
+            </EditForm>
+        </div>
+    }
+    else
+    {
+        <div class="setup-step">
+            <div class="step-caption">گام ۲ از ۲ · اتصال و ایجاد پایگاه داده SQL Server</div>
+            <p>حساب SQL باید مجوز اتصال به master و ایجاد پایگاه داده را داشته باشد.</p>
+
+            <EditForm Model="_sqlModel" OnValidSubmit="ConfigureSqlAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <label for="sql-server">نام سرور یا نمونه SQL</label>
+                <InputText id="sql-server" @bind-Value="_sqlModel.Server" placeholder="مثلاً SERVER\SQLINSTANCE" />
+
+                <label for="sql-database">نام پایگاه داده</label>
+                <InputText id="sql-database" @bind-Value="_sqlModel.Database" />
+
+                <label for="sql-user">نام کاربری SQL</label>
+                <InputText id="sql-user" @bind-Value="_sqlModel.Username" autocomplete="username" />
+
+                <label for="sql-password">رمز عبور SQL</label>
+                <InputText id="sql-password" type="password" @bind-Value="_sqlModel.Password" autocomplete="new-password" />
+
+                <label class="checkbox-line">
+                    <InputCheckbox @bind-Value="_sqlModel.TrustServerCertificate" />
+                    اعتماد به گواهی سرور SQL (فقط در صورت نیاز شبکه داخلی)
+                </label>
+
+                <button type="submit" class="primary-button" disabled="@_isBusy">
+                    @(_isBusy ? "در حال اتصال و ایجاد جداول..." : "آزمایش اتصال و ایجاد پایگاه داده")
+                </button>
+            </EditForm>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="@(_isError ? "setup-error" : "setup-info")" role="status">
+            @_message
+        </div>
+    }
+</section>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private bool _hasLocalAdministrator;
+    private bool _administratorVerified;
+    private bool _setupCompleted;
+    private bool _isError;
+    private string? _message;
+
+    private readonly AdministratorModel _administratorModel = new();
+    private readonly VerificationModel _verificationModel = new();
+    private readonly SqlModel _sqlModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var state = await BootstrapStateStore.ReadAsync();
+            _hasLocalAdministrator = state.HasLocalAdministrator;
+            _setupCompleted = state.SetupCompleted;
+            _verificationModel.Username = state.LocalAdministratorUsername ?? string.Empty;
+        }
+        catch (Exception exception)
+        {
+            ShowUnexpectedError(exception, "بررسی وضعیت راه‌اندازی");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// ایجاد حساب اضطراری مستقل از SQL و Active Directory.
+    /// </summary>
+    private async Task CreateAdministratorAsync()
+    {
+        _isBusy = true;
+        _message = null;
+
+        try
+        {
+            if (_administratorModel.Password != _administratorModel.ConfirmPassword)
+            {
+                throw new InvalidOperationException("رمز عبور و تکرار آن یکسان نیستند.");
+            }
+
+            await BootstrapSetup.CreateLocalAdministratorAsync(
+                _administratorModel.SetupCode,
+                _administratorModel.Username,
+                _administratorModel.Password);
+
+            _hasLocalAdministrator = true;
+            _verificationModel.Username = _administratorModel.Username;
+            _message = "حساب مدیر محلی ساخته شد. برای ادامه، ورود مدیر را تأیید کنید.";
+        }
+        catch (Exception exception)
+        {
+            ShowUnexpectedError(exception, "ایجاد مدیر محلی");
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// تأیید مجدد مدیر محلی پیش از نمایش تنظیمات اتصال پایگاه داده.
+    /// </summary>
+    private async Task VerifyAdministratorAsync()
+    {
+        _isBusy = true;
+        _message = null;
+
+        try
+        {
+            _administratorVerified = await BootstrapSetup.VerifyLocalAdministratorAsync(
+                _verificationModel.Username,
+                _verificationModel.Password);
+
+            if (!_administratorVerified)
+            {
+                throw new UnauthorizedAccessException("نام کاربری یا رمز عبور مدیر محلی صحیح نیست.");
+            }
+
+            _message = "هویت مدیر تأیید شد.";
+        }
+        catch (Exception exception)
+        {
+            ShowUnexpectedError(exception, "تأیید مدیر محلی");
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// آزمایش اتصال، ایجاد پایگاه داده، اجرای Migration و قفل کردن ویزارد.
+    /// </summary>
+    private async Task ConfigureSqlAsync()
+    {
+        _isBusy = true;
+        _message = null;
+
+        try
+        {
+            await SqlSetup.TestAndSaveAsync(
+                _sqlModel.Server,
+                _sqlModel.Database,
+                _sqlModel.Username,
+                _sqlModel.Password,
+                _sqlModel.TrustServerCertificate);
+
+            await DatabaseInitializer.InitializeAsync();
+            await BootstrapSetup.CompleteSetupAsync();
+
+            _setupCompleted = true;
+            _message = "اتصال SQL برقرار شد، جداول ایجاد شدند و راه‌اندازی اولیه تکمیل شد.";
+        }
+        catch (Exception exception)
+        {
+            ShowUnexpectedError(exception, "اتصال یا آماده‌سازی پایگاه داده");
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// ثبت جزئیات فنی فقط در گزارش سرور و نمایش شناسه پیگیری به کاربر.
+    /// </summary>
+    private void ShowUnexpectedError(Exception exception, string operation)
+    {
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "خطا در عملیات {Operation}. شناسه پیگیری: {TrackingId}", operation, trackingId);
+        _isError = true;
+        _message = $"عملیات انجام نشد. تنظیمات را بررسی کنید یا با مدیر فنی تماس بگیرید. شناسه پیگیری: {trackingId}";
+    }
+
+    /// <summary>
+    /// داده‌های فرم ایجاد مدیر محلی.
+    /// </summary>
+    private sealed class AdministratorModel
+    {
+        [Required(ErrorMessage = "کد راه‌اندازی الزامی است.")]
+        public string SetupCode { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "نام کاربری الزامی است.")]
+        [StringLength(64, MinimumLength = 3, ErrorMessage = "نام کاربری باید بین ۳ تا ۶۴ نویسه باشد.")]
+        public string Username { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "رمز عبور الزامی است.")]
+        [MinLength(14, ErrorMessage = "رمز عبور باید حداقل ۱۴ نویسه داشته باشد.")]
+        public string Password { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "تکرار رمز عبور الزامی است.")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// داده‌های فرم تأیید هویت مدیر محلی.
+    /// </summary>
+    private sealed class VerificationModel
+    {
+        [Required(ErrorMessage = "نام کاربری الزامی است.")]
+        public string Username { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "رمز عبور الزامی است.")]
+        public string Password { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// داده‌های فرم اتصال SQL Server.
+    /// </summary>
+    private sealed class SqlModel
+    {
+        [Required(ErrorMessage = "نام سرور SQL الزامی است.")]
+        public string Server { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "نام پایگاه داده الزامی است.")]
+        public string Database { get; set; } = "FleetManagement";
+
+        [Required(ErrorMessage = "نام کاربری SQL الزامی است.")]
+        public string Username { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "رمز عبور SQL الزامی است.")]
+        public string Password { get; set; } = string.Empty;
+
+        public bool TrustServerCertificate { get; set; }
+    }
+}
