@@ -42,6 +42,10 @@ public sealed class ApplicationUserConfiguration : IEntityTypeConfiguration<Appl
         builder.Property(user => user.IsOrganizationalUnitManuallyOverridden)
             .IsRequired();
 
+        builder.Property(user => user.DirectoryGroupsJson)
+            .HasMaxLength(12000)
+            .IsRequired();
+
         builder.Property(user => user.DirectoryDistinguishedName)
             .HasMaxLength(2048)
             .IsRequired();
