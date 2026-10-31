@@ -15,6 +15,11 @@
     <AuthorizeView>
         <Authorized Context="authenticatedContext">
             <nav class="admin-navigation" aria-label="ناوبری سامانه">
+                <AuthorizeView Policy="Permission:missions.view.own">
+                    <Authorized Context="missionsPermissionContext">
+                        <a href="/missions">درخواست‌های مأموریت</a>
+                    </Authorized>
+                </AuthorizeView>
                 <a href="/locations">مکان‌های مأموریت</a>
                 <AuthorizeView Policy="Permission:vehicles.view">
                     <Authorized Context="vehiclesPermissionContext">
