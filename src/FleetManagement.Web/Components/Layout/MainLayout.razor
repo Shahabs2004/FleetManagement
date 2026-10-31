@@ -53,6 +53,11 @@
                         <a href="/reports/missions">گزارش عملکرد</a>
                     </Authorized>
                 </AuthorizeView>
+                <AuthorizeView Roles="SystemAdministrator">
+                    <Authorized Context="usersAdminContext">
+                        <a href="/admin/users">مدیریت کاربران</a>
+                    </Authorized>
+                </AuthorizeView>
                 <AuthorizeView Policy="Permission:security.audit.view">
                     <Authorized Context="auditPermissionContext">
                         <a href="/admin/audit">گزارش ممیزی</a>
