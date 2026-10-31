@@ -30,6 +30,7 @@ public static class BootstrapServiceCollectionExtensions
         // تنظیمات عملیاتی و دایرکتوری در جدول SQL نگهداری می‌شوند.
         services.AddScoped<ISystemSettingsStore, SqlSystemSettingsStore>();
         services.AddScoped<ActiveDirectorySettingsService>();
+        services.AddScoped<ActiveDirectoryAuthenticator>();
         services.AddScoped<OrganizationSettingsService>();
         services.AddScoped<SmsSettingsService>();
         services.AddSingleton<ActiveDirectoryConnectionTester>();
