@@ -1,0 +1,117 @@
+@page "/recovery"
+@rendermode InteractiveServer
+@using FleetManagement.Infrastructure.Bootstrap
+@inject IBootstrapStateStore StateStore
+@inject BootstrapSetupService SetupService
+@inject SqlAvailabilityService Availability
+@inject SqlConnectionSetupService SqlSetup
+@inject SqlDatabaseInitializer DatabaseInitializer
+@inject NavigationManager Navigation
+
+<PageTitle>بازیابی اضطراری</PageTitle>
+
+<section class="setup-panel">
+    <div class="eyebrow">حالت اضطراری</div>
+    <h1>بازیابی اتصال پایگاه داده</h1>
+
+    @if (_checking)
+    {
+        <p>در حال بررسی اتصال...</p>
+    }
+    else if (_done)
+    {
+        <div class="setup-success">
+            اتصال پایگاه داده بازیابی شد.
+            <button class="primary-button" @onclick="() => Navigation.NavigateTo("/", true)">بازگشت</button>
+        </div>
+    }
+    else if (!_verified)
+    {
+        <p>برای بازیابی، مدیر محلی باید هویت خود را تأیید کند.</p>
+        <label>نام کاربری مدیر</label>
+        <input @bind="_username" autocomplete="username" />
+        <label>رمز عبور مدیر</label>
+        <input type="password" @bind="_password" autocomplete="current-password" />
+        <button class="primary-button" @onclick="VerifyAsync" disabled="@_busy">تأیید مدیر</button>
+    }
+    else
+    {
+        <p>اطلاعات اتصال SQL را اصلاح کنید. اطلاعات قبلی نمایش داده نمی‌شوند.</p>
+        <label>سرور SQL</label>
+        <input @bind="_server" />
+        <label>نام پایگاه داده</label>
+        <input @bind="_database" />
+        <label>نام کاربری SQL</label>
+        <input @bind="_sqlUser" />
+        <label>رمز SQL</label>
+        <input type="password" @bind="_sqlPassword" />
+        <button class="primary-button" @onclick="RestoreAsync" disabled="@_busy">آزمایش و بازیابی</button>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <p class="setup-error">@_message</p>
+    }
+</section>
+
+@code {
+    private bool _checking = true;
+    private bool _busy;
+    private bool _verified;
+    private bool _done;
+    private string _username = string.Empty;
+    private string _password = string.Empty;
+    private string _server = string.Empty;
+    private string _database = "FleetManagement";
+    private string _sqlUser = string.Empty;
+    private string _sqlPassword = string.Empty;
+    private string? _message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await StateStore.ReadAsync();
+        if (!state.SetupCompleted)
+        {
+            Navigation.NavigateTo("/setup", true);
+            return;
+        }
+
+        if (await Availability.IsAvailableAsync())
+        {
+            Navigation.NavigateTo("/", true);
+            return;
+        }
+
+        _checking = false;
+    }
+
+    private async Task VerifyAsync()
+    {
+        _busy = true;
+        _password = string.Empty;
+        _verified = await SetupService.VerifyLocalAdministratorAsync(_username, _password);
+        _message = _verified ? null : "اطلاعات مدیر محلی صحیح نیست یا حساب موقتاً قفل شده است.";
+        _busy = false;
+    }
+
+    private async Task RestoreAsync()
+    {
+        _busy = true;
+        try
+        {
+            await SqlSetup.TestAndSaveAsync(_server, _database, _sqlUser, _sqlPassword, false);
+            await DatabaseInitializer.InitializeAsync();
+            _done = await Availability.IsAvailableAsync();
+            _message = _done ? null : "اتصال پایگاه داده هنوز قابل تأیید نیست.";
+        }
+        catch
+        {
+            _message = "بازیابی انجام نشد. تنظیمات SQL را بررسی کنید.";
+        }
+        finally
+        {
+            _sqlPassword = string.Empty;
+            _busy = false;
+        }
+    }
+}
