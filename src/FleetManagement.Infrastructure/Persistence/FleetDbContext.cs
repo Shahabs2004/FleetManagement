@@ -2,6 +2,7 @@ using FleetManagement.Domain.Configuration;
 using FleetManagement.Domain.Drivers;
 using FleetManagement.Domain.Vehicles;
 using FleetManagement.Domain.Users;
+using FleetManagement.Domain.Sessions;
 using Microsoft.EntityFrameworkCore;
 
 namespace FleetManagement.Infrastructure.Persistence;
@@ -20,6 +21,9 @@ public sealed class FleetDbContext(DbContextOptions<FleetDbContext> options)
 
     /// <summary>پروفایل کاربران سازمانی همگام‌شده با Active Directory.</summary>
     public DbSet<ApplicationUser> ApplicationUsers => Set<ApplicationUser>();
+
+    /// <summary>سابقه دائمی ورود، خروج و تلاش‌های ناموفق کاربران.</summary>
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
 
     /// <summary>مجموعه تنظیمات عمومی و ماژولی سامانه.</summary>
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
