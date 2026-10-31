@@ -2,6 +2,7 @@ using FleetManagement.Application.Notifications;
 using FleetManagement.Domain.Notifications;
 using FleetManagement.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace FleetManagement.Infrastructure.Configuration;
 
