@@ -1,16 +1,49 @@
 @page "/"
 @rendermode InteractiveServer
+@inject FleetManagement.Infrastructure.Bootstrap.IBootstrapStateStore BootstrapStateStore
+@inject NavigationManager Navigation
+
 <PageTitle>مدیریت ناوگان</PageTitle>
 
 <section class="welcome-panel">
-    <span class="eyebrow">نسخه پایه</span>
+    <span class="eyebrow">سامانه مدیریت ناوگان</span>
     <h1>به سامانه مدیریت ناوگان خوش آمدید</h1>
-    <p>
-        زیرساخت اولیه سامانه ایجاد شده است. در گام‌های بعدی، ویزارد راه‌اندازی،
-        احراز هویت و ماژول‌های عملیاتی به‌صورت مرحله‌ای اضافه خواهند شد.
-    </p>
-    <div class="status-line">
-        <span class="status-dot"></span>
-        هسته رابط کاربری آماده توسعه است
-    </div>
+
+    @if (_isLoading)
+    {
+        <p>در حال بررسی وضعیت سامانه...</p>
+    }
+    else if (_setupCompleted)
+    {
+        <p>
+            راه‌اندازی اولیه تکمیل شده است. بخش ورود کاربران و ماژول‌های عملیاتی
+            در مراحل بعدی توسعه به این صفحه متصل می‌شوند.
+        </p>
+        <div class="status-line">
+            <span class="status-dot"></span>
+            زیرساخت اولیه آماده است
+        </div>
+    }
+    else
+    {
+        <p>سامانه برای اولین اجرا آماده می‌شود و شما را به ویزارد راه‌اندازی هدایت می‌کند.</p>
+    }
 </section>
+
+@code {
+    private bool _isLoading = true;
+    private bool _setupCompleted;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await BootstrapStateStore.ReadAsync();
+        _setupCompleted = state.SetupCompleted;
+        _isLoading = false;
+
+        // تا زمان تکمیل ویزارد، صفحه اصلی به راه‌اندازی اولیه هدایت می‌شود.
+        if (!_setupCompleted)
+        {
+            Navigation.NavigateTo("/setup", replace: true);
+        }
+    }
+}
