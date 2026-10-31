@@ -57,6 +57,18 @@ public sealed class AddAuditEntries : Migration
             name: "IX_AuditEntries_Action_Outcome",
             table: "AuditEntries",
             columns: new[] { "Action", "Outcome" });
+
+        // جلوگیری از تغییر یا حذف سوابق ممیزی حتی در صورت خطای برنامه.
+        migrationBuilder.Sql("""
+            CREATE TRIGGER TR_AuditEntries_Immutable
+            ON dbo.AuditEntries
+            AFTER UPDATE, DELETE
+            AS
+            BEGIN
+                SET NOCOUNT ON;
+                THROW 51000, N'سوابق ممیزی قابل ویرایش یا حذف نیستند.', 1;
+            END;
+            """);
     }
 
     /// <summary>
