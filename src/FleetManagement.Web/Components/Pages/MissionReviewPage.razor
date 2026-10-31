@@ -126,6 +126,77 @@
                     </div>
                 }
 
+                @if (mission.Status == MissionStatus.Running)
+                {
+                    <div class="driver-actions">
+                        <button type="button" class="secondary-button" @onclick="() => OpenSplit(mission)">تقسیم مأموریت</button>
+                    </div>
+                }
+
+                @if (_splitMissionId == mission.Id)
+                {
+                    <section class="audit-detail">
+                        <h3>تقسیم به دو مأموریت مستقل</h3>
+                        <div class="mission-assignment-grid">
+                            <div>
+                                <label>راننده بخش دوم</label>
+                                <select @bind="_splitDriver">
+                                    <option value="">انتخاب راننده</option>
+                                    @foreach (var driver in _drivers)
+                                    {
+                                        <option value="@driver.Id">@driver.FirstName @driver.LastName</option>
+                                    }
+                                </select>
+                            </div>
+                            <div>
+                                <label>خودروی بخش دوم</label>
+                                <select @bind="_splitVehicle">
+                                    <option value="">انتخاب خودرو</option>
+                                    @foreach (var vehicle in _vehicles)
+                                    {
+                                        <option value="@vehicle.Id">@vehicle.Brand @vehicle.Model — @vehicle.LicensePlate</option>
+                                    }
+                                </select>
+                            </div>
+                            <div>
+                                <label>زمان تقسیم (به وقت تهران)</label>
+                                <input type="datetime-local" step="3600" value="@_splitAtLocal" @onchange="OnSplitTimeChanged" />
+                            </div>
+                            <div>
+                                <label>کیلومترشمار پایان بخش اول</label>
+                                <input type="text" inputmode="numeric" dir="ltr" @bind="_splitEndOdometer" />
+                            </div>
+                            <div>
+                                <label>کیلومترشمار شروع خودروی جدید (در صورت تغییر خودرو)</label>
+                                <input type="text" inputmode="numeric" dir="ltr" @bind="_splitStartOdometer" />
+                            </div>
+                            <div>
+                                <label>دلیل تقسیم</label>
+                                <select @bind="_splitReason">
+                                    <option value="@MissionSplitReason.VehicleBreakdown">خرابی خودرو</option>
+                                    <option value="@MissionSplitReason.DriverChange">تعویض راننده</option>
+                                    <option value="@MissionSplitReason.DriverAndVehicleChange">تعویض هم‌زمان راننده و خودرو</option>
+                                    <option value="@MissionSplitReason.Other">سایر موارد</option>
+                                </select>
+                            </div>
+                        </div>
+                        @if (_splitReason == MissionSplitReason.Other)
+                        {
+                            <label>توضیح دلیل</label>
+                            <input @bind="_splitExplanation" maxlength="900" />
+                        }
+                        <div class="driver-actions">
+                            <button type="button" class="primary-button" @onclick="SplitAsync" disabled="@_busy">ثبت تقسیم</button>
+                            <button type="button" class="secondary-button" @onclick="CloseSplit">انصراف</button>
+                        </div>
+                    </section>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(mission.SplitReason))
+                {
+                    <p class="mission-reason"><b>تقسیم‌شده:</b> @mission.SplitReason — زمان @FormatTime(mission.SplitAtUtc ?? mission.PlannedEndAtUtc) — مأموریت مرتبط: @mission.RelatedMissionId</p>
+                }
+
                 @if (!string.IsNullOrWhiteSpace(mission.DecisionReason))
                 {
                     <p class="mission-reason"><b>آخرین علت ثبت‌شده:</b> @mission.DecisionReason</p>
@@ -147,6 +218,14 @@
     private IReadOnlyList<Vehicle> _vehicles = [];
     private readonly Dictionary<Guid, string> _driverSelection = [];
     private readonly Dictionary<Guid, string> _vehicleSelection = [];
+    private Guid? _splitMissionId;
+    private string _splitDriver = string.Empty;
+    private string _splitVehicle = string.Empty;
+    private string _splitAtLocal = string.Empty;
+    private string _splitEndOdometer = string.Empty;
+    private string _splitStartOdometer = string.Empty;
+    private string _splitExplanation = string.Empty;
+    private MissionSplitReason _splitReason = MissionSplitReason.VehicleBreakdown;
 
     /// <summary>بارگذاری مأموریت‌ها و منابع قابل تخصیص.</summary>
     protected override Task OnInitializedAsync() => LoadAsync();
@@ -180,6 +259,96 @@
         {
             _loading = false;
         }
+    }
+
+    /// <summary>بازکردن فرم تقسیم برای مأموریت در حال اجرا.</summary>
+    private void OpenSplit(Mission mission)
+    {
+        _splitMissionId = mission.Id;
+        _splitDriver = mission.DriverId?.ToString() ?? string.Empty;
+        _splitVehicle = mission.VehicleId?.ToString() ?? string.Empty;
+        _splitAtLocal = string.Empty;
+        _splitEndOdometer = string.Empty;
+        _splitStartOdometer = string.Empty;
+        _splitExplanation = string.Empty;
+        _splitReason = MissionSplitReason.VehicleBreakdown;
+    }
+
+    /// <summary>دریافت زمان تقسیم از ورودی تاریخ و ساعت.</summary>
+    private void OnSplitTimeChanged(ChangeEventArgs args)
+        => _splitAtLocal = args.Value?.ToString() ?? string.Empty;
+
+    /// <summary>بستن فرم تقسیم.</summary>
+    private void CloseSplit() => _splitMissionId = null;
+
+    /// <summary>اعتبارسنجی و ثبت تقسیم مأموریت.</summary>
+    private async Task SplitAsync()
+    {
+        if (!_splitMissionId.HasValue
+            || !Guid.TryParse(_splitDriver, out var driverId)
+            || !Guid.TryParse(_splitVehicle, out var vehicleId)
+            || !long.TryParse(_splitEndOdometer, out var endOdometer))
+        {
+            _error = "راننده، خودرو، زمان تقسیم و کیلومترشمار پایان بخش اول را کامل کنید.";
+            return;
+        }
+
+        long? secondStart = null;
+        if (!string.IsNullOrWhiteSpace(_splitStartOdometer))
+        {
+            if (!long.TryParse(_splitStartOdometer, out var parsedStart))
+            {
+                _error = "کیلومترشمار شروع خودروی جدید معتبر نیست.";
+                return;
+            }
+
+            secondStart = parsedStart;
+        }
+
+        _busy = true;
+        try
+        {
+            var splitAt = ParseTehranLocalTime(_splitAtLocal);
+            await MissionService.SplitAsync(
+                _splitMissionId.Value,
+                driverId,
+                vehicleId,
+                splitAt,
+                endOdometer,
+                secondStart,
+                _splitReason,
+                _splitExplanation,
+                await GetActorAsync());
+
+            _message = "مأموریت به دو رکورد مستقل تقسیم شد.";
+            _splitMissionId = null;
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "تقسیم مأموریت");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>تبدیل زمان محلی تهران به UTC.</summary>
+    private static DateTimeOffset ParseTehranLocalTime(string value)
+    {
+        if (!DateTime.TryParseExact(value, "yyyy-MM-ddTHH:mm", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var local) || local.Minute != 0)
+        {
+            throw new InvalidOperationException("زمان تقسیم باید با دقت ساعت کامل وارد شود.");
+        }
+
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+
+        var utc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), zone);
+        return new DateTimeOffset(utc, TimeSpan.Zero);
     }
 
     /// <summary>شروع بررسی درخواست.</summary>
