@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Configuration;
@@ -14,6 +15,10 @@ public sealed class BootstrapSetupService(
     ILogger<BootstrapSetupService> logger)
 {
     private static readonly TimeSpan SetupCodeLifetime = TimeSpan.FromHours(24);
+    private static readonly TimeSpan LoginLockoutDuration = TimeSpan.FromMinutes(15);
+    private const int MaximumFailedAttempts = 5;
+
+    private static readonly ConcurrentDictionary<string, LoginAttemptState> LoginAttempts = new();
 
     private readonly string _setupCodePath =
         configuration["Bootstrap:SetupCodePath"]
@@ -119,28 +124,43 @@ public sealed class BootstrapSetupService(
     }
 
     /// <summary>
-    /// بررسی رمز حساب مدیر محلی مستقل از SQL و Active Directory.
+    /// بررسی رمز مدیر محلی همراه با قفل موقت پس از پنج تلاش ناموفق.
     /// </summary>
     public async Task<bool> VerifyLocalAdministratorAsync(
         string username,
         string password,
         CancellationToken cancellationToken = default)
     {
-        var state = await stateStore.ReadAsync(cancellationToken);
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+        ArgumentNullException.ThrowIfNull(password);
 
-        if (!state.HasLocalAdministrator
-            || !string.Equals(
-                state.LocalAdministratorUsername,
-                username,
-                StringComparison.OrdinalIgnoreCase))
+        var attemptKey = username.Trim().ToUpperInvariant();
+
+        if (IsLockedOut(attemptKey))
         {
             return false;
         }
 
-        return LocalPasswordHasher.VerifyPassword(
-            password,
-            state.LocalAdministratorPasswordHash!,
-            state.LocalAdministratorPasswordSalt!);
+        var state = await stateStore.ReadAsync(cancellationToken);
+
+        var isValid = state.HasLocalAdministrator
+            && string.Equals(
+                state.LocalAdministratorUsername,
+                username,
+                StringComparison.OrdinalIgnoreCase)
+            && LocalPasswordHasher.VerifyPassword(
+                password,
+                state.LocalAdministratorPasswordHash!,
+                state.LocalAdministratorPasswordSalt!);
+
+        if (isValid)
+        {
+            LoginAttempts.TryRemove(attemptKey, out _);
+            return true;
+        }
+
+        RegisterFailedAttempt(attemptKey);
+        return false;
     }
 
     /// <summary>
@@ -164,6 +184,52 @@ public sealed class BootstrapSetupService(
         await stateStore.WriteAsync(state, cancellationToken);
     }
 
+    /// <summary>
+    /// بررسی وضعیت قفل حساب بر اساس نام کاربری.
+    /// </summary>
+    private static bool IsLockedOut(string attemptKey)
+    {
+        if (!LoginAttempts.TryGetValue(attemptKey, out var attempt))
+        {
+            return false;
+        }
+
+        lock (attempt)
+        {
+            if (attempt.LockedUntilUtc is null)
+            {
+                return false;
+            }
+
+            if (attempt.LockedUntilUtc > DateTimeOffset.UtcNow)
+            {
+                return true;
+            }
+
+            LoginAttempts.TryRemove(attemptKey, out _);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// ثبت تلاش ناموفق و اعمال قفل پانزده‌دقیقه‌ای پس از پنج بار خطا.
+    /// </summary>
+    private static void RegisterFailedAttempt(string attemptKey)
+    {
+        var attempt = LoginAttempts.GetOrAdd(attemptKey, _ => new LoginAttemptState());
+
+        lock (attempt)
+        {
+            attempt.FailedAttempts++;
+
+            if (attempt.FailedAttempts >= MaximumFailedAttempts)
+            {
+                attempt.FailedAttempts = 0;
+                attempt.LockedUntilUtc = DateTimeOffset.UtcNow.Add(LoginLockoutDuration);
+            }
+        }
+    }
+
     private static string HashSetupCode(string setupCode)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(setupCode));
@@ -182,5 +248,14 @@ public sealed class BootstrapSetupService(
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// وضعیت تلاش‌های ورود در حافظه برنامه.
+    /// </summary>
+    private sealed class LoginAttemptState
+    {
+        public int FailedAttempts { get; set; }
+        public DateTimeOffset? LockedUntilUtc { get; set; }
     }
 }
