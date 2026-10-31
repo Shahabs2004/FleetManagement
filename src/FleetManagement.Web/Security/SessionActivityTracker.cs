@@ -3,11 +3,11 @@ using System.Collections.Concurrent;
 namespace FleetManagement.Web.Security;
 
 /// <summary>
-/// جلوگیری از نوشتن در SQL در هر درخواست؛ آخرین فعالیت حداکثر هر پنج دقیقه ثبت می‌شود.
+/// جلوگیری از نوشتن در SQL در هر درخواست؛ آخرین فعالیت حداکثر هر یک دقیقه ثبت می‌شود.
 /// </summary>
 public sealed class SessionActivityTracker
 {
-    private static readonly TimeSpan MinimumTouchInterval = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan MinimumTouchInterval = TimeSpan.FromMinutes(1);
     private readonly ConcurrentDictionary<Guid, DateTimeOffset> _lastTouch = new();
 
     /// <summary>
