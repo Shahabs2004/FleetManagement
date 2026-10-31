@@ -1,0 +1,121 @@
+using FleetManagement.Application.Notifications;
+using FleetManagement.Domain.Notifications;
+using FleetManagement.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace FleetManagement.Infrastructure.Configuration;
+
+/// <summary>
+/// ثبت، دریافت و خوانده‌شدن اعلان‌های داخلی با انتشار لحظه‌ای.
+/// </summary>
+public sealed class NotificationService(
+    IDbContextFactory<FleetDbContext> dbContextFactory,
+    INotificationPublisher publisher)
+{
+    /// <summary>ثبت اعلان برای یک کاربر و انتشار آن به نشست‌های فعال.</summary>
+    public async Task<Guid> CreateAsync(
+        string recipientUsername,
+        string title,
+        string message,
+        string eventKey,
+        string? referenceType = null,
+        string? referenceId = null,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var notification = new UserNotification(
+            recipientUsername,
+            title,
+            message,
+            eventKey,
+            referenceType,
+            referenceId);
+
+        db.UserNotifications.Add(notification);
+        await db.SaveChangesAsync(cancellationToken);
+
+        await publisher.PublishAsync(
+            recipientUsername,
+            new NotificationPush(
+                notification.Id,
+                notification.Title,
+                notification.Message,
+                notification.EventKey,
+                notification.ReferenceType,
+                notification.ReferenceId,
+                notification.CreatedAtUtc),
+            cancellationToken);
+
+        return notification.Id;
+    }
+
+    /// <summary>دریافت اعلان‌های اخیر کاربر جاری.</summary>
+    public async Task<IReadOnlyList<UserNotification>> GetRecentAsync(
+        string username,
+        bool unreadOnly = false,
+        int take = 100,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var query = db.UserNotifications.AsNoTracking()
+            .Where(notification => notification.RecipientUsername == username);
+
+        if (unreadOnly)
+        {
+            query = query.Where(notification => notification.ReadAtUtc == null);
+        }
+
+        return await query
+            .OrderByDescending(notification => notification.CreatedAtUtc)
+            .Take(Math.Clamp(take, 1, 200))
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>تعداد اعلان‌های خوانده‌نشده کاربر.</summary>
+    public async Task<int> GetUnreadCountAsync(
+        string username,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.UserNotifications.CountAsync(
+            notification => notification.RecipientUsername == username && notification.ReadAtUtc == null,
+            cancellationToken);
+    }
+
+    /// <summary>علامت‌گذاری یک اعلان متعلق به کاربر جاری به‌عنوان خوانده‌شده.</summary>
+    public async Task MarkAsReadAsync(
+        Guid notificationId,
+        string username,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var notification = await db.UserNotifications.SingleOrDefaultAsync(
+            item => item.Id == notificationId && item.RecipientUsername == username,
+            cancellationToken);
+
+        if (notification is null) return;
+        notification.MarkAsRead(DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>علامت‌گذاری همه اعلان‌های خوانده‌نشده کاربر جاری.</summary>
+    public async Task MarkAllAsReadAsync(
+        string username,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var unread = await db.UserNotifications
+            .Where(item => item.RecipientUsername == username && item.ReadAtUtc == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var notification in unread)
+        {
+            notification.MarkAsRead(DateTimeOffset.UtcNow);
+        }
+
+        if (unread.Count > 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+}
