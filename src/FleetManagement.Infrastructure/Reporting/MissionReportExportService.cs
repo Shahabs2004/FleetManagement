@@ -202,22 +202,22 @@ public sealed class MissionReportExportService
         using var writer = XmlWriter.Create(builder, CreateXmlSettings());
         writer.WriteStartDocument();
         writer.WriteStartElement("Types", "http://schemas.openxmlformats.org/package/2006/content-types");
-        writer.WriteStartElement("Default");
+        writer.WriteStartElement("Default", "http://schemas.openxmlformats.org/package/2006/content-types");
         writer.WriteAttributeString("Extension", "rels");
         writer.WriteAttributeString("ContentType", "application/vnd.openxmlformats-package.relationships+xml");
         writer.WriteEndElement();
-        writer.WriteStartElement("Default");
+        writer.WriteStartElement("Default", "http://schemas.openxmlformats.org/package/2006/content-types");
         writer.WriteAttributeString("Extension", "xml");
         writer.WriteAttributeString("ContentType", "application/xml");
         writer.WriteEndElement();
-        writer.WriteStartElement("Override");
+        writer.WriteStartElement("Override", "http://schemas.openxmlformats.org/package/2006/content-types");
         writer.WriteAttributeString("PartName", "/xl/workbook.xml");
         writer.WriteAttributeString("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml");
         writer.WriteEndElement();
 
         for (var index = 1; index <= sheetCount; index++)
         {
-            writer.WriteStartElement("Override");
+            writer.WriteStartElement("Override", "http://schemas.openxmlformats.org/package/2006/content-types");
             writer.WriteAttributeString("PartName", $"/xl/worksheets/sheet{index}.xml");
             writer.WriteAttributeString("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml");
             writer.WriteEndElement();
@@ -234,7 +234,7 @@ public sealed class MissionReportExportService
         using var writer = XmlWriter.Create(builder, CreateXmlSettings());
         writer.WriteStartDocument();
         writer.WriteStartElement("Relationships", "http://schemas.openxmlformats.org/package/2006/relationships");
-        writer.WriteStartElement("Relationship");
+        writer.WriteStartElement("Relationship", "http://schemas.openxmlformats.org/package/2006/relationships");
         writer.WriteAttributeString("Id", "rId1");
         writer.WriteAttributeString("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument");
         writer.WriteAttributeString("Target", "xl/workbook.xml");
@@ -277,7 +277,7 @@ public sealed class MissionReportExportService
 
         for (var index = 1; index <= sheetCount; index++)
         {
-            writer.WriteStartElement("Relationship");
+            writer.WriteStartElement("Relationship", "http://schemas.openxmlformats.org/package/2006/relationships");
             writer.WriteAttributeString("Id", $"rId{index}");
             writer.WriteAttributeString("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet");
             writer.WriteAttributeString("Target", $"worksheets/sheet{index}.xml");
