@@ -8,6 +8,7 @@
 @using FleetManagement.Infrastructure.Configuration
 @using FleetManagement.Infrastructure.Reporting
 @using FleetManagement.Web.Security
+@using Microsoft.JSInterop
 @inject MissionReportService ReportService
 @inject DriverManagementService DriverService
 @inject VehicleManagementService VehicleService
@@ -92,7 +93,7 @@
             <button type="button" class="secondary-button" @onclick="PrintReportAsync">چاپ / ذخیره PDF</button>
         </div>
         <div class="report-summary-grid">
-            <div class="report-summary-item"><strong>@ToPersian(_report.Drivers.Sum(row => row.MissionCount))</strong><span>تعداد مأموریت‌های رانندگان</span></div>
+            <div class="report-summary-item"><strong>@ToPersian(_report.Drivers.Sum(row => row.MissionCount).ToString())</strong><span>تعداد مأموریت‌های رانندگان</span></div>
             <div class="report-summary-item"><strong>@ToPersian(_report.Drivers.Sum(row => row.TotalHours).ToString("0.0", CultureInfo.InvariantCulture))</strong><span>مجموع ساعت مأموریت</span></div>
             <div class="report-summary-item"><strong>@ToPersian(_report.FreightMissionCount.ToString())</strong><span>مأموریت بار</span></div>
             <div class="report-summary-item"><strong>@ToPersian(_report.PassengerMissionCount.ToString())</strong><span>مأموریت مسافر</span></div>
