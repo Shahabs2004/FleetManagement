@@ -18,6 +18,7 @@ public static class FleetAuthenticationEndpoints
     public static IEndpointRouteBuilder MapFleetAuthentication(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost("/auth/ad", SignInWithDirectoryPasswordAsync);
+        endpoints.MapPost("/auth/local-admin", SignInWithLocalAdministratorAsync);
         endpoints.MapPost("/auth/windows", SignInWithWindowsAsync);
         endpoints.MapPost("/auth/logout", SignOutAsync);
 
@@ -82,6 +83,74 @@ public static class FleetAuthenticationEndpoints
         finally
         {
             // تلاش می‌شود ارجاع محلی رمز عبور پس از پایان پردازش آزاد شود.
+            password = string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// ورود اضطراری مدیر محلی مستقل از Active Directory.
+    /// </summary>
+    private static async Task<IResult> SignInWithLocalAdministratorAsync(
+        HttpContext context,
+        IAntiforgery antiforgery,
+        IBootstrapStateStore stateStore,
+        BootstrapSetupService setupService)
+    {
+        if (!await ValidateAntiforgeryAsync(context, antiforgery))
+        {
+            return Results.BadRequest("درخواست معتبر نیست. صفحه ورود را دوباره باز کنید.");
+        }
+
+        var state = await stateStore.ReadAsync(context.RequestAborted);
+        if (!state.SetupCompleted)
+        {
+            return Results.Redirect("/setup");
+        }
+
+        var form = await context.Request.ReadFormAsync();
+        var username = form["username"].ToString().Trim();
+        var password = form["password"].ToString();
+
+        try
+        {
+            var isValid = await setupService.VerifyLocalAdministratorAsync(
+                username,
+                password,
+                context.RequestAborted);
+
+            if (!isValid)
+            {
+                return Results.Redirect("/login?error=local-admin-invalid");
+            }
+
+            var claims = new List<Claim>
+            {
+                new(ClaimTypes.NameIdentifier, "local-emergency-administrator"),
+                new(ClaimTypes.Name, username),
+                new("fleet:username", username),
+                new("fleet:auth-source", "local-emergency"),
+                new("fleet:session-start", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()),
+                new(ClaimTypes.Role, "SystemAdministrator")
+            };
+
+            var principal = new ClaimsPrincipal(
+                new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
+
+            await context.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                principal,
+                new AuthenticationProperties
+                {
+                    IsPersistent = false,
+                    AllowRefresh = true,
+                    IssuedUtc = DateTimeOffset.UtcNow,
+                    ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(30)
+                });
+
+            return Results.Redirect("/");
+        }
+        finally
+        {
             password = string.Empty;
         }
     }
