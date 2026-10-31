@@ -23,8 +23,12 @@ public static class DependencyInjection
 
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
-            services.AddDbContext<FleetDbContext>(options =>
-                options.UseSqlServer(connectionString));
+            // در Blazor Interactive Server عمر Circuit ممکن است طولانی باشد؛
+            // برای هر عملیات داده، DbContext تازه از Factory ساخته می‌شود.
+            services.AddDbContextFactory<FleetDbContext>(options =>
+                options.UseSqlServer(
+                    connectionString,
+                    sqlOptions => sqlOptions.EnableRetryOnFailure()));
         }
 
         return services;
