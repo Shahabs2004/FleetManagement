@@ -8,6 +8,7 @@ namespace FleetManagement.Infrastructure.Configuration;
 public sealed class SmsSettingsService(ISystemSettingsStore settingsStore)
 {
     private const string SettingKey = "Notifications.Sms.ADP";
+    private const string SkippedSettingKey = "Notifications.Sms.SetupSkipped";
 
     /// <summary>خواندن تنظیمات سرویس پیامک.</summary>
     public Task<SmsProviderConfiguration?> GetAsync(
@@ -18,8 +19,20 @@ public sealed class SmsSettingsService(ISystemSettingsStore settingsStore)
             cancellationToken);
     }
 
+    /// <summary>بررسی عبور مدیر فنی از مرحله پیامک در ویزارد.</summary>
+    public async Task<bool> IsSkippedAsync(CancellationToken cancellationToken = default)
+    {
+        return await settingsStore.GetAsync<bool>(SkippedSettingKey, cancellationToken);
+    }
+
+    /// <summary>ثبت عبور از مرحله پیامک بدون فعال‌سازی سرویس.</summary>
+    public Task MarkSkippedAsync(CancellationToken cancellationToken = default)
+    {
+        return settingsStore.SetAsync(SkippedSettingKey, true, cancellationToken);
+    }
+
     /// <summary>اعتبارسنجی و ذخیره تنظیمات سرویس پیامک.</summary>
-    public Task SaveAsync(
+    public async Task SaveAsync(
         SmsProviderConfiguration configuration,
         CancellationToken cancellationToken = default)
     {
@@ -66,9 +79,14 @@ public sealed class SmsSettingsService(ISystemSettingsStore settingsStore)
             throw new ArgumentException("برای هر رویداد فقط یک قالب پیامک تعریف شود.");
         }
 
-        return settingsStore.SetAsync(
+        await settingsStore.SetAsync(
             SettingKey,
             configuration,
+            cancellationToken);
+
+        await settingsStore.SetAsync(
+            SkippedSettingKey,
+            false,
             cancellationToken);
     }
 }
