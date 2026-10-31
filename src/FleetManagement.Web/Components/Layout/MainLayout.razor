@@ -54,6 +54,11 @@
                     </Authorized>
                 </AuthorizeView>
                 <AuthorizeView Roles="SystemAdministrator">
+                    <Authorized Context="missionSettingsAdminContext">
+                        <a href="/admin/mission-settings">تنظیمات مأموریت</a>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Roles="SystemAdministrator">
                     <Authorized Context="usersAdminContext">
                         <a href="/admin/users">مدیریت کاربران</a>
                     </Authorized>
