@@ -11,19 +11,16 @@ public sealed class Vehicle : Entity
     private Vehicle()
     {
         // سازنده خصوصی برای استفاده EF Core
-        Brand = string.Empty;
-        Model = string.Empty;
-        LicensePlate = string.Empty;
     }
 
     /// <summary>برند خودرو.</summary>
-    public string Brand { get; private set; }
+    public string Brand { get; private set; } = string.Empty;
 
     /// <summary>مدل خودرو.</summary>
-    public string Model { get; private set; }
+    public string Model { get; private set; } = string.Empty;
 
     /// <summary>نمایش ساختاریافته پلاک ملی؛ اعتبارسنجی تفصیلی در Value Object انجام می‌شود.</summary>
-    public string LicensePlate { get; private set; }
+    public string LicensePlate { get; private set; } = string.Empty;
 
     /// <summary>وضعیت دستی خودرو؛ وضعیت مأموریت از این فیلد مستقل است.</summary>
     public ManualVehicleStatus ManualStatus { get; private set; } = ManualVehicleStatus.Ready;
