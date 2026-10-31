@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FleetManagement.Domain.Common;
 
 namespace FleetManagement.Domain.Users;
@@ -30,6 +31,9 @@ public sealed class ApplicationUser : Entity
     /// <summary>آیا واحد سازمانی توسط مدیر سامانه به‌صورت دستی تعیین شده است؟</summary>
     public bool IsOrganizationalUnitManuallyOverridden { get; private set; }
 
+    /// <summary>فهرست DN گروه‌های مجاز کاربر در AD به‌صورت JSON.</summary>
+    public string DirectoryGroupsJson { get; private set; } = "[]";
+
     /// <summary>شناسه Distinguished Name در Active Directory.</summary>
     public string DirectoryDistinguishedName { get; private set; } = string.Empty;
 
@@ -50,13 +54,15 @@ public sealed class ApplicationUser : Entity
         string firstName,
         string lastName,
         string organizationalUnit,
-        string directoryDistinguishedName)
+        string directoryDistinguishedName,
+        IEnumerable<string>? directoryGroups = null)
     {
         Username = RequiredText(username, nameof(username), 64);
         FirstName = OptionalText(firstName, 100);
         LastName = OptionalText(lastName, 100);
         OrganizationalUnit = OptionalText(organizationalUnit, 200);
         DirectoryOrganizationalUnit = OptionalText(organizationalUnit, 200);
+        DirectoryGroupsJson = SerializeGroups(directoryGroups);
         DirectoryDistinguishedName = RequiredText(
             directoryDistinguishedName,
             nameof(directoryDistinguishedName),
@@ -73,7 +79,8 @@ public sealed class ApplicationUser : Entity
         string firstName,
         string lastName,
         string organizationalUnit,
-        string directoryDistinguishedName)
+        string directoryDistinguishedName,
+        IEnumerable<string>? directoryGroups = null)
     {
         FirstName = OptionalText(firstName, 100);
         LastName = OptionalText(lastName, 100);
@@ -81,6 +88,7 @@ public sealed class ApplicationUser : Entity
             directoryDistinguishedName,
             nameof(directoryDistinguishedName),
             2048);
+        DirectoryGroupsJson = SerializeGroups(directoryGroups);
 
         DirectoryOrganizationalUnit = OptionalText(organizationalUnit, 200);
         if (!IsOrganizationalUnitManuallyOverridden)
@@ -89,6 +97,21 @@ public sealed class ApplicationUser : Entity
         }
 
         LastDirectorySyncAtUtc = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>خواندن DN گروه‌های مجاز کاربر از تصویر ذخیره‌شده.</summary>
+    public IReadOnlyList<string> GetDirectoryGroupDistinguishedNames()
+        => JsonSerializer.Deserialize<List<string>>(DirectoryGroupsJson) ?? [];
+
+    private static string SerializeGroups(IEnumerable<string>? groups)
+    {
+        var normalized = (groups ?? [])
+            .Where(group => !string.IsNullOrWhiteSpace(group))
+            .Select(group => group.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return JsonSerializer.Serialize(normalized);
     }
 
     /// <summary>
