@@ -1,0 +1,219 @@
+@page "/admin/users"
+@rendermode InteractiveServer
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "SystemAdministrator")]
+@using FleetManagement.Domain.Users
+@using FleetManagement.Infrastructure.Configuration
+@using Microsoft.AspNetCore.Components.Authorization
+@inject UserManagementService UserService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<UserManagementPage> Logger
+
+<PageTitle>مدیریت کاربران</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">مدیریت دسترسی</div>
+    <h1>کاربران سازمانی</h1>
+    <p>حساب‌های AD حذف نمی‌شوند. غیرفعال‌سازی در این سامانه مستقل از وضعیت AD است و فعال‌سازی مجدد فقط با اقدام صریح مدیر سامانه انجام می‌شود.</p>
+
+    <div class="session-filters">
+        <div>
+            <label for="user-search">جست‌وجوی نام، نام خانوادگی یا نام کاربری</label>
+            <input id="user-search" @bind="_search" @bind:event="oninput" placeholder="عبارت جست‌وجو" />
+        </div>
+        <button type="button" class="primary-button" @onclick="LoadAsync" disabled="@_busy">جست‌وجو</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="setup-info">@_message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="setup-error">@_error</div>
+    }
+
+    @if (_loading)
+    {
+        <p>در حال دریافت کاربران...</p>
+    }
+    else if (_users.Count == 0)
+    {
+        <div class="setup-info">کاربری یافت نشد.</div>
+    }
+    else
+    {
+        <div class="session-table-wrap">
+            <table class="session-table">
+                <thead>
+                    <tr>
+                        <th>نام و نام خانوادگی</th>
+                        <th>نام کاربری</th>
+                        <th>واحد سازمانی</th>
+                        <th>وضعیت داخلی</th>
+                        <th>واحد دستی</th>
+                        <th>آخرین همگام‌سازی AD</th>
+                        <th>عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in _users)
+                    {
+                        <tr @key="user.Id">
+                            <td>@user.FirstName @user.LastName</td>
+                            <td>@user.Username</td>
+                            <td>@user.OrganizationalUnit</td>
+                            <td>@(user.IsDisabled ? "غیرفعال" : "فعال")</td>
+                            <td>@(user.IsOrganizationalUnitManuallyOverridden ? "دستی" : "همگام با AD")</td>
+                            <td>@FormatDate(user.LastDirectorySyncAtUtc)</td>
+                            <td>
+                                @if (user.IsDisabled)
+                                {
+                                    <button type="button" class="secondary-button" @onclick="() => EnableAsync(user.Id)" disabled="@_busy">فعال‌سازی</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="secondary-button" @onclick="() => DisableAsync(user.Id)" disabled="@_busy">غیرفعال‌سازی</button>
+                                }
+                                <button type="button" class="secondary-button" @onclick="() => BeginOverride(user)">اصلاح واحد</button>
+                                @if (user.IsOrganizationalUnitManuallyOverridden)
+                                {
+                                    <button type="button" class="secondary-button" @onclick="() => ClearOverrideAsync(user.Id)" disabled="@_busy">بازگشت به AD</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (_selectedUser is not null)
+    {
+        <section class="audit-detail">
+            <h2>تعیین واحد سازمانی دستی</h2>
+            <p>@_selectedUser.FirstName @_selectedUser.LastName — @_selectedUser.Username</p>
+            <input @bind="_organizationalUnit" maxlength="200" placeholder="واحد سازمانی" />
+            <div class="driver-actions">
+                <button type="button" class="primary-button" @onclick="SaveOverrideAsync" disabled="@_busy">ذخیره</button>
+                <button type="button" class="secondary-button" @onclick="CloseOverride">انصراف</button>
+            </div>
+        </section>
+    }
+</section>
+
+@code {
+    private bool _loading = true;
+    private bool _busy;
+    private string _search = string.Empty;
+    private string _organizationalUnit = string.Empty;
+    private string _message = string.Empty;
+    private string _error = string.Empty;
+    private string _actor = string.Empty;
+    private ApplicationUser? _selectedUser;
+    private IReadOnlyList<ApplicationUser> _users = [];
+
+    /// <summary>دریافت هویت مدیر و بارگذاری فهرست کاربران.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _actor = auth.User.FindFirst("fleet:username")?.Value ?? auth.User.Identity?.Name ?? "unknown";
+        await LoadAsync();
+    }
+
+    /// <summary>جست‌وجوی کاربران با فیلتر نام و نام کاربری.</summary>
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _users = await UserService.SearchAsync(_search);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "دریافت کاربران");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>غیرفعال‌سازی داخلی کاربر.</summary>
+    private Task DisableAsync(Guid id) => ExecuteAsync(async () =>
+    {
+        await UserService.DisableAsync(id, _actor);
+        _message = "حساب کاربر در سامانه غیرفعال شد.";
+    });
+
+    /// <summary>فعال‌سازی مجدد با اقدام صریح مدیر سامانه.</summary>
+    private Task EnableAsync(Guid id) => ExecuteAsync(async () =>
+    {
+        await UserService.EnableAsync(id, _actor);
+        _message = "حساب کاربر در سامانه فعال شد.";
+    });
+
+    /// <summary>انتخاب کاربر برای اصلاح واحد سازمانی.</summary>
+    private void BeginOverride(ApplicationUser user)
+    {
+        _selectedUser = user;
+        _organizationalUnit = user.OrganizationalUnit;
+    }
+
+    /// <summary>ذخیره واحد سازمانی دستی.</summary>
+    private Task SaveOverrideAsync() => ExecuteAsync(async () =>
+    {
+        if (_selectedUser is null) return;
+        await UserService.OverrideOrganizationalUnitAsync(_selectedUser.Id, _organizationalUnit, _actor);
+        _selectedUser = null;
+        _message = "واحد سازمانی دستی ذخیره شد.";
+    });
+
+    /// <summary>بازگشت واحد سازمانی به آخرین مقدار همگام‌شده از AD.</summary>
+    private Task ClearOverrideAsync(Guid id) => ExecuteAsync(async () =>
+    {
+        await UserService.ClearOrganizationalUnitOverrideAsync(id, _actor);
+        _message = "واحد سازمانی به مقدار Active Directory بازگشت.";
+    });
+
+    /// <summary>اجرای عملیات مدیریتی و تازه‌سازی فهرست.</summary>
+    private async Task ExecuteAsync(Func<Task> action)
+    {
+        _busy = true;
+        _error = string.Empty;
+        try
+        {
+            await action();
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "مدیریت کاربر");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>بستن فرم واحد سازمانی.</summary>
+    private void CloseOverride() => _selectedUser = null;
+
+    /// <summary>نمایش زمان آخرین همگام‌سازی در تقویم جلالی تهران.</summary>
+    private static string FormatDate(DateTimeOffset value)
+    {
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+        var local = TimeZoneInfo.ConvertTime(value, zone);
+        var calendar = new System.Globalization.PersianCalendar();
+        return $"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} {local.Hour:00}:00";
+    }
+
+    /// <summary>ثبت خطا با شناسه پیگیری.</summary>
+    private void ReportError(Exception exception, string operation)
+    {
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "{Operation} ناموفق بود. شناسه پیگیری: {TrackingId}", operation, trackingId);
+        _error = $"عملیات انجام نشد. شناسه پیگیری: {trackingId}";
+    }
+}
