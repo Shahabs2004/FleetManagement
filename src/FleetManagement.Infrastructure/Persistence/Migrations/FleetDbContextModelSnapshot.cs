@@ -119,6 +119,11 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
             entity.Property<bool>("IsOrganizationalUnitManuallyOverridden")
                 .HasColumnType("bit");
 
+            entity.Property<string>("DirectoryGroupsJson")
+                .IsRequired()
+                .HasMaxLength(12000)
+                .HasColumnType("nvarchar(12000)");
+
             entity.Property<string>("DirectoryDistinguishedName")
                 .IsRequired()
                 .HasMaxLength(2048)
