@@ -212,6 +212,7 @@ public static class FleetAuthenticationEndpoints
         ActiveDirectoryAuthenticator authenticator,
         DirectoryUserProvisioningService userProvisioning,
         AuthorizationResolutionService authorizationResolver,
+        UserSessionService sessionService,
         ILoggerFactory loggerFactory)
     {
         if (!await ValidateAntiforgeryAsync(context, antiforgery))
