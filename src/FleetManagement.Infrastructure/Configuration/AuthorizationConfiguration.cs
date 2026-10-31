@@ -61,6 +61,8 @@ public sealed class AuthorizationConfiguration
                         new() { Permission = "drivers.view" },
                         new() { Permission = "vehicles.view" },
                         new() { Permission = "missions.view" },
+                        new() { Permission = "missions.view.own" },
+                        new() { Permission = "missions.review" },
                         new() { Permission = "missions.create" },
                         new() { Permission = "missions.edit" },
                         new() { Permission = "missions.approve" },
