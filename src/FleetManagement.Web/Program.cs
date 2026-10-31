@@ -2,6 +2,8 @@ using FleetManagement.Infrastructure;
 using FleetManagement.Infrastructure.Bootstrap;
 using FleetManagement.Web.Components;
 using FleetManagement.Web.Security;
+using FleetManagement.Web.Notifications;
+using FleetManagement.Application.Notifications;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +15,8 @@ builder.Services
 // ثبت سرویس‌های زیرساختی؛ اتصال SQL پس از تکمیل ویزارد از فایل محافظت‌شده خوانده می‌شود.
 builder.Services.AddFleetInfrastructure(builder.Configuration);
 builder.Services.AddFleetAuthentication();
+builder.Services.AddSignalR();
+builder.Services.AddScoped<INotificationPublisher, SignalRNotificationPublisher>();
 
 var app = builder.Build();
 
@@ -39,6 +43,7 @@ app.UseAntiforgery();
 
 // مسیرهای ورود و خروج با کنترل توکن ضد جعل ثبت می‌شوند.
 app.MapFleetAuthentication();
+app.MapHub<NotificationHub>("/hubs/notifications").RequireAuthorization();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
