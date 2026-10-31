@@ -140,7 +140,8 @@ public static class FleetAuthenticationEndpoints
                 new("fleet:username", username),
                 new("fleet:auth-source", "local-emergency"),
                 new("fleet:session-start", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()),
-                new(ClaimTypes.Role, "SystemAdministrator")
+                new(ClaimTypes.Role, "SystemAdministrator"),
+                new("fleet:permission", "*")
             };
 
             var principal = new ClaimsPrincipal(
