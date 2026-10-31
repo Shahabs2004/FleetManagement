@@ -1,0 +1,32 @@
+@page "/logout"
+@using Microsoft.AspNetCore.Antiforgery
+@using Microsoft.AspNetCore.Http
+@inject IHttpContextAccessor HttpContextAccessor
+@inject IAntiforgery Antiforgery
+
+<PageTitle>خروج از سامانه</PageTitle>
+
+<section class="login-panel">
+    <h1>خروج از سامانه</h1>
+    <p>برای پایان امن نشست کاربری، دکمه زیر را انتخاب کنید.</p>
+    <form method="post" action="/auth/logout">
+        <input type="hidden" name="__RequestVerificationToken" value="@_requestToken" />
+        <button type="submit" class="primary-button">خروج امن</button>
+    </form>
+</section>
+
+@code {
+    private string? _requestToken;
+
+    /// <summary>
+    /// ایجاد توکن ضد جعل برای درخواست خروج.
+    /// </summary>
+    protected override void OnInitialized()
+    {
+        var httpContext = HttpContextAccessor.HttpContext;
+        if (httpContext is not null)
+        {
+            _requestToken = Antiforgery.GetAndStoreTokens(httpContext).RequestToken;
+        }
+    }
+}
