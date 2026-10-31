@@ -32,6 +32,8 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<ActiveDirectorySettingsService>();
         services.AddScoped<ActiveDirectoryAuthenticator>();
         services.AddScoped<DirectoryUserProvisioningService>();
+        services.AddScoped<AuthorizationSettingsService>();
+        services.AddScoped<AuthorizationResolutionService>();
         services.AddScoped<OrganizationSettingsService>();
         services.AddScoped<SmsSettingsService>();
         services.AddSingleton<ActiveDirectoryConnectionTester>();
