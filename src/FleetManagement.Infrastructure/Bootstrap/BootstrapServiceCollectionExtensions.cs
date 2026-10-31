@@ -1,6 +1,7 @@
 using FleetManagement.Application.Configuration;
 using FleetManagement.Infrastructure.Configuration;
 using FleetManagement.Infrastructure.Persistence;
+using FleetManagement.Infrastructure.Reporting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
