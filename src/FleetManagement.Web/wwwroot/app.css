@@ -615,3 +615,30 @@ h1 {
         grid-template-columns: 1fr;
     }
 }
+
+
+/* فرم مسیر و درخواست مأموریت */
+.mission-route-editor {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 18px;
+}
+
+.mission-route-editor textarea {
+    width: 100%;
+    min-height: 76px;
+    padding: 10px 12px;
+    border: 1px solid #d6e0d9;
+    border-radius: 8px;
+    background: #fff;
+    font: inherit;
+    resize: vertical;
+}
+
+.driver-form-grid small {
+    display: block;
+    margin-top: 5px;
+    color: #6a7a71;
+    font-size: .8rem;
+}
