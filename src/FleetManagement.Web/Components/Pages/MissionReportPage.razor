@@ -12,6 +12,8 @@
 @inject DriverManagementService DriverService
 @inject VehicleManagementService VehicleService
 @inject ILogger<MissionReportPage> Logger
+@inject NavigationManager Navigation
+@inject Microsoft.JSInterop.IJSRuntime JS
 
 <PageTitle>گزارش عملکرد ناوگان</PageTitle>
 
@@ -81,6 +83,14 @@
 
     @if (_report is not null)
     {
+        <div class="driver-actions report-actions">
+            <AuthorizeView Policy="Permission:reports.export">
+                <Authorized>
+                    <button type="button" class="primary-button" @onclick="ExportExcel">دریافت فایل Excel</button>
+                </Authorized>
+            </AuthorizeView>
+            <button type="button" class="secondary-button" @onclick="PrintReportAsync">چاپ / ذخیره PDF</button>
+        </div>
         <div class="report-summary-grid">
             <div class="report-summary-item"><strong>@ToPersian(_report.Drivers.Sum(row => row.MissionCount))</strong><span>تعداد مأموریت‌های رانندگان</span></div>
             <div class="report-summary-item"><strong>@ToPersian(_report.Drivers.Sum(row => row.TotalHours).ToString("0.0", CultureInfo.InvariantCulture))</strong><span>مجموع ساعت مأموریت</span></div>
@@ -179,6 +189,35 @@
         _drivers = await DriverService.SearchAsync(includeArchived: true);
         _vehicles = await VehicleService.SearchAsync(includeArchived: true);
     }
+
+    /// <summary>دریافت فایل اکسل با فیلترهای جاری.</summary>
+    private void ExportExcel()
+    {
+        var parameters = new List<string>();
+        AddParameter(parameters, "from", ParseJalaliDate(_fromDate, endOfDay: false)?.ToString("O", CultureInfo.InvariantCulture));
+        AddParameter(parameters, "to", ParseJalaliDate(_toDate, endOfDay: true)?.ToString("O", CultureInfo.InvariantCulture));
+        AddParameter(parameters, "driverId", _driverId);
+        AddParameter(parameters, "vehicleId", _vehicleId);
+        AddParameter(parameters, "type", _type);
+        AddParameter(parameters, "status", _status);
+        AddParameter(parameters, "unit", _organizationalUnit);
+
+        Navigation.NavigateTo(
+            "/reports/missions/export.xlsx?" + string.Join("&", parameters),
+            forceLoad: true);
+    }
+
+    /// <summary>افزودن پارامتر غیرخالی به آدرس خروجی.</summary>
+    private static void AddParameter(List<string> parameters, string key, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            parameters.Add($"{Uri.EscapeDataString(key)}={Uri.EscapeDataString(value)}");
+        }
+    }
+
+    /// <summary>بازکردن پنجره چاپ مرورگر برای ذخیره گزارش به‌صورت PDF.</summary>
+    private ValueTask PrintReportAsync() => JS.InvokeVoidAsync("window.print");
 
     /// <summary>ساخت گزارش با فیلترهای انتخاب‌شده.</summary>
     private async Task BuildReportAsync()
