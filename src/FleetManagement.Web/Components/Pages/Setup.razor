@@ -208,6 +208,24 @@
             <div class="step-caption">گام ۵ از ۵ · تنظیم پیامک ADP (اختیاری)</div>
             <p>تنظیم پیامک اختیاری است. در این مرحله هیچ پیامک آزمایشی ارسال نمی‌شود؛ اختلال پیامک مانع فعالیت سامانه نخواهد شد.</p>
 
+            @if (!_technicalAdministratorVerified)
+            {
+                <div class="setup-info">
+                    این مرحله فقط برای مدیر فنی است. کد مستقل مدیر فنی را از فایل محافظت‌شده روی Windows Server دریافت کنید.
+                    تأیید مدیر محلی به‌تنهایی اجازه مشاهده یا تغییر اطلاعات محرمانه پیامک را نمی‌دهد.
+                </div>
+
+                <EditForm Model="_technicalAdministratorCode" OnValidSubmit="VerifyTechnicalAdministratorAsync">
+                    <label for="technical-admin-code">کد دسترسی مدیر فنی</label>
+                    <InputText id="technical-admin-code" @bind-Value="_technicalAdministratorCode" autocomplete="off" />
+                    <button type="submit" class="primary-button" disabled="@_isBusy">تأیید دسترسی مدیر فنی</button>
+                </EditForm>
+            }
+            else
+            {
+            <div class="setup-info">
+                دسترسی مدیر فنی تأیید شده است. رمز و اطلاعات سرویس پیامک فقط در همین مرحله قابل مشاهده و تنظیم هستند.
+            </div>
             <EditForm Model="_smsModel" OnValidSubmit="SaveSmsSettingsAsync">
                 <DataAnnotationsValidator />
                 <ValidationSummary />
@@ -245,6 +263,7 @@
             <button type="button" class="secondary-button" @onclick="SkipSmsSettingsAsync" disabled="@_isBusy">
                 فعلاً بدون پیامک ادامه بده
             </button>
+            }
         </div>
     }
     else
@@ -275,6 +294,7 @@
     private bool _adReady;
     private bool _organizationReady;
     private bool _smsReady;
+    private bool _technicalAdministratorVerified;
     private bool _setupCompleted;
     private bool _isError;
     private string? _message;
@@ -285,6 +305,7 @@
     private readonly ActiveDirectoryModel _adModel = new();
     private readonly OrganizationModel _organizationModel = new();
     private readonly SmsModel _smsModel = new();
+    private string _technicalAdministratorCode = string.Empty;
     private string? _existingLogoBase64;
     private string? _existingLogoContentType;
     private string? _newLogoBase64;
@@ -627,10 +648,49 @@
     }
 
     /// <summary>
+    /// تأیید کد مستقل مدیر فنی؛ فقط پس از تأیید، فرم محرمانه پیامک نمایش داده می‌شود.
+    /// </summary>
+    private async Task VerifyTechnicalAdministratorAsync()
+    {
+        _isBusy = true;
+        _message = null;
+
+        try
+        {
+            _technicalAdministratorVerified =
+                await BootstrapSetup.VerifyTechnicalAdministratorAccessAsync(_technicalAdministratorCode);
+
+            _technicalAdministratorCode = string.Empty;
+
+            if (!_technicalAdministratorVerified)
+            {
+                throw new UnauthorizedAccessException("کد مدیر فنی نامعتبر یا منقضی شده است.");
+            }
+
+            _message = "دسترسی مدیر فنی تأیید شد.";
+            _isError = false;
+        }
+        catch (Exception exception)
+        {
+            _technicalAdministratorCode = string.Empty;
+            ShowUnexpectedError(exception, "تأیید دسترسی مدیر فنی");
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    /// <summary>
     /// ذخیره تنظیمات ADP؛ در این مرحله هیچ پیامکی ارسال نمی‌شود.
     /// </summary>
     private async Task SaveSmsSettingsAsync()
     {
+        if (!_technicalAdministratorVerified)
+        {
+            throw new UnauthorizedAccessException("برای تغییر تنظیمات پیامک، دسترسی مدیر فنی لازم است.");
+        }
+
         _isBusy = true;
         try
         {
@@ -676,6 +736,11 @@
     /// </summary>
     private Task SkipSmsSettingsAsync()
     {
+        if (!_technicalAdministratorVerified)
+        {
+            throw new UnauthorizedAccessException("فقط مدیر فنی می‌تواند از مرحله پیامک عبور کند.");
+        }
+
         _smsReady = true;
         _message = "تنظیم پیامک رد شد؛ سامانه بدون ارسال پیامک راه‌اندازی خواهد شد.";
         _isError = false;
