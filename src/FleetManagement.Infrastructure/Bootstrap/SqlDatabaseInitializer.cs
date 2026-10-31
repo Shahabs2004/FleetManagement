@@ -4,13 +4,13 @@ using Microsoft.EntityFrameworkCore;
 namespace FleetManagement.Infrastructure.Bootstrap;
 
 /// <summary>
-/// ایجاد پایگاه داده و اعمال Migrationهای نسخه جاری.
+/// ایجاد یا ارتقای ساختار پایگاه داده با Migrationهای EF Core.
 /// </summary>
 public sealed class SqlDatabaseInitializer(
     IDbContextFactory<FleetDbContext> dbContextFactory)
 {
     /// <summary>
-    /// اجرای Migrationها برای ایجاد یا ارتقای ساختار پایگاه داده.
+    /// اجرای Migrationها برای ایجاد جداول نسخه جاری.
     /// </summary>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
