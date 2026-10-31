@@ -485,6 +485,90 @@ public sealed class Mission : Entity
         DecisionReason = SplitReason;
     }
 
+    /// <summary>
+    /// اعمال یکپارچه مقادیر پیشنهادی پس از تأیید درخواست تغییر.
+    /// کنترل تعارض منابع و پیوستگی کیلومترشمار در سرویس کاربردی انجام می‌شود.
+    /// </summary>
+    public void ApplyApprovedChanges(
+        string title,
+        MissionType type,
+        string purpose,
+        string origin,
+        string destination,
+        IEnumerable<string>? intermediateStops,
+        DateTimeOffset plannedStartAtUtc,
+        DateTimeOffset plannedEndAtUtc,
+        Guid driverId,
+        Guid vehicleId,
+        string requesterPhoneSnapshot,
+        string requestingGroup,
+        string? description,
+        int? passengerCount,
+        string? missionOrderNumber,
+        DateOnly? missionOrderDate,
+        long? odometerStartKm)
+    {
+        if (Status is not (MissionStatus.Confirmed or MissionStatus.Running))
+        {
+            throw new InvalidOperationException("درخواست تغییر فقط برای مأموریت تأییدشده یا در حال اجرا قابل اعمال است.");
+        }
+
+        if (!Enum.IsDefined(type) || driverId == Guid.Empty || vehicleId == Guid.Empty)
+        {
+            throw new ArgumentException("نوع مأموریت، راننده یا خودرو معتبر نیست.");
+        }
+
+        ValidateHour(plannedStartAtUtc, nameof(plannedStartAtUtc));
+        ValidateHour(plannedEndAtUtc, nameof(plannedEndAtUtc));
+        if (plannedEndAtUtc <= plannedStartAtUtc)
+        {
+            throw new ArgumentException("زمان پایان باید بعد از زمان شروع باشد.");
+        }
+
+        if (ActualStartAtUtc.HasValue && plannedEndAtUtc <= ActualStartAtUtc.Value)
+        {
+            throw new ArgumentException("زمان پایان جدید نمی‌تواند پیش از شروع واقعی مأموریت باشد.");
+        }
+
+        if (passengerCount is < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(passengerCount));
+        }
+
+        var vehicleChanged = VehicleId != vehicleId;
+        if (vehicleChanged && !odometerStartKm.HasValue)
+        {
+            throw new InvalidOperationException("برای تغییر خودرو باید کیلومترشمار شروع خودروی جدید مشخص شود.");
+        }
+
+        Title = Required(title, 200, nameof(title));
+        Type = type;
+        Purpose = Required(purpose, 500, nameof(purpose));
+        Origin = Required(origin, 200, nameof(origin));
+        Destination = Required(destination, 200, nameof(destination));
+        RouteJson = JsonSerializer.Serialize(NormalizeStops(intermediateStops));
+        PlannedStartAtUtc = plannedStartAtUtc;
+        PlannedEndAtUtc = plannedEndAtUtc;
+        DriverId = driverId;
+        VehicleId = vehicleId;
+        RequesterPhoneSnapshot = Required(requesterPhoneSnapshot, 20, nameof(requesterPhoneSnapshot));
+        RequestingGroup = Required(requestingGroup, 200, nameof(requestingGroup));
+        Description = Optional(description, 2000);
+        PassengerCount = passengerCount;
+        MissionOrderNumber = Optional(missionOrderNumber, 50);
+        MissionOrderDate = missionOrderDate;
+
+        if (vehicleChanged)
+        {
+            OdometerStartKm = odometerStartKm;
+            OdometerEndKm = null;
+        }
+        else if (odometerStartKm.HasValue)
+        {
+            SetOdometerStart(odometerStartKm.Value);
+        }
+    }
+
     /// <summary>خواندن مقصدهای میانی با حفظ ترتیب ثبت.</summary>
     public IReadOnlyList<string> GetIntermediateStops()
         => JsonSerializer.Deserialize<List<string>>(RouteJson) ?? [];
