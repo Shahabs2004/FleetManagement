@@ -87,11 +87,11 @@
                         </div>
                         <div>
                             <label for="mission-start">زمان شروع (به وقت تهران)</label>
-                            <input id="mission-start" type="datetime-local" step="3600" @bind="_startLocal" />
+                            <input id="mission-start" type="datetime-local" step="3600" value="@_startLocal" @onchange="OnStartChanged" />
                         </div>
                         <div>
                             <label for="mission-end">زمان پایان (به وقت تهران)</label>
-                            <input id="mission-end" type="datetime-local" step="3600" @bind="_endLocal" />
+                            <input id="mission-end" type="datetime-local" step="3600" value="@_endLocal" @onchange="OnEndChanged" />
                         </div>
                         <div>
                             <label for="mission-passengers">تعداد همراهان / مسافران</label>
@@ -107,7 +107,7 @@
                         </div>
                         <div>
                             <label for="mission-order-date">تاریخ دستور مأموریت (اختیاری)</label>
-                            <input id="mission-order-date" type="date" @bind="_missionOrderDate" />
+                            <input id="mission-order-date" type="date" value="@_missionOrderDate" @onchange="OnOrderDateChanged" />
                         </div>
                     </div>
                     <div class="mission-route-editor">
@@ -219,6 +219,15 @@
             _loading = false;
         }
     }
+
+    /// <summary>دریافت زمان شروع از ورودی تاریخ و ساعت مرورگر.</summary>
+    private void OnStartChanged(ChangeEventArgs args) => _startLocal = args.Value?.ToString() ?? string.Empty;
+
+    /// <summary>دریافت زمان پایان از ورودی تاریخ و ساعت مرورگر.</summary>
+    private void OnEndChanged(ChangeEventArgs args) => _endLocal = args.Value?.ToString() ?? string.Empty;
+
+    /// <summary>دریافت تاریخ اختیاری دستور مأموریت.</summary>
+    private void OnOrderDateChanged(ChangeEventArgs args) => _missionOrderDate = args.Value?.ToString() ?? string.Empty;
 
     /// <summary>ثبت درخواست پس از کنترل فهرست مکان‌ها و زمان‌های انتخاب‌شده.</summary>
     private async Task CreateAsync()
