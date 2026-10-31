@@ -6,6 +6,7 @@ using FleetManagement.Domain.Sessions;
 using FleetManagement.Domain.Auditing;
 using FleetManagement.Domain.Missions;
 using FleetManagement.Domain.Locations;
+using FleetManagement.Domain.Notifications;
 using Microsoft.EntityFrameworkCore;
 
 namespace FleetManagement.Infrastructure.Persistence;
@@ -33,6 +34,9 @@ public sealed class FleetDbContext(DbContextOptions<FleetDbContext> options)
 
     /// <summary>سابقه دائمی ورود، خروج و تلاش‌های ناموفق کاربران.</summary>
     public DbSet<UserSession> UserSessions => Set<UserSession>();
+
+    /// <summary>اعلان‌های داخلی کاربران.</summary>
+    public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
 
     /// <summary>رویدادهای دائمی ممیزی عملیات مهم سامانه.</summary>
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
