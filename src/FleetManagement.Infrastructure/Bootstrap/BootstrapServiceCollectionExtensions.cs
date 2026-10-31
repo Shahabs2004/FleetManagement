@@ -18,6 +18,7 @@ public static class BootstrapServiceCollectionExtensions
         services.AddSingleton<BootstrapSetupService>();
         services.AddSingleton<SqlConnectionSetupService>();
         services.AddSingleton<SqlDatabaseInitializer>();
+        services.AddSingleton<SqlAvailabilityService>();
         services.AddSingleton<BootstrapDbContextFactory>();
 
         // اتصال از فایل محلی محافظت‌شده خوانده می‌شود تا پس از تکمیل ویزارد نیاز به Restart نباشد.
