@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FleetManagement.Application.Configuration;
 
 namespace FleetManagement.Infrastructure.Configuration;
@@ -5,7 +6,9 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// <summary>
 /// خواندن و ذخیره الگوی چاپ دستور مأموریت در تنظیمات SQL.
 /// </summary>
-public sealed class MissionOrderTemplateService(ISystemSettingsStore settingsStore)
+public sealed class MissionOrderTemplateService(
+    ISystemSettingsStore settingsStore,
+    AuditLogService auditLog)
 {
     private const string SettingKey = "Missions.OrderTemplate";
 
@@ -25,7 +28,17 @@ public sealed class MissionOrderTemplateService(ISystemSettingsStore settingsSto
         ArgumentNullException.ThrowIfNull(template);
         Validate(template);
 
+        var before = await GetAsync(cancellationToken);
         await settingsStore.SetAsync(SettingKey, template, cancellationToken);
+        await auditLog.RecordAsync(
+            actor,
+            "UpdateTemplate",
+            "MissionOrderTemplate",
+            null,
+            "Success",
+            beforeJson: JsonSerializer.Serialize(before),
+            afterJson: JsonSerializer.Serialize(template),
+            cancellationToken: cancellationToken);
     }
 
     private static void Validate(MissionOrderTemplateConfiguration template)
