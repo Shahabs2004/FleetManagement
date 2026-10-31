@@ -63,6 +63,37 @@ public sealed class UserSessionService(IDbContextFactory<FleetDbContext> dbConte
         }
     }
 
+    /// <summary>
+    /// جست‌وجوی سوابق نشست و تلاش ورود؛ خروجی به‌صورت صفحه محدودشده و فقط خواندنی است.
+    /// </summary>
+    public async Task<IReadOnlyList<UserSession>> GetRecentAsync(
+        string? username = null,
+        UserSessionStatus? status = null,
+        int take = 200,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext =
+            await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var query = dbContext.UserSessions.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(username))
+        {
+            var normalizedUsername = username.Trim();
+            query = query.Where(session => session.Username.Contains(normalizedUsername));
+        }
+
+        if (status.HasValue)
+        {
+            query = query.Where(session => session.Status == status.Value);
+        }
+
+        return await query
+            .OrderByDescending(session => session.LoginAtUtc)
+            .Take(Math.Clamp(take, 1, 500))
+            .ToListAsync(cancellationToken);
+    }
+
     /// <summary>به‌روزرسانی آخرین فعالیت نشست.</summary>
     public async Task TouchAsync(
         Guid sessionId,
