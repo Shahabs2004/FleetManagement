@@ -125,6 +125,12 @@
     </AuthorizeView>
 
     <h2>سوابق درخواست‌ها</h2>
+    <div class="session-filters">
+        <div>
+            <label for="request-action-reason">علت لغو یا درخواست انصراف</label>
+            <input id="request-action-reason" @bind="_requestActionReason" maxlength="1000" placeholder="ثبت علت الزامی است" />
+        </div>
+    </div>
     @if (_loading)
     {
         <p>در حال دریافت درخواست‌ها...</p>
@@ -146,6 +152,7 @@
                         <th>نوع</th>
                         <th>وضعیت</th>
                         <th>علت تصمیم</th>
+                        <th>عملیات</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -159,6 +166,16 @@
                             <td>@(mission.Type == MissionType.Freight ? "بار" : "مسافر")</td>
                             <td>@GetStatusName(mission.Status)</td>
                             <td>@mission.DecisionReason</td>
+                            <td>
+                                @if (mission.Status == MissionStatus.Pending)
+                                {
+                                    <button type="button" class="secondary-button" @onclick="() => CancelPendingAsync(mission.Id)" disabled="@_busy">لغو درخواست</button>
+                                }
+                                else if (mission.Status is MissionStatus.UnderReview or MissionStatus.Confirmed or MissionStatus.Running)
+                                {
+                                    <button type="button" class="secondary-button" @onclick="() => RequestWithdrawalAsync(mission.Id)" disabled="@_busy">درخواست انصراف</button>
+                                }
+                            </td>
                         </tr>
                     }
                 </tbody>
@@ -189,6 +206,7 @@
     private string _organizationalUnit = string.Empty;
     private string _message = string.Empty;
     private string _error = string.Empty;
+    private string _requestActionReason = string.Empty;
     private IReadOnlyList<string> _groups = [];
     private IReadOnlyList<Location> _locations = [];
     private IReadOnlyList<Mission> _missions = [];
@@ -295,6 +313,52 @@
         finally
         {
             _busy = false;
+        }
+    }
+
+    /// <summary>لغو مستقیم درخواست تأییدنشده توسط درخواست‌کننده.</summary>
+    private Task CancelPendingAsync(Guid missionId) => ExecuteRequestActionAsync(async () =>
+    {
+        EnsureRequestReason();
+        await MissionService.CancelPendingRequestAsync(missionId, _username, _requestActionReason);
+        _message = "درخواست مأموریت لغو شد.";
+    });
+
+    /// <summary>ثبت درخواست انصراف برای مأموریت بررسی‌شده یا تأییدشده.</summary>
+    private Task RequestWithdrawalAsync(Guid missionId) => ExecuteRequestActionAsync(async () =>
+    {
+        EnsureRequestReason();
+        await MissionService.RequestWithdrawalAsync(missionId, _username, _requestActionReason);
+        _message = "درخواست انصراف برای بررسی مسئول ناوگان ارسال شد.";
+    });
+
+    /// <summary>اجرای عملیات درخواست‌کننده و تازه‌سازی سوابق.</summary>
+    private async Task ExecuteRequestActionAsync(Func<Task> action)
+    {
+        _busy = true;
+        _error = string.Empty;
+        try
+        {
+            await action();
+            _requestActionReason = string.Empty;
+            _missions = await MissionService.SearchAsync(requesterUsername: _username);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "ثبت تصمیم درخواست مأموریت");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>الزام ثبت علت برای لغو یا انصراف.</summary>
+    private void EnsureRequestReason()
+    {
+        if (string.IsNullOrWhiteSpace(_requestActionReason))
+        {
+            throw new InvalidOperationException("ثبت علت الزامی است.");
         }
     }
 
