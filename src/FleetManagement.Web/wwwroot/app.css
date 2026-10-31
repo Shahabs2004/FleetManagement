@@ -793,3 +793,74 @@ h1 {
     color: #748278;
     text-align: center;
 }
+
+
+/* فیلترها و خلاصه گزارش عملکرد */
+.report-filters {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(150px, 1fr));
+    align-items: end;
+    gap: 12px;
+    margin: 22px 0;
+}
+
+.report-filters input,
+.report-filters select {
+    width: 100%;
+    min-height: 42px;
+    margin-top: 6px;
+    padding: 8px 10px;
+    border: 1px solid #d6e0d9;
+    border-radius: 8px;
+    background: #fff;
+    font: inherit;
+}
+
+.report-filters .primary-button {
+    width: auto;
+    margin: 0;
+}
+
+.report-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(150px, 1fr));
+    gap: 12px;
+    margin: 24px 0;
+}
+
+.report-summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px;
+    border: 1px solid #dce7df;
+    border-radius: 10px;
+    background: #f8fbf8;
+}
+
+.report-summary-item strong {
+    color: #245346;
+    font-size: 1.35rem;
+}
+
+.report-summary-item span {
+    color: #63756a;
+    font-size: .85rem;
+}
+
+@media (max-width: 850px) {
+    .report-filters {
+        grid-template-columns: repeat(2, minmax(140px, 1fr));
+    }
+
+    .report-summary-grid {
+        grid-template-columns: repeat(2, minmax(140px, 1fr));
+    }
+}
+
+@media (max-width: 520px) {
+    .report-filters,
+    .report-summary-grid {
+        grid-template-columns: 1fr;
+    }
+}
