@@ -48,8 +48,27 @@
         <button type="submit" class="secondary-button">ورود یکپارچه با حساب ویندوز</button>
     </form>
 
+    <div class="login-divider"><span>ورود اضطراری مدیر محلی</span></div>
+
+    <div class="setup-info">
+        این روش فقط برای مدیر محلی اضطراری و هنگام اختلال Active Directory است.
+        حساب محلی مستقل از دامنه بوده و دسترسی مدیریتی کامل دارد.
+    </div>
+
+    <form method="post" action="/auth/local-admin" class="login-form">
+        <input type="hidden" name="__RequestVerificationToken" value="@_requestToken" />
+
+        <label for="local-admin-username">نام کاربری مدیر محلی</label>
+        <input id="local-admin-username" name="username" autocomplete="username" required />
+
+        <label for="local-admin-password">رمز عبور مدیر محلی</label>
+        <input id="local-admin-password" name="password" type="password" autocomplete="current-password" required />
+
+        <button type="submit" class="secondary-button">ورود اضطراری</button>
+    </form>
+
     <p class="login-footnote">
-        فقط کاربران فعال عضو گروه‌های مجاز سازمان امکان ورود دارند.
+        فقط کاربران فعال عضو گروه‌های مجاز سازمان امکان ورود عادی دارند.
     </p>
 </section>
 
@@ -97,6 +116,7 @@
             "account-locked" => "حساب کاربری شما در دایرکتوری قفل شده است.",
             "account-expired" => "اعتبار زمانی حساب کاربری شما پایان یافته است.",
             "app-disabled" => "حساب شما توسط مدیر سامانه غیرفعال شده است. برای فعال‌سازی با مدیر سامانه تماس بگیرید.",
+            "local-admin-invalid" => "اطلاعات مدیر محلی صحیح نیست یا حساب موقتاً قفل شده است.",
             "not-allowed" => "حساب شما عضو هیچ‌یک از گروه‌های مجاز سامانه نیست.",
             "directory-unavailable" => "ارتباط با Active Directory برقرار نشد. بعداً دوباره تلاش کنید.",
             "method-disabled" => "این روش ورود توسط مدیر سامانه غیرفعال شده است.",
