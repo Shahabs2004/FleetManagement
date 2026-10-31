@@ -52,6 +52,8 @@ public static class FleetAuthenticationExtensions
             });
 
         services.AddAuthorization();
+        services.AddSingleton<IAuthorizationPolicyProvider, FleetAuthorizationPolicyProvider>();
+        services.AddSingleton<IAuthorizationHandler, FleetPermissionAuthorizationHandler>();
         services.AddCascadingAuthenticationState();
         services.AddHttpContextAccessor();
         services.AddAntiforgery();
