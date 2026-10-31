@@ -134,6 +134,68 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
             entity.ToTable("ApplicationUsers");
         });
 
+        modelBuilder.Entity("FleetManagement.Domain.Missions.Mission", entity =>
+        {
+            entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uniqueidentifier");
+            entity.Property<string>("MissionNumber").IsRequired().HasMaxLength(20).HasColumnType("nvarchar(20)");
+            entity.Property<string>("Title").IsRequired().HasMaxLength(200).HasColumnType("nvarchar(200)");
+            entity.Property<string>("RequesterUsername").IsRequired().HasMaxLength(64).HasColumnType("nvarchar(64)");
+            entity.Property<string>("RequesterName").IsRequired().HasMaxLength(200).HasColumnType("nvarchar(200)");
+            entity.Property<string>("RequesterPhoneSnapshot").IsRequired().HasMaxLength(20).HasColumnType("nvarchar(20)");
+            entity.Property<string>("RequesterOrganizationalUnit").IsRequired().HasMaxLength(200).HasColumnType("nvarchar(200)");
+            entity.Property<string>("RequestingGroup").IsRequired().HasMaxLength(200).HasColumnType("nvarchar(200)");
+            entity.Property<int>("Type").HasColumnType("int");
+            entity.Property<string>("Purpose").IsRequired().HasMaxLength(500).HasColumnType("nvarchar(500)");
+            entity.Property<string>("Origin").IsRequired().HasMaxLength(200).HasColumnType("nvarchar(200)");
+            entity.Property<string>("Destination").IsRequired().HasMaxLength(200).HasColumnType("nvarchar(200)");
+            entity.Property<string>("RouteJson").IsRequired().HasColumnType("nvarchar(max)");
+            entity.Property<DateTimeOffset>("PlannedStartAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<DateTimeOffset>("PlannedEndAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<Guid?>("DriverId").HasColumnType("uniqueidentifier");
+            entity.Property<Guid?>("VehicleId").HasColumnType("uniqueidentifier");
+            entity.Property<string>("Description").HasMaxLength(2000).HasColumnType("nvarchar(2000)");
+            entity.Property<int?>("PassengerCount").HasColumnType("int");
+            entity.Property<string>("MissionOrderNumber").HasMaxLength(50).HasColumnType("nvarchar(50)");
+            entity.Property<DateOnly?>("MissionOrderDate").HasColumnType("date");
+            entity.Property<int>("Status").HasColumnType("int");
+            entity.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<DateTimeOffset?>("ReviewStartedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<string>("ApprovedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            entity.Property<DateTimeOffset?>("ApprovedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<DateTimeOffset?>("ActualStartAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<DateTimeOffset?>("ActualEndAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<long?>("OdometerStartKm").HasColumnType("bigint");
+            entity.Property<long?>("OdometerEndKm").HasColumnType("bigint");
+            entity.Property<string>("DecisionReason").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            entity.Property<int?>("StatusBeforeWithdrawal").HasColumnType("int");
+            entity.Property<Guid?>("RelatedMissionId").HasColumnType("uniqueidentifier");
+            entity.Property<string>("SplitReason").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            entity.Property<DateTimeOffset?>("SplitAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<string>("SplitBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            entity.HasKey("Id");
+            entity.HasIndex("MissionNumber").IsUnique();
+            entity.HasIndex("Status", "PlannedStartAtUtc", "PlannedEndAtUtc");
+            entity.HasIndex("DriverId", "PlannedStartAtUtc", "PlannedEndAtUtc");
+            entity.HasIndex("VehicleId", "PlannedStartAtUtc", "PlannedEndAtUtc");
+            entity.HasIndex("RequesterUsername");
+            entity.ToTable("Missions");
+        });
+
+        modelBuilder.Entity("FleetManagement.Domain.Missions.Mission", entity =>
+        {
+            entity.HasOne("FleetManagement.Domain.Drivers.Driver", null)
+                .WithMany()
+                .HasForeignKey("DriverId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_Missions_Drivers_DriverId");
+
+            entity.HasOne("FleetManagement.Domain.Vehicles.Vehicle", null)
+                .WithMany()
+                .HasForeignKey("VehicleId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_Missions_Vehicles_VehicleId");
+        });
+
         modelBuilder.Entity("FleetManagement.Domain.Sessions.UserSession", entity =>
         {
             entity.Property<Guid>("Id")
