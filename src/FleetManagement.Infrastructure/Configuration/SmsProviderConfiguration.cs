@@ -35,4 +35,27 @@ public sealed class SmsProviderConfiguration
 
     /// <summary>قالب‌های قابل تنظیم برای رویدادهای پیامکی.</summary>
     public List<SmsEventTemplateConfiguration> EventTemplates { get; set; } = [];
+
+    /// <summary>
+    /// ساخت قالب‌های پیش‌فرض نه رویداد پیامکی مصوب.
+    /// ارسال پیامک برای مأموریت تقسیم‌شده عمداً تعریف نشده است.
+    /// </summary>
+    public static SmsProviderConfiguration CreateDefault()
+    {
+        return new SmsProviderConfiguration
+        {
+            EventTemplates =
+            [
+                new() { EventType = SmsEventType.MissionApproved, Template = "مأموریت {MissionNumber} با عنوان {MissionTitle} تأیید شد. زمان شروع: {StartDateTime}" },
+                new() { EventType = SmsEventType.MissionRejected, Template = "درخواست مأموریت {MissionNumber} رد شد. علت: {RejectionReason}" },
+                new() { EventType = SmsEventType.MissionChanged, Template = "جزئیات مأموریت {MissionNumber} تغییر کرد. زمان جدید: {StartDateTime}" },
+                new() { EventType = SmsEventType.DriverOrVehicleChanged, Template = "در مأموریت {MissionNumber} راننده یا خودرو تغییر کرده است." },
+                new() { EventType = SmsEventType.MissionCancelled, Template = "مأموریت {MissionNumber} لغو شد. علت: {CancellationReason}" },
+                new() { EventType = SmsEventType.WithdrawalApproved, Template = "درخواست انصراف از مأموریت {MissionNumber} تأیید شد." },
+                new() { EventType = SmsEventType.WithdrawalRejected, Template = "درخواست انصراف از مأموریت {MissionNumber} رد شد." },
+                new() { EventType = SmsEventType.MissionStartReminder, Template = "یادآوری: مأموریت {MissionNumber} در ساعت {StartDateTime} آغاز می‌شود." },
+                new() { EventType = SmsEventType.MissionCompleted, Template = "مأموریت {MissionNumber} به پایان رسید." }
+            ]
+        };
+    }
 }
