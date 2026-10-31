@@ -1,3 +1,5 @@
+using FleetManagement.Application.Configuration;
+
 namespace FleetManagement.Infrastructure.Configuration;
 
 /// <summary>
