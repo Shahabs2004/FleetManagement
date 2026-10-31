@@ -223,6 +223,30 @@ public sealed class MissionManagementService(
             cancellationToken: cancellationToken);
     }
 
+    /// <summary>لغو مستقیم درخواست تأییدنشده توسط درخواست‌کننده.</summary>
+    public async Task CancelPendingRequestAsync(
+        Guid missionId,
+        string requesterUsername,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var mission = await GetMissionAsync(db, missionId, cancellationToken);
+        if (!string.Equals(mission.RequesterUsername, requesterUsername, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new UnauthorizedAccessException("فقط درخواست‌کننده می‌تواند درخواست خود را لغو کند.");
+        }
+
+        if (mission.Status != MissionStatus.Pending)
+        {
+            throw new InvalidOperationException("لغو مستقیم فقط برای درخواست در انتظار بررسی مجاز است.");
+        }
+
+        mission.Cancel(reason, DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync(cancellationToken);
+        await RecordMissionAuditAsync(requesterUsername, "CancelPendingRequest", mission, "Success", cancellationToken, reason);
+    }
+
     /// <summary>درخواست انصراف توسط درخواست‌کننده.</summary>
     public async Task RequestWithdrawalAsync(
         Guid missionId,
@@ -235,6 +259,11 @@ public sealed class MissionManagementService(
         if (!string.Equals(mission.RequesterUsername, requesterUsername, StringComparison.OrdinalIgnoreCase))
         {
             throw new UnauthorizedAccessException("فقط درخواست‌کننده می‌تواند برای مأموریت خود درخواست انصراف ثبت کند.");
+        }
+
+        if (mission.Status == MissionStatus.Pending)
+        {
+            throw new InvalidOperationException("درخواست تأییدنشده باید مستقیماً لغو شود و نیاز به درخواست انصراف ندارد.");
         }
 
         mission.RequestWithdrawal(reason);
