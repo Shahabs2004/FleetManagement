@@ -67,6 +67,10 @@
                 <div class="mission-review-heading">
                     <strong>@mission.MissionNumber — @mission.Title</strong>
                     <span>@GetStatusName(mission.Status)</span>
+                    @if (mission.Status is MissionStatus.Confirmed or MissionStatus.Running or MissionStatus.Completed or MissionStatus.Cancelled)
+                    {
+                        <a class="secondary-button" href="@("/missions/" + mission.Id + "/print")">چاپ دستور</a>
+                    }
                 </div>
                 <div class="mission-review-grid">
                     <div><b>درخواست‌کننده:</b> @mission.RequesterName (@mission.RequesterUsername)</div>
