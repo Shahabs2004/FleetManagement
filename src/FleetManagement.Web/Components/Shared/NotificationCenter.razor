@@ -1,0 +1,129 @@
+@implements IDisposable
+@using FleetManagement.Domain.Notifications
+@using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Web.Notifications
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NotificationEventBus NotificationEvents
+
+<div class="notification-center">
+    <button type="button" class="notification-toggle" @onclick="TogglePanel" aria-label="اعلان‌ها">
+        اعلان‌ها
+        @if (_unreadCount > 0)
+        {
+            <span class="notification-count">@ToPersianDigits(_unreadCount.ToString())</span>
+        }
+    </button>
+
+    @if (_isOpen)
+    {
+        <section class="notification-panel">
+            <div class="notification-panel-heading">
+                <strong>اعلان‌های سامانه</strong>
+                <button type="button" class="secondary-button" @onclick="MarkAllReadAsync" disabled="@(_unreadCount == 0)">خواندن همه</button>
+            </div>
+            @if (_notifications.Count == 0)
+            {
+                <p class="notification-empty">اعلانی وجود ندارد.</p>
+            }
+            else
+            {
+                @foreach (var notification in _notifications)
+                {
+                    <button type="button"
+                            class="notification-item @(notification.IsRead ? "is-read" : "is-unread")"
+                            @onclick="() => MarkReadAsync(notification.Id)"
+                            @key="notification.Id">
+                        <strong>@notification.Title</strong>
+                        <span>@notification.Message</span>
+                        <small>@FormatTime(notification.CreatedAtUtc)</small>
+                    </button>
+                }
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private string _username = string.Empty;
+    private bool _isOpen;
+    private int _unreadCount;
+    private IReadOnlyList<UserNotification> _notifications = [];
+
+    /// <summary>دریافت نام کاربر، اعلان‌های قبلی و اتصال به رویداد لحظه‌ای.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _username = auth.User.FindFirst("fleet:username")?.Value ?? auth.User.Identity?.Name ?? string.Empty;
+        NotificationEvents.Published += OnNotificationPublished;
+        await ReloadAsync();
+    }
+
+    /// <summary>باز یا بسته کردن پنل اعلان‌ها.</summary>
+    private void TogglePanel() => _isOpen = !_isOpen;
+
+    /// <summary>دریافت اعلان‌های اخیر و تعداد خوانده‌نشده.</summary>
+    private async Task ReloadAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_username)) return;
+        _notifications = await NotificationService.GetRecentAsync(_username);
+        _unreadCount = await NotificationService.GetUnreadCountAsync(_username);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>واکنش به اعلان جدید کاربر جاری.</summary>
+    private void OnNotificationPublished(string username, FleetManagement.Application.Notifications.NotificationPush notification)
+    {
+        if (string.Equals(username, _username, StringComparison.OrdinalIgnoreCase))
+        {
+            _ = InvokeAsync(ReloadAsync);
+        }
+    }
+
+    /// <summary>علامت‌گذاری یک اعلان به‌عنوان خوانده‌شده.</summary>
+    private async Task MarkReadAsync(Guid id)
+    {
+        await NotificationService.MarkAsReadAsync(id, _username);
+        await ReloadAsync();
+    }
+
+    /// <summary>خوانده‌شده کردن همه اعلان‌ها.</summary>
+    private async Task MarkAllReadAsync()
+    {
+        await NotificationService.MarkAllAsReadAsync(_username);
+        await ReloadAsync();
+    }
+
+    /// <summary>نمایش تاریخ و ساعت جلالی تهران.</summary>
+    private static string FormatTime(DateTimeOffset value)
+    {
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+        var local = TimeZoneInfo.ConvertTime(value, zone);
+        var calendar = new System.Globalization.PersianCalendar();
+        return $"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} - {local.Hour:00}:00";
+    }
+
+    /// <summary>تبدیل ارقام برای نمایش فارسی.</summary>
+    private static string ToPersianDigits(string value)
+    {
+        const string latin = "0123456789";
+        const string persian = "۰۱۲۳۴۵۶۷۸۹";
+        return string.Create(value.Length, value, (destination, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                var digit = latin.IndexOf(source[index]);
+                destination[index] = digit >= 0 ? persian[digit] : source[index];
+            }
+        });
+    }
+
+    /// <summary>قطع اشتراک هنگام حذف کامپوننت.</summary>
+    public void Dispose()
+    {
+        NotificationEvents.Published -= OnNotificationPublished;
+    }
+}
