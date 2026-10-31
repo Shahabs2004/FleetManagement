@@ -125,8 +125,8 @@
                         <button type="button" class="secondary-button" @onclick="() => CancelAsync(mission.Id)" disabled="@_busy">لغو مأموریت</button>
                         @if (mission.Status == MissionStatus.Running)
                         {
-                            <button type="button" class="secondary-button" @onclick="() => OpenTimeAction(mission.Id, "extend", mission.PlannedEndAtUtc)">تمدید زمان</button>
-                            <button type="button" class="secondary-button" @onclick="() => OpenTimeAction(mission.Id, "early", mission.PlannedEndAtUtc)">خاتمه زودهنگام</button>
+                            <button type="button" class="secondary-button" @onclick='() => OpenTimeAction(mission.Id, "extend", mission.PlannedEndAtUtc)'>تمدید زمان</button>
+                            <button type="button" class="secondary-button" @onclick='() => OpenTimeAction(mission.Id, "early", mission.PlannedEndAtUtc)'>خاتمه زودهنگام</button>
                         }
                     </div>
                 }
