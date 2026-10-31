@@ -17,6 +17,11 @@
         <Authorized Context="authenticatedContext">
             <NotificationCenter />
             <nav class="admin-navigation" aria-label="ناوبری سامانه">
+                <AuthorizeView Policy="Permission:missions.view.own">
+                    <Authorized Context="missionChangesPermissionContext">
+                        <a href="/missions/changes">درخواست تغییر مأموریت</a>
+                    </Authorized>
+                </AuthorizeView>
                 <AuthorizeView Policy="Permission:missions.review">
                     <Authorized Context="missionReviewPermissionContext">
                         <a href="/admin/missions">بررسی مأموریت‌ها</a>
