@@ -89,6 +89,16 @@ public sealed class AuthorizationSettingsService(ISystemSettingsStore settingsSt
             throw new ArgumentException("تخصیص دستی نقش به کاربر نامعتبر است.", nameof(configuration));
         }
 
+        if (configuration.ManualUserPermissions.Any(mapping =>
+                string.IsNullOrWhiteSpace(mapping.Username)
+                || mapping.Permissions.Count == 0
+                || mapping.Permissions.Any(permission =>
+                    string.IsNullOrWhiteSpace(permission.Permission)
+                    || !Enum.IsDefined(permission.Effect))))
+        {
+            throw new ArgumentException("مجوز مستقیم یکی از کاربران معتبر نیست.", nameof(configuration));
+        }
+
         await settingsStore.SetAsync(
             SettingKey,
             configuration,
