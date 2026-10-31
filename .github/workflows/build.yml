@@ -23,3 +23,6 @@ jobs:
 
       - name: ساخت نسخه
         run: dotnet build FleetManagement.sln --configuration Release --no-restore
+
+      - name: اجرای آزمون‌ها
+        run: dotnet test FleetManagement.sln --configuration Release --no-build --verbosity normal
