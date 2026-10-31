@@ -33,6 +33,7 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAuthentication();
+app.UseMiddleware<FleetSessionTrackingMiddleware>();
 app.UseAuthorization();
 app.UseAntiforgery();
 
