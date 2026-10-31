@@ -1,0 +1,303 @@
+@page "/locations"
+@rendermode InteractiveServer
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using FleetManagement.Domain.Locations
+@using FleetManagement.Infrastructure.Configuration
+@using Microsoft.AspNetCore.Components.Authorization
+@inject LocationManagementService LocationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<LocationsPage> Logger
+
+<PageTitle>مکان‌های مأموریت</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">اطلاعات پایه مأموریت</div>
+    <h1>مکان‌های مشترک</h1>
+    <p>مکان‌های تأییدشده برای انتخاب در مبدأ، مقصد و توقف‌های میانی استفاده می‌شوند. هر کاربر می‌تواند مکان جدید پیشنهاد دهد و تأیید نهایی فقط با مدیر سامانه است.</p>
+
+    <section class="driver-editor">
+        <h2>پیشنهاد مکان جدید</h2>
+        <div class="driver-form-grid">
+            <div>
+                <label for="location-name">نام مکان</label>
+                <input id="location-name" @bind="_newName" maxlength="200" placeholder="نام محل" />
+            </div>
+        </div>
+        @if (_similarNames.Count > 0)
+        {
+            <div class="setup-info">
+                نام‌های مشابه پیدا شدند: @string.Join("، ", _similarNames)
+                <br />
+                می‌توانید با وجود این هشدار پیشنهاد را ثبت کنید.
+            </div>
+        }
+        <div class="driver-actions">
+            <button type="button" class="primary-button" @onclick="CheckSimilarAsync" disabled="@_busy">بررسی نام مشابه</button>
+            <button type="button" class="primary-button" @onclick="ProposeAsync" disabled="@_busy">ثبت پیشنهاد</button>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="setup-info">@_message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="setup-error">@_error</div>
+    }
+
+    <h2>مکان‌های قابل انتخاب</h2>
+    @if (_approved.Count == 0)
+    {
+        <div class="setup-info">هنوز مکان تأییدشده‌ای ثبت نشده است.</div>
+    }
+    else
+    {
+        <div class="session-table-wrap">
+            <table class="session-table">
+                <thead><tr><th>نام مکان</th><th>عملیات مدیریتی</th></tr></thead>
+                <tbody>
+                    @foreach (var location in _approved)
+                    {
+                        <tr @key="location.Id">
+                            <td>@location.Name</td>
+                            <td>
+                                <AuthorizeView Roles="SystemAdministrator">
+                                    <Authorized>
+                                        <button type="button" class="secondary-button" @onclick="() => BeginRename(location)">ویرایش نام</button>
+                                        <button type="button" class="secondary-button" @onclick="() => DeactivateAsync(location.Id)" disabled="@_busy">غیرفعال‌سازی</button>
+                                    </Authorized>
+                                </AuthorizeView>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <AuthorizeView Roles="SystemAdministrator">
+        <Authorized>
+            <h2 class="location-pending-title">پیشنهادهای در انتظار تأیید</h2>
+            @if (_pending.Count == 0)
+            {
+                <div class="setup-info">پیشنهاد در انتظار بررسی وجود ندارد.</div>
+            }
+            else
+            {
+                <div class="session-table-wrap">
+                    <table class="session-table">
+                        <thead><tr><th>نام پیشنهادی</th><th>پیشنهاددهنده</th><th>زمان ثبت</th><th>تصمیم</th></tr></thead>
+                        <tbody>
+                            @foreach (var location in _pending)
+                            {
+                                <tr @key="location.Id">
+                                    <td>@location.Name</td>
+                                    <td>@location.ProposedBy</td>
+                                    <td>@FormatDate(location.CreatedAtUtc)</td>
+                                    <td>
+                                        <button type="button" class="secondary-button" @onclick="() => ApproveAsync(location.Id)" disabled="@_busy">تأیید</button>
+                                        <button type="button" class="secondary-button" @onclick="() => RejectAsync(location.Id)" disabled="@_busy">رد</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </Authorized>
+    </AuthorizeView>
+
+    @if (_renaming is not null)
+    {
+        <section class="audit-detail">
+            <h2>اصلاح نام مکان</h2>
+            <input @bind="_renameValue" maxlength="200" />
+            <div class="driver-actions">
+                <button type="button" class="primary-button" @onclick="SaveRenameAsync" disabled="@_busy">ذخیره</button>
+                <button type="button" class="secondary-button" @onclick="() => _renaming = null">انصراف</button>
+            </div>
+        </section>
+    }
+</section>
+
+@code {
+    private bool _busy;
+    private string _newName = string.Empty;
+    private string _renameValue = string.Empty;
+    private string _message = string.Empty;
+    private string _error = string.Empty;
+    private IReadOnlyList<string> _similarNames = [];
+    private IReadOnlyList<Location> _approved = [];
+    private IReadOnlyList<Location> _pending = [];
+    private Location? _renaming;
+
+    /// <summary>بارگذاری مکان‌های قابل انتخاب و پیشنهادهای مدیریتی.</summary>
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    /// <summary>بازیابی فهرست مکان‌ها.</summary>
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _approved = await LocationService.GetApprovedAsync();
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (state.User.IsInRole("SystemAdministrator"))
+            {
+                _pending = await LocationService.GetPendingAsync();
+            }
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "دریافت فهرست مکان‌ها");
+        }
+    }
+
+    /// <summary>نمایش هشدار نام‌های مشابه بدون مسدودکردن ثبت.</summary>
+    private async Task CheckSimilarAsync()
+    {
+        try
+        {
+            _similarNames = await LocationService.FindSimilarNamesAsync(_newName);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "بررسی نام مکان");
+        }
+    }
+
+    /// <summary>ثبت پیشنهاد مکان توسط کاربر جاری.</summary>
+    private async Task ProposeAsync()
+    {
+        _busy = true;
+        try
+        {
+            await LocationService.ProposeAsync(_newName, await GetActorAsync());
+            _message = "پیشنهاد مکان ثبت شد و پس از تأیید مدیر سامانه قابل انتخاب خواهد بود.";
+            _newName = string.Empty;
+            _similarNames = [];
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "ثبت پیشنهاد مکان");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>تأیید پیشنهاد مکان توسط مدیر سامانه.</summary>
+    private async Task ApproveAsync(Guid id)
+    {
+        _busy = true;
+        try
+        {
+            await LocationService.ApproveAsync(id, await GetActorAsync());
+            _message = "مکان تأیید شد.";
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "تأیید مکان");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>رد پیشنهاد مکان با علت.</summary>
+    private async Task RejectAsync(Guid id)
+    {
+        _busy = true;
+        try
+        {
+            await LocationService.RejectAsync(id, "پیشنهاد توسط مدیر سامانه رد شد.", await GetActorAsync());
+            _message = "پیشنهاد رد شد.";
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "رد مکان");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>انتخاب مکان برای اصلاح نام.</summary>
+    private void BeginRename(Location location)
+    {
+        _renaming = location;
+        _renameValue = location.Name;
+    }
+
+    /// <summary>ذخیره نام اصلاح‌شده مکان.</summary>
+    private async Task SaveRenameAsync()
+    {
+        if (_renaming is null) return;
+        _busy = true;
+        try
+        {
+            await LocationService.RenameAsync(_renaming.Id, _renameValue, await GetActorAsync());
+            _renaming = null;
+            _message = "نام مکان اصلاح شد.";
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "اصلاح نام مکان");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>غیرفعال‌سازی مکان تأییدشده.</summary>
+    private async Task DeactivateAsync(Guid id)
+    {
+        _busy = true;
+        try
+        {
+            await LocationService.DeactivateAsync(id, await GetActorAsync());
+            _message = "مکان غیرفعال شد و از فهرست انتخاب حذف گردید.";
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "غیرفعال‌سازی مکان");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>دریافت نام کاربری عامل.</summary>
+    private async Task<string> GetActorAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        return state.User.FindFirst("fleet:username")?.Value ?? state.User.Identity?.Name ?? "unknown";
+    }
+
+    /// <summary>نمایش تاریخ جلالی در منطقه تهران.</summary>
+    private static string FormatDate(DateTimeOffset value)
+    {
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+        var local = TimeZoneInfo.ConvertTime(value, zone);
+        var calendar = new System.Globalization.PersianCalendar();
+        return $"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00}";
+    }
+
+    /// <summary>ثبت خطا با شناسه پیگیری.</summary>
+    private void ReportError(Exception exception, string operation)
+    {
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "{Operation} ناموفق بود. شناسه پیگیری: {TrackingId}", operation, trackingId);
+        _error = $"عملیات انجام نشد. شناسه پیگیری: {trackingId}";
+    }
+}
