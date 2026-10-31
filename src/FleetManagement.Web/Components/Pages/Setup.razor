@@ -10,6 +10,8 @@
 @inject FleetManagement.Infrastructure.Bootstrap.SqlAvailabilityService SqlAvailability
 @inject FleetManagement.Infrastructure.Configuration.ActiveDirectorySettingsService ActiveDirectorySettings
 @inject FleetManagement.Infrastructure.Configuration.ActiveDirectoryConnectionTester ActiveDirectoryTester
+@inject FleetManagement.Infrastructure.Configuration.OrganizationSettingsService OrganizationSettings
+@inject FleetManagement.Infrastructure.Configuration.SmsSettingsService SmsSettings
 @inject ILogger<Setup> Logger
 
 <PageTitle>راه‌اندازی سامانه</PageTitle>
@@ -112,10 +114,10 @@
             </EditForm>
         </div>
     }
-    else
+    else if (!_adReady)
     {
         <div class="setup-step">
-            <div class="step-caption">گام ۳ از ۳ · تنظیم Active Directory</div>
+            <div class="step-caption">گام ۳ از ۵ · تنظیم Active Directory</div>
             <p>اطلاعات اتصال دایرکتوری و گروه‌های مجاز را وارد کنید. اگر AD موقتاً در دسترس نیست، می‌توانید این مرحله را رد کنید و بعداً تنظیمات را تکمیل کنید.</p>
 
             <EditForm Model="_adModel" OnValidSubmit="SaveAndTestActiveDirectoryAsync">
@@ -175,6 +177,86 @@
             </button>
         </div>
     }
+    else if (!_organizationReady)
+    {
+        <div class="setup-step">
+            <div class="step-caption">گام ۴ از ۵ · مشخصات سازمان</div>
+            <p>نام سازمان در سربرگ سامانه، صفحه ورود و برگه مأموریت نمایش داده می‌شود.</p>
+
+            <EditForm Model="_organizationModel" OnValidSubmit="SaveOrganizationAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <label for="organization-name">نام سازمان</label>
+                <InputText id="organization-name" @bind-Value="_organizationModel.OrganizationName" />
+
+                <label for="organization-logo">نشان سازمان (PNG یا JPEG، حداکثر ۱٫۵ مگابایت)</label>
+                <InputFile id="organization-logo" OnChange="LogoSelectedAsync" accept="image/png,image/jpeg" />
+
+                @if (!string.IsNullOrWhiteSpace(_logoFileName))
+                {
+                    <p>فایل انتخاب‌شده: @_logoFileName</p>
+                }
+
+                <button type="submit" class="primary-button" disabled="@_isBusy">ذخیره مشخصات سازمان</button>
+            </EditForm>
+        </div>
+    }
+    else if (!_smsReady)
+    {
+        <div class="setup-step">
+            <div class="step-caption">گام ۵ از ۵ · تنظیم پیامک ADP (اختیاری)</div>
+            <p>تنظیم پیامک اختیاری است. در این مرحله هیچ پیامک آزمایشی ارسال نمی‌شود؛ اختلال پیامک مانع فعالیت سامانه نخواهد شد.</p>
+
+            <EditForm Model="_smsModel" OnValidSubmit="SaveSmsSettingsAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <label for="sms-organization">شناسه سازمان در سرویس‌دهنده</label>
+                <InputText id="sms-organization" @bind-Value="_smsModel.Organization" />
+
+                <label for="sms-username">نام کاربری سرویس پیامک</label>
+                <InputText id="sms-username" @bind-Value="_smsModel.Username" />
+
+                <label for="sms-password">رمز سرویس پیامک</label>
+                <InputText id="sms-password" type="password" @bind-Value="_smsModel.Password" autocomplete="new-password" />
+
+                <label for="sms-source">شماره فرستنده ثابت</label>
+                <InputText id="sms-source" @bind-Value="_smsModel.SourceNumber" />
+
+                <label for="sms-retries">تعداد تلاش مجدد خطاهای موقت</label>
+                <InputNumber id="sms-retries" @bind-Value="_smsModel.MaximumRetryCount" />
+
+                <label for="sms-retry-interval">فاصله تلاش مجدد (ثانیه)</label>
+                <InputNumber id="sms-retry-interval" @bind-Value="_smsModel.RetryIntervalSeconds" />
+
+                <label for="sms-poll-interval">فاصله بررسی وضعیت تحویل (ثانیه)</label>
+                <InputNumber id="sms-poll-interval" @bind-Value="_smsModel.StatusPollingIntervalSeconds" />
+
+                <label for="sms-poll-count">حداکثر دفعات بررسی وضعیت</label>
+                <InputNumber id="sms-poll-count" @bind-Value="_smsModel.MaximumStatusPollingAttempts" />
+
+                <label for="sms-reminder">یادآوری پیش از شروع (دقیقه)</label>
+                <InputNumber id="sms-reminder" @bind-Value="_smsModel.ReminderLeadMinutes" />
+
+                <button type="submit" class="primary-button" disabled="@_isBusy">ذخیره تنظیمات پیامک</button>
+            </EditForm>
+
+            <button type="button" class="secondary-button" @onclick="SkipSmsSettingsAsync" disabled="@_isBusy">
+                فعلاً بدون پیامک ادامه بده
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="setup-step">
+            <div class="step-caption">پایان راه‌اندازی اولیه</div>
+            <p>تنظیمات اصلی ثبت شده‌اند. با تکمیل این مرحله، مسیر راه‌اندازی اولیه قفل می‌شود.</p>
+            <button type="button" class="primary-button" @onclick="CompleteInitialSetupAsync" disabled="@_isBusy">
+                تکمیل و قفل کردن راه‌اندازی
+            </button>
+        </div>
+    }
 
     @if (!string.IsNullOrWhiteSpace(_message))
     {
@@ -190,6 +272,9 @@
     private bool _hasLocalAdministrator;
     private bool _administratorVerified;
     private bool _sqlReady;
+    private bool _adReady;
+    private bool _organizationReady;
+    private bool _smsReady;
     private bool _setupCompleted;
     private bool _isError;
     private string? _message;
@@ -198,6 +283,13 @@
     private readonly VerificationModel _verificationModel = new();
     private readonly SqlModel _sqlModel = new();
     private readonly ActiveDirectoryModel _adModel = new();
+    private readonly OrganizationModel _organizationModel = new();
+    private readonly SmsModel _smsModel = new();
+    private string? _existingLogoBase64;
+    private string? _existingLogoContentType;
+    private string? _newLogoBase64;
+    private string? _newLogoContentType;
+    private string? _logoFileName;
 
     protected override async Task OnInitializedAsync()
     {
@@ -228,6 +320,30 @@
                     _adModel.AllowedGroupsText = string.Join(
                         Environment.NewLine,
                         savedDirectorySettings.AllowedGroups.Select(group => $"{group.Name}|{group.DistinguishedName}"));
+                    _adReady = true;
+                }
+
+                var savedOrganization = await OrganizationSettings.GetAsync();
+                if (savedOrganization is not null)
+                {
+                    _organizationModel.OrganizationName = savedOrganization.OrganizationName;
+                    _existingLogoBase64 = savedOrganization.LogoBase64;
+                    _existingLogoContentType = savedOrganization.LogoContentType;
+                    _organizationReady = true;
+                }
+
+                var savedSms = await SmsSettings.GetAsync();
+                if (savedSms is not null)
+                {
+                    _smsModel.Organization = savedSms.Organization;
+                    _smsModel.Username = savedSms.Username;
+                    _smsModel.SourceNumber = savedSms.SourceNumber;
+                    _smsModel.MaximumRetryCount = savedSms.MaximumRetryCount;
+                    _smsModel.RetryIntervalSeconds = savedSms.RetryIntervalSeconds;
+                    _smsModel.StatusPollingIntervalSeconds = savedSms.StatusPollingIntervalSeconds;
+                    _smsModel.MaximumStatusPollingAttempts = savedSms.MaximumStatusPollingAttempts;
+                    _smsModel.ReminderLeadMinutes = savedSms.ReminderLeadMinutes;
+                    _smsReady = true;
                 }
             }
         }
@@ -399,11 +515,9 @@
 
             await ActiveDirectorySettings.SaveAsync(configuration);
             await ActiveDirectoryTester.TestAsync(configuration);
-            await BootstrapSetup.CompleteSetupAsync();
-
-            _setupCompleted = true;
+            _adReady = true;
             _adModel.ServiceAccountPassword = string.Empty;
-            _message = "اتصال Active Directory تأیید شد و راه‌اندازی اولیه تکمیل شد.";
+            _message = "اتصال Active Directory تأیید شد. اکنون مشخصات سازمان را ثبت کنید.";
         }
         catch (Exception exception)
         {
@@ -425,13 +539,156 @@
         _isBusy = true;
         try
         {
-            await BootstrapSetup.CompleteSetupAsync();
-            _setupCompleted = true;
-            _message = "راه‌اندازی با AD ناقص تکمیل شد. ورود کاربران عادی تا پیکربندی AD غیرفعال خواهد بود.";
+            _adReady = true;
+            _message = "مرحله AD رد شد. ورود کاربران عادی تا پیکربندی AD غیرفعال خواهد بود. اکنون مشخصات سازمان را ثبت کنید.";
         }
         catch (Exception exception)
         {
             ShowUnexpectedError(exception, "تکمیل راه‌اندازی بدون AD");
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// دریافت و اعتبارسنجی فایل نشان سازمان در مرورگر.
+    /// </summary>
+    private async Task LogoSelectedAsync(InputFileChangeEventArgs args)
+    {
+        try
+        {
+            var file = args.File;
+
+            if (file.ContentType is not ("image/png" or "image/jpeg"))
+            {
+                throw new InvalidOperationException("فقط فایل PNG یا JPEG پذیرفته می‌شود.");
+            }
+
+            if (file.Size > 1_500_000)
+            {
+                throw new InvalidOperationException("حجم فایل نشان باید کمتر از ۱٫۵ مگابایت باشد.");
+            }
+
+            await using var stream = file.OpenReadStream(1_500_000);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+
+            _newLogoBase64 = Convert.ToBase64String(memory.ToArray());
+            _newLogoContentType = file.ContentType;
+            _logoFileName = file.Name;
+            _message = "فایل نشان انتخاب شد.";
+            _isError = false;
+        }
+        catch (Exception exception)
+        {
+            ShowUnexpectedError(exception, "بارگذاری نشان سازمان");
+        }
+    }
+
+    /// <summary>
+    /// ذخیره نام و نشان سازمان در SQL.
+    /// </summary>
+    private async Task SaveOrganizationAsync()
+    {
+        _isBusy = true;
+        try
+        {
+            await OrganizationSettings.SaveAsync(
+                new FleetManagement.Infrastructure.Configuration.OrganizationProfileConfiguration
+                {
+                    OrganizationName = _organizationModel.OrganizationName,
+                    LogoBase64 = _newLogoBase64 ?? _existingLogoBase64,
+                    LogoContentType = _newLogoContentType ?? _existingLogoContentType
+                });
+
+            _organizationReady = true;
+            _message = "مشخصات سازمان ذخیره شد. اکنون تنظیم پیامک را انجام دهید یا از آن عبور کنید.";
+            _isError = false;
+        }
+        catch (Exception exception)
+        {
+            ShowUnexpectedError(exception, "ذخیره مشخصات سازمان");
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// ذخیره تنظیمات ADP؛ در این مرحله هیچ پیامکی ارسال نمی‌شود.
+    /// </summary>
+    private async Task SaveSmsSettingsAsync()
+    {
+        _isBusy = true;
+        try
+        {
+            var previous = await SmsSettings.GetAsync();
+            var servicePassword = string.IsNullOrWhiteSpace(_smsModel.Password)
+                ? previous?.Password ?? string.Empty
+                : _smsModel.Password;
+
+            var configuration = new FleetManagement.Infrastructure.Configuration.SmsProviderConfiguration
+            {
+                Organization = _smsModel.Organization,
+                Username = _smsModel.Username,
+                Password = servicePassword,
+                SourceNumber = _smsModel.SourceNumber,
+                MaximumRetryCount = _smsModel.MaximumRetryCount,
+                RetryIntervalSeconds = _smsModel.RetryIntervalSeconds,
+                StatusPollingIntervalSeconds = _smsModel.StatusPollingIntervalSeconds,
+                MaximumStatusPollingAttempts = _smsModel.MaximumStatusPollingAttempts,
+                ReminderLeadMinutes = _smsModel.ReminderLeadMinutes,
+                EventTemplates = previous?.EventTemplates
+                    ?? FleetManagement.Infrastructure.Configuration.SmsProviderConfiguration.CreateDefault().EventTemplates
+            };
+
+            await SmsSettings.SaveAsync(configuration);
+            _smsReady = true;
+            _smsModel.Password = string.Empty;
+            _message = "تنظیمات پیامک ذخیره شد. هیچ پیامک آزمایشی ارسال نشده است.";
+            _isError = false;
+        }
+        catch (Exception exception)
+        {
+            ShowUnexpectedError(exception, "ذخیره تنظیمات پیامک");
+        }
+        finally
+        {
+            _smsModel.Password = string.Empty;
+            _isBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// ادامه راه‌اندازی بدون فعال‌سازی پیامک.
+    /// </summary>
+    private Task SkipSmsSettingsAsync()
+    {
+        _smsReady = true;
+        _message = "تنظیم پیامک رد شد؛ سامانه بدون ارسال پیامک راه‌اندازی خواهد شد.";
+        _isError = false;
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// تکمیل نهایی و قفل کردن ویزارد پس از ثبت تنظیمات اصلی.
+    /// </summary>
+    private async Task CompleteInitialSetupAsync()
+    {
+        _isBusy = true;
+        try
+        {
+            await BootstrapSetup.CompleteSetupAsync();
+            _setupCompleted = true;
+            _message = "راه‌اندازی اولیه تکمیل شد و مسیر ویزارد قفل شد.";
+            _isError = false;
+        }
+        catch (Exception exception)
+        {
+            ShowUnexpectedError(exception, "تکمیل راه‌اندازی اولیه");
         }
         finally
         {
@@ -500,6 +757,38 @@
         public string Password { get; set; } = string.Empty;
 
         public bool TrustServerCertificate { get; set; }
+    }
+
+    /// <summary>
+    /// داده‌های فرم مشخصات سازمان.
+    /// </summary>
+    private sealed class OrganizationModel
+    {
+        [Required(ErrorMessage = "نام سازمان الزامی است.")]
+        public string OrganizationName { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// داده‌های فرم اتصال سرویس پیامک ADP.
+    /// </summary>
+    private sealed class SmsModel
+    {
+        [Required(ErrorMessage = "شناسه سازمان الزامی است.")]
+        public string Organization { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "نام کاربری سرویس پیامک الزامی است.")]
+        public string Username { get; set; } = string.Empty;
+
+        public string Password { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "شماره فرستنده الزامی است.")]
+        public string SourceNumber { get; set; } = string.Empty;
+
+        public int MaximumRetryCount { get; set; } = 3;
+        public int RetryIntervalSeconds { get; set; } = 60;
+        public int StatusPollingIntervalSeconds { get; set; } = 60;
+        public int MaximumStatusPollingAttempts { get; set; } = 10;
+        public int ReminderLeadMinutes { get; set; } = 60;
     }
 
     /// <summary>
