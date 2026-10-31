@@ -339,19 +339,6 @@ public sealed class MissionManagementService(
                 throw new InvalidOperationException("کیلومترشمار شروع از آخرین مقدار ثبت‌شده برای این خودرو کمتر است.");
             }
 
-            var nextStart = await db.Missions
-                .Where(item => item.Id != mission.Id
-                    && item.VehicleId == mission.VehicleId
-                    && item.OdometerStartKm.HasValue
-                    && item.PlannedStartAtUtc >= mission.PlannedEndAtUtc)
-                .OrderBy(item => item.PlannedStartAtUtc)
-                .Select(item => item.OdometerStartKm)
-                .FirstOrDefaultAsync(cancellationToken);
-
-            if (nextStart.HasValue && startKm.Value > nextStart.Value)
-            {
-                throw new InvalidOperationException("اصلاح کیلومترشمار شروع با پیوستگی مأموریت بعدی سازگار نیست.");
-            }
         }
 
         if (mission.VehicleId.HasValue && endKm.HasValue)
