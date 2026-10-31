@@ -253,6 +253,23 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
             entity.ToTable("UserSessions");
         });
 
+        modelBuilder.Entity("FleetManagement.Domain.Notifications.UserNotification", entity =>
+        {
+            entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uniqueidentifier");
+            entity.Property<string>("RecipientUsername").IsRequired().HasMaxLength(64).HasColumnType("nvarchar(64)");
+            entity.Property<string>("Title").IsRequired().HasMaxLength(200).HasColumnType("nvarchar(200)");
+            entity.Property<string>("Message").IsRequired().HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            entity.Property<string>("EventKey").IsRequired().HasMaxLength(80).HasColumnType("nvarchar(80)");
+            entity.Property<string>("ReferenceType").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            entity.Property<string>("ReferenceId").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            entity.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<DateTimeOffset?>("ReadAtUtc").HasColumnType("datetimeoffset");
+            entity.HasKey("Id");
+            entity.HasIndex("RecipientUsername", "CreatedAtUtc");
+            entity.HasIndex("RecipientUsername", "ReadAtUtc");
+            entity.ToTable("UserNotifications");
+        });
+
         modelBuilder.Entity("FleetManagement.Domain.Auditing.AuditEntry", entity =>
         {
             entity.Property<Guid>("Id")
