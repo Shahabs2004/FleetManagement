@@ -1,0 +1,108 @@
+@page "/login"
+@using Microsoft.AspNetCore.Antiforgery
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Http
+@inject IHttpContextAccessor HttpContextAccessor
+@inject IAntiforgery Antiforgery
+@inject FleetManagement.Infrastructure.Configuration.OrganizationSettingsService OrganizationSettings
+
+<PageTitle>ورود به سامانه</PageTitle>
+
+<section class="login-panel">
+    <div class="login-brand">
+        <div class="brand-mark" aria-hidden="true">ن</div>
+        <div>
+            <span class="eyebrow">سامانه مدیریت ناوگان</span>
+            <h1>@_organizationName</h1>
+            <p>برای ادامه، با حساب کاربری سازمانی وارد شوید.</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="setup-error" role="alert">
+            @_errorMessage
+            @if (!string.IsNullOrWhiteSpace(Tracking))
+            {
+                <p>شناسه پیگیری: @Tracking</p>
+            }
+        </div>
+    }
+
+    <form method="post" action="/auth/ad" class="login-form">
+        <input type="hidden" name="__RequestVerificationToken" value="@_requestToken" />
+
+        <label for="username">نام کاربری دامنه</label>
+        <input id="username" name="username" autocomplete="username" required />
+
+        <label for="password">رمز عبور دامنه</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+        <button type="submit" class="primary-button">ورود با نام کاربری و رمز دامنه</button>
+    </form>
+
+    <div class="login-divider"><span>یا</span></div>
+
+    <form method="post" action="/auth/windows">
+        <input type="hidden" name="__RequestVerificationToken" value="@_requestToken" />
+        <button type="submit" class="secondary-button">ورود یکپارچه با حساب ویندوز</button>
+    </form>
+
+    <p class="login-footnote">
+        فقط کاربران فعال عضو گروه‌های مجاز سازمان امکان ورود دارند.
+    </p>
+</section>
+
+@code {
+    private string? _requestToken;
+    private string _organizationName = "سامانه مدیریت ناوگان";
+    private string? _errorMessage;
+
+    /// <summary>
+    /// شناسه پیگیری خطاهای غیرمنتظره از Query String خوانده می‌شود.
+    /// </summary>
+    [SupplyParameterFromQuery(Name = "tracking")]
+    public string? Tracking { get; set; }
+
+    /// <summary>
+    /// کد خطای ورود از Query String خوانده می‌شود.
+    /// </summary>
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
+    /// <summary>
+    /// ایجاد توکن ضد جعل و بارگذاری نام سازمان برای صفحه ورود.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        var httpContext = HttpContextAccessor.HttpContext;
+
+        if (httpContext is not null)
+        {
+            _requestToken = Antiforgery.GetAndStoreTokens(httpContext).RequestToken;
+        }
+
+        var organization = await OrganizationSettings.GetAsync();
+
+        if (!string.IsNullOrWhiteSpace(organization?.OrganizationName))
+        {
+            _organizationName = organization.OrganizationName;
+        }
+
+        _errorMessage = Error switch
+        {
+            "ad-not-configured" => "اتصال Active Directory هنوز تنظیم یا تأیید نشده است.",
+            "invalid-credentials" => "نام کاربری یا رمز عبور صحیح نیست.",
+            "account-disabled" => "حساب کاربری شما در دایرکتوری غیرفعال است.",
+            "account-locked" => "حساب کاربری شما در دایرکتوری قفل شده است.",
+            "account-expired" => "اعتبار زمانی حساب کاربری شما پایان یافته است.",
+            "not-allowed" => "حساب شما عضو هیچ‌یک از گروه‌های مجاز سامانه نیست.",
+            "directory-unavailable" => "ارتباط با Active Directory برقرار نشد. بعداً دوباره تلاش کنید.",
+            "method-disabled" => "این روش ورود توسط مدیر سامانه غیرفعال شده است.",
+            "windows-not-configured" => "ورود یکپارچه ویندوز در IIS فعال نیست. با روش جایگزین وارد شوید.",
+            "unexpected" => "در ورود خطایی رخ داد. در صورت نیاز شناسه پیگیری را به مدیر فنی بدهید.",
+            "denied" => "مجوز لازم برای مشاهده این بخش را ندارید.",
+            _ => null
+        };
+    }
+}
