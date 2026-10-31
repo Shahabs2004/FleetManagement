@@ -385,7 +385,8 @@ public static class FleetAuthenticationEndpoints
         HttpContext context,
         IAntiforgery antiforgery,
         UserSessionService sessionService,
-        SessionActivityTracker activityTracker)
+        SessionActivityTracker activityTracker,
+        AuditLogService auditLog)
     {
         if (!await ValidateAntiforgeryAsync(context, antiforgery))
         {
@@ -401,6 +402,14 @@ public static class FleetAuthenticationEndpoints
                 context.RequestAborted);
 
             activityTracker.Forget(sessionId);
+            await auditLog.RecordAsync(
+                context.User.Identity?.Name ?? "unknown",
+                "Logout",
+                "Authentication",
+                sessionId.ToString(),
+                "Success",
+                clientIpAddress: context.Connection.RemoteIpAddress?.ToString(),
+                cancellationToken: context.RequestAborted);
         }
 
         await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
