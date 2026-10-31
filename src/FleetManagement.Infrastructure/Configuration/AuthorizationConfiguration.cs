@@ -63,6 +63,7 @@ public sealed class AuthorizationConfiguration
                         new() { Permission = "missions.view" },
                         new() { Permission = "missions.view.own" },
                         new() { Permission = "missions.review" },
+                        new() { Permission = "missions.print" },
                         new() { Permission = "missions.create" },
                         new() { Permission = "missions.edit" },
                         new() { Permission = "missions.approve" },
@@ -85,6 +86,21 @@ public sealed class AuthorizationConfiguration
                         new() { Permission = "drivers.view" },
                         new() { Permission = "vehicles.view" },
                         new() { Permission = "missions.view" },
+                        new() { Permission = "dashboard.view" }
+                    ]
+                },
+                new()
+                {
+                    Key = "Requester",
+                    Name = "درخواست‌کننده مأموریت",
+                    Description = "ثبت، پیگیری، چاپ و درخواست تغییر مأموریت‌های خود.",
+                    IsSystemRole = true,
+                    Permissions =
+                    [
+                        new() { Permission = "missions.view.own" },
+                        new() { Permission = "missions.create" },
+                        new() { Permission = "missions.print" },
+                        new() { Permission = "notifications.view" },
                         new() { Permission = "dashboard.view" }
                     ]
                 }
