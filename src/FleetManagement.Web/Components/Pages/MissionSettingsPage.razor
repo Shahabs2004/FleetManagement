@@ -1,0 +1,110 @@
+@page "/admin/mission-settings"
+@rendermode InteractiveServer
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "SystemAdministrator")]
+@using FleetManagement.Infrastructure.Configuration
+@using Microsoft.AspNetCore.Components.Authorization
+@inject MissionManagementService MissionService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<MissionSettingsPage> Logger
+
+<PageTitle>تنظیمات مأموریت</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">تنظیمات سامانه</div>
+    <h1>قواعد برنامه‌ریزی مأموریت</h1>
+    <p>فاصله حداقلی بین دو مأموریت متوالی برای راننده و خودرو در زمان تأیید و تمدید کنترل می‌شود.</p>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="setup-info">@_message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="setup-error">@_error</div>
+    }
+
+    <div class="driver-editor">
+        <div class="driver-form-grid">
+            <div>
+                <label for="mission-gap">فاصله حداقلی بین مأموریت‌ها (ساعت)</label>
+                <input id="mission-gap" type="text" inputmode="numeric" @bind="_gapHours" />
+                <small>مقدار مجاز: صفر تا ۲۴ ساعت</small>
+            </div>
+            <div>
+                <label for="mission-horizon">حداکثر افق رزرو (روز)</label>
+                <input id="mission-horizon" type="text" inputmode="numeric" @bind="_bookingHorizon" />
+                <small>مقدار مجاز: ۱ تا ۷۳۰ روز</small>
+            </div>
+        </div>
+        <div class="driver-actions">
+            <button type="button" class="primary-button" @onclick="SaveAsync" disabled="@_busy">ذخیره تنظیمات</button>
+        </div>
+    </div>
+</section>
+
+@code {
+    private bool _busy;
+    private string _gapHours = "0";
+    private string _bookingHorizon = "90";
+    private string _message = string.Empty;
+    private string _error = string.Empty;
+    private string _actor = "unknown";
+
+    /// <summary>بارگذاری قواعد فعلی و هویت مدیر.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            _actor = auth.User.FindFirst("fleet:username")?.Value ?? auth.User.Identity?.Name ?? "unknown";
+            var rules = await MissionService.GetRulesAsync();
+            _gapHours = rules.MinimumGapHours.ToString();
+            _bookingHorizon = rules.BookingHorizonDays.ToString();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception);
+        }
+    }
+
+    /// <summary>اعتبارسنجی و ذخیره قواعد برنامه‌ریزی.</summary>
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        _error = string.Empty;
+        try
+        {
+            if (!int.TryParse(_gapHours, out var gap)
+                || !int.TryParse(_bookingHorizon, out var horizon))
+            {
+                throw new InvalidOperationException("مقادیر فاصله و افق رزرو باید عدد صحیح باشند.");
+            }
+
+            await MissionService.SaveRulesAsync(
+                new MissionRulesConfiguration
+                {
+                    MinimumGapHours = gap,
+                    BookingHorizonDays = horizon
+                },
+                _actor);
+
+            _message = "قواعد برنامه‌ریزی مأموریت ذخیره شد.";
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>ثبت خطا با شناسه پیگیری.</summary>
+    private void ReportError(Exception exception)
+    {
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "ذخیره تنظیمات مأموریت ناموفق بود. شناسه پیگیری: {TrackingId}", trackingId);
+        _error = $"ذخیره تنظیمات انجام نشد. شناسه پیگیری: {trackingId}";
+    }
+}
