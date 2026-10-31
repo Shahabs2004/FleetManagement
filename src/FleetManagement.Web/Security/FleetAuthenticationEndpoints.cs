@@ -4,7 +4,6 @@ using FleetManagement.Infrastructure.Bootstrap;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Server.IISIntegration;
 
 namespace FleetManagement.Web.Security;
 
@@ -191,15 +190,10 @@ public static class FleetAuthenticationEndpoints
                 CookieAuthenticationDefaults.AuthenticationScheme,
                 StringComparison.OrdinalIgnoreCase))
         {
-            try
-            {
-                await context.ChallengeAsync(IISDefaults.AuthenticationScheme);
-                return Results.Empty;
-            }
-            catch (InvalidOperationException)
-            {
-                return Results.Redirect("/login?error=windows-not-configured");
-            }
+            // پاسخ 401 همراه با چالش Negotiate/NTLM باعث شروع مذاکره Windows Authentication در IIS می‌شود.
+            context.Response.Headers.WWWAuthenticate = "Negotiate, NTLM";
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Results.Empty;
         }
 
         try
