@@ -163,6 +163,35 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
                 .HasConstraintName("FK_MissionChangeRequests_Missions_MissionId");
         });
 
+        modelBuilder.Entity("FleetManagement.Domain.Missions.MissionChangeRequest", entity =>
+        {
+            entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uniqueidentifier");
+            entity.Property<Guid>("MissionId").HasColumnType("uniqueidentifier");
+            entity.Property<string>("RequesterUsername").IsRequired().HasMaxLength(64).HasColumnType("nvarchar(64)");
+            entity.Property<string>("Reason").IsRequired().HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            entity.Property<string>("ProposedValuesJson").IsRequired().HasMaxLength(12000).HasColumnType("nvarchar(12000)");
+            entity.Property<int>("Status").HasColumnType("int");
+            entity.Property<string>("ReviewerUsername").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            entity.Property<DateTimeOffset?>("ReviewStartedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<DateTimeOffset?>("ReviewedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<string>("DecisionReason").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            entity.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("datetimeoffset");
+            entity.HasKey("Id");
+            entity.HasIndex("MissionId", "Status");
+            entity.HasIndex("RequesterUsername", "CreatedAtUtc");
+            entity.ToTable("MissionChangeRequests");
+        });
+
+        modelBuilder.Entity("FleetManagement.Domain.Missions.MissionChangeRequest", entity =>
+        {
+            entity.HasOne("FleetManagement.Domain.Missions.Mission", null)
+                .WithMany()
+                .HasForeignKey("MissionId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("FK_MissionChangeRequests_Missions_MissionId");
+        });
+
         modelBuilder.Entity("FleetManagement.Domain.Locations.Location", entity =>
         {
             entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uniqueidentifier");
