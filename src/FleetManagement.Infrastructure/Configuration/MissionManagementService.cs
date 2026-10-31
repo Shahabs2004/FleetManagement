@@ -16,7 +16,8 @@ namespace FleetManagement.Infrastructure.Configuration;
 public sealed class MissionManagementService(
     IDbContextFactory<FleetDbContext> dbContextFactory,
     ISystemSettingsStore settingsStore,
-    AuditLogService auditLog)
+    AuditLogService auditLog,
+    NotificationService notificationService)
 {
     private const string RulesKey = "Missions.Rules";
 
@@ -180,6 +181,14 @@ public sealed class MissionManagementService(
         await transaction.CommitAsync(cancellationToken);
 
         await RecordMissionAuditAsync(actor, "Approve", mission, "Success", cancellationToken);
+        await notificationService.CreateAsync(
+            mission.RequesterUsername,
+            "درخواست مأموریت تأیید شد",
+            $"درخواست {mission.MissionNumber} تأیید شد و راننده و خودرو تخصیص یافتند.",
+            "MissionApproved",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
     }
 
     /// <summary>رد درخواست با علت اجباری.</summary>
@@ -190,6 +199,14 @@ public sealed class MissionManagementService(
         mission.Reject(reason);
         await db.SaveChangesAsync(cancellationToken);
         await RecordMissionAuditAsync(actor, "Reject", mission, "Rejected", cancellationToken, reason);
+        await notificationService.CreateAsync(
+            mission.RequesterUsername,
+            "درخواست مأموریت رد شد",
+            $"درخواست {mission.MissionNumber} رد شد. علت: {reason}",
+            "MissionRejected",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
     }
 
     /// <summary>لغو مأموریت با علت و ثبت ممیزی.</summary>
@@ -200,6 +217,14 @@ public sealed class MissionManagementService(
         mission.Cancel(reason, DateTimeOffset.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
         await RecordMissionAuditAsync(actor, "Cancel", mission, "Success", cancellationToken, reason);
+        await notificationService.CreateAsync(
+            mission.RequesterUsername,
+            "مأموریت لغو شد",
+            $"مأموریت {mission.MissionNumber} لغو شد. علت: {reason}",
+            "MissionCancelled",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
     }
 
     /// <summary>خاتمه زودهنگام مأموریت با آزادسازی فوری منابع.</summary>
@@ -282,6 +307,14 @@ public sealed class MissionManagementService(
         mission.ApproveWithdrawal(DateTimeOffset.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
         await RecordMissionAuditAsync(reviewer, "ApproveWithdrawal", mission, "Success", cancellationToken);
+        await notificationService.CreateAsync(
+            mission.RequesterUsername,
+            "درخواست انصراف تأیید شد",
+            $"درخواست انصراف مأموریت {mission.MissionNumber} تأیید شد.",
+            "WithdrawalApproved",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
     }
 
     /// <summary>رد درخواست انصراف و بازگرداندن وضعیت قبلی.</summary>
@@ -296,6 +329,14 @@ public sealed class MissionManagementService(
         mission.RejectWithdrawal(reason);
         await db.SaveChangesAsync(cancellationToken);
         await RecordMissionAuditAsync(reviewer, "RejectWithdrawal", mission, "Rejected", cancellationToken, reason);
+        await notificationService.CreateAsync(
+            mission.RequesterUsername,
+            "درخواست انصراف رد شد",
+            $"درخواست انصراف مأموریت {mission.MissionNumber} رد شد. علت: {reason}",
+            "WithdrawalRejected",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
     }
 
     /// <summary>تمدید مأموریت با بررسی تعارض جدید برای همان راننده و خودرو.</summary>
@@ -338,6 +379,14 @@ public sealed class MissionManagementService(
             beforeJson: JsonSerializer.Serialize(new { PlannedEndAtUtc = oldEnd }),
             afterJson: JsonSerializer.Serialize(new { PlannedEndAtUtc = newEndAtUtc }),
             cancellationToken: cancellationToken);
+        await notificationService.CreateAsync(
+            mission.RequesterUsername,
+            "زمان مأموریت تغییر کرد",
+            $"زمان پایان مأموریت {mission.MissionNumber} به‌روزرسانی شد.",
+            "MissionExtended",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
     }
 
     /// <summary>ثبت یا اصلاح کیلومترشمار شروع و پایان توسط کاربر مجاز.</summary>
