@@ -1,0 +1,382 @@
+@page "/missions"
+@rendermode InteractiveServer
+@attribute [FleetPermission("missions.view.own")]
+@using System.Globalization
+@using System.Security.Claims
+@using FleetManagement.Domain.Missions
+@using FleetManagement.Domain.Locations
+@using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Web.Security
+@using Microsoft.AspNetCore.Components.Authorization
+@inject MissionManagementService MissionService
+@inject LocationManagementService LocationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<MissionsPage> Logger
+
+<PageTitle>درخواست‌های مأموریت</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">مدیریت مأموریت</div>
+    <h1>درخواست‌های مأموریت من</h1>
+    <p>درخواست ثبت‌شده تا زمان تأیید، راننده و خودرو را رزرو نمی‌کند. پس از شروع بررسی توسط مسئول ناوگان، امکان ویرایش مستقیم درخواست بسته می‌شود.</p>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="setup-info">@_message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="setup-error">@_error</div>
+    }
+
+    <AuthorizeView Policy="Permission:missions.create">
+        <Authorized>
+            <section class="driver-editor">
+                <h2>ثبت درخواست جدید</h2>
+                @if (_locations.Count == 0)
+                {
+                    <div class="setup-info">برای ثبت درخواست ابتدا باید حداقل یک مکان توسط مدیر سامانه تأیید شود.</div>
+                }
+                else
+                {
+                    <div class="driver-form-grid">
+                        <div>
+                            <label for="mission-title">عنوان مأموریت</label>
+                            <input id="mission-title" @bind="_title" maxlength="200" />
+                        </div>
+                        <div>
+                            <label for="mission-phone">شماره همراه درخواست‌کننده</label>
+                            <input id="mission-phone" @bind="_requesterPhone" maxlength="20" dir="ltr" />
+                        </div>
+                        <div>
+                            <label for="mission-group">گروه درخواست‌کننده</label>
+                            <select id="mission-group" @bind="_requestingGroup">
+                                <option value="">انتخاب گروه</option>
+                                @foreach (var group in _groups)
+                                {
+                                    <option value="@group">@group</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label for="mission-type">نوع مأموریت</label>
+                            <select id="mission-type" @bind="_type">
+                                <option value="@MissionType.Passenger">حمل مسافر</option>
+                                <option value="@MissionType.Freight">حمل بار</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="mission-origin">مبدأ</label>
+                            <select id="mission-origin" @bind="_origin">
+                                <option value="">انتخاب مبدأ</option>
+                                @foreach (var location in _locations)
+                                {
+                                    <option value="@location.Name">@location.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label for="mission-destination">مقصد نهایی</label>
+                            <select id="mission-destination" @bind="_destination">
+                                <option value="">انتخاب مقصد</option>
+                                @foreach (var location in _locations)
+                                {
+                                    <option value="@location.Name">@location.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label for="mission-start">زمان شروع (به وقت تهران)</label>
+                            <input id="mission-start" type="datetime-local" step="3600" @bind="_startLocal" />
+                        </div>
+                        <div>
+                            <label for="mission-end">زمان پایان (به وقت تهران)</label>
+                            <input id="mission-end" type="datetime-local" step="3600" @bind="_endLocal" />
+                        </div>
+                        <div>
+                            <label for="mission-passengers">تعداد همراهان / مسافران</label>
+                            <input id="mission-passengers" type="number" min="0" @bind="_passengerCount" />
+                        </div>
+                        <div>
+                            <label for="mission-purpose">هدف یا علت مأموریت</label>
+                            <input id="mission-purpose" @bind="_purpose" maxlength="500" />
+                        </div>
+                        <div>
+                            <label for="mission-order">شماره دستور مأموریت (اختیاری)</label>
+                            <input id="mission-order" @bind="_missionOrderNumber" maxlength="50" />
+                        </div>
+                        <div>
+                            <label for="mission-order-date">تاریخ دستور مأموریت (اختیاری)</label>
+                            <input id="mission-order-date" type="date" @bind="_missionOrderDate" />
+                        </div>
+                    </div>
+                    <div class="mission-route-editor">
+                        <label for="mission-stops">توقف‌های میانی (هر مکان در یک خط و از فهرست تأییدشده)</label>
+                        <textarea id="mission-stops" @bind="_intermediateStops" rows="3" placeholder="نام مکان اول&#10;نام مکان دوم"></textarea>
+                        <label for="mission-description">توضیحات تکمیلی</label>
+                        <textarea id="mission-description" @bind="_description" rows="3" maxlength="2000"></textarea>
+                    </div>
+                    <div class="driver-actions">
+                        <button type="button" class="primary-button" @onclick="CreateAsync" disabled="@_busy">ثبت درخواست مأموریت</button>
+                    </div>
+                }
+            </section>
+        </Authorized>
+    </AuthorizeView>
+
+    <h2>سوابق درخواست‌ها</h2>
+    @if (_loading)
+    {
+        <p>در حال دریافت درخواست‌ها...</p>
+    }
+    else if (_missions.Count == 0)
+    {
+        <div class="setup-info">هنوز درخواستی ثبت نکرده‌اید.</div>
+    }
+    else
+    {
+        <div class="session-table-wrap">
+            <table class="session-table">
+                <thead>
+                    <tr>
+                        <th>شماره مأموریت</th>
+                        <th>عنوان</th>
+                        <th>مسیر</th>
+                        <th>زمان برنامه‌ریزی</th>
+                        <th>نوع</th>
+                        <th>وضعیت</th>
+                        <th>علت تصمیم</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var mission in _missions)
+                    {
+                        <tr @key="mission.Id">
+                            <td>@mission.MissionNumber</td>
+                            <td>@mission.Title</td>
+                            <td>@mission.Origin ← @mission.Destination</td>
+                            <td>@FormatTime(mission.PlannedStartAtUtc) تا @FormatTime(mission.PlannedEndAtUtc)</td>
+                            <td>@(mission.Type == MissionType.Freight ? "بار" : "مسافر")</td>
+                            <td>@GetStatusName(mission.Status)</td>
+                            <td>@mission.DecisionReason</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private bool _loading = true;
+    private bool _busy;
+    private string _title = string.Empty;
+    private string _requesterPhone = string.Empty;
+    private string _requestingGroup = string.Empty;
+    private string _origin = string.Empty;
+    private string _destination = string.Empty;
+    private string _startLocal = string.Empty;
+    private string _endLocal = string.Empty;
+    private string _purpose = string.Empty;
+    private string _intermediateStops = string.Empty;
+    private string _description = string.Empty;
+    private string _missionOrderNumber = string.Empty;
+    private string _missionOrderDate = string.Empty;
+    private int? _passengerCount;
+    private MissionType _type = MissionType.Passenger;
+    private string _username = string.Empty;
+    private string _requesterName = string.Empty;
+    private string _organizationalUnit = string.Empty;
+    private string _message = string.Empty;
+    private string _error = string.Empty;
+    private IReadOnlyList<string> _groups = [];
+    private IReadOnlyList<Location> _locations = [];
+    private IReadOnlyList<Mission> _missions = [];
+
+    /// <summary>بارگذاری پروفایل، گروه‌های مجاز، مکان‌ها و سوابق شخصی.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = auth.User;
+            _username = user.FindFirst("fleet:username")?.Value ?? user.Identity?.Name ?? string.Empty;
+            _requesterName = user.Identity?.Name ?? _username;
+            _organizationalUnit = user.FindFirst("fleet:organizational-unit")?.Value ?? string.Empty;
+            _groups = user.FindAll("fleet:ad-group-name")
+                .Select(claim => claim.Value)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            _locations = await LocationService.GetApprovedAsync();
+            _missions = await MissionService.SearchAsync(requesterUsername: _username);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "بارگذاری درخواست‌های مأموریت");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>ثبت درخواست پس از کنترل فهرست مکان‌ها و زمان‌های انتخاب‌شده.</summary>
+    private async Task CreateAsync()
+    {
+        _busy = true;
+        _error = string.Empty;
+        _message = string.Empty;
+
+        try
+        {
+            if (!_locations.Any(location => location.Name == _origin)
+                || !_locations.Any(location => location.Name == _destination))
+            {
+                throw new InvalidOperationException("مبدأ و مقصد باید از فهرست مکان‌های تأییدشده انتخاب شوند.");
+            }
+
+            if (!_groups.Contains(_requestingGroup, StringComparer.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("گروه انتخاب‌شده در گروه‌های مجاز حساب شما نیست.");
+            }
+
+            var stops = _intermediateStops
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            if (stops.Any(stop => !_locations.Any(location => location.Name == stop)))
+            {
+                throw new InvalidOperationException("تمام توقف‌های میانی باید از فهرست مکان‌های تأییدشده انتخاب شوند.");
+            }
+
+            var start = ParseTehranLocalTime(_startLocal);
+            var end = ParseTehranLocalTime(_endLocal);
+            DateOnly? orderDate = string.IsNullOrWhiteSpace(_missionOrderDate)
+                ? null
+                : DateOnly.ParseExact(_missionOrderDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+            await MissionService.CreateRequestAsync(
+                _title,
+                _username,
+                _requesterName,
+                _requesterPhone,
+                _organizationalUnit,
+                _requestingGroup,
+                _type,
+                _purpose,
+                _origin,
+                _destination,
+                stops,
+                start,
+                end,
+                _description,
+                _passengerCount,
+                _missionOrderNumber,
+                orderDate,
+                _username);
+
+            _message = "درخواست مأموریت ثبت شد و برای بررسی ارسال گردید.";
+            ResetForm();
+            _missions = await MissionService.SearchAsync(requesterUsername: _username);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "ثبت درخواست مأموریت");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>تبدیل تاریخ و ساعت ورودی تهران به زمان UTC.</summary>
+    private static DateTimeOffset ParseTehranLocalTime(string value)
+    {
+        if (!DateTime.TryParseExact(
+            value,
+            "yyyy-MM-ddTHH:mm",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out var localTime))
+        {
+            throw new InvalidOperationException("تاریخ و ساعت شروع و پایان را وارد کنید.");
+        }
+
+        if (localTime.Minute != 0)
+        {
+            throw new InvalidOperationException("زمان مأموریت فقط با دقت ساعت کامل قابل ثبت است.");
+        }
+
+        TimeZoneInfo zone;
+        try
+        {
+            zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran");
+        }
+
+        var unspecified = DateTime.SpecifyKind(localTime, DateTimeKind.Unspecified);
+        var utc = TimeZoneInfo.ConvertTimeToUtc(unspecified, zone);
+        return new DateTimeOffset(utc, TimeSpan.Zero);
+    }
+
+    /// <summary>پاک‌سازی فرم پس از ثبت موفق درخواست.</summary>
+    private void ResetForm()
+    {
+        _title = string.Empty;
+        _requesterPhone = string.Empty;
+        _requestingGroup = string.Empty;
+        _origin = string.Empty;
+        _destination = string.Empty;
+        _startLocal = string.Empty;
+        _endLocal = string.Empty;
+        _purpose = string.Empty;
+        _intermediateStops = string.Empty;
+        _description = string.Empty;
+        _missionOrderNumber = string.Empty;
+        _missionOrderDate = string.Empty;
+        _passengerCount = null;
+    }
+
+    /// <summary>نمایش زمان جلالی و ساعت تهران.</summary>
+    private static string FormatTime(DateTimeOffset utcValue)
+    {
+        TimeZoneInfo zone;
+        try
+        {
+            zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran");
+        }
+
+        var local = TimeZoneInfo.ConvertTime(utcValue, zone);
+        var calendar = new PersianCalendar();
+        return $"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} ساعت {local.Hour:00}";
+    }
+
+    /// <summary>عنوان فارسی وضعیت چرخه عمر درخواست.</summary>
+    private static string GetStatusName(MissionStatus status) => status switch
+    {
+        MissionStatus.Pending => "در انتظار بررسی",
+        MissionStatus.UnderReview => "در حال بررسی",
+        MissionStatus.Confirmed => "تأیید شده",
+        MissionStatus.Running => "در حال اجرا",
+        MissionStatus.Completed => "پایان‌یافته",
+        MissionStatus.Cancelled => "لغوشده",
+        MissionStatus.Rejected => "ردشده",
+        MissionStatus.WithdrawalPending => "در انتظار تصمیم انصراف",
+        _ => "نامشخص"
+    };
+
+    /// <summary>ثبت خطا با شناسه پیگیری.</summary>
+    private void ReportError(Exception exception, string operation)
+    {
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "{Operation} ناموفق بود. شناسه پیگیری: {TrackingId}", operation, trackingId);
+        _error = $"عملیات انجام نشد. شناسه پیگیری: {trackingId}";
+    }
+}
