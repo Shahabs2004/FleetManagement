@@ -431,6 +431,60 @@ public sealed class Mission : Entity
         PassengerCount = passengerCount;
     }
 
+    /// <summary>
+    /// پایان بخش اول مأموریت در زمان تقسیم و ثبت کیلومترشمار اجباری آن.
+    /// </summary>
+    public void CloseFirstSegmentForSplit(
+        DateTimeOffset splitAtUtc,
+        long odometerEndKm,
+        string reason,
+        string actor)
+    {
+        EnsureStatus(MissionStatus.Running);
+        ValidateHour(splitAtUtc, nameof(splitAtUtc));
+        if (!ActualStartAtUtc.HasValue
+            || splitAtUtc <= ActualStartAtUtc.Value
+            || splitAtUtc >= PlannedEndAtUtc
+            || splitAtUtc > DateTimeOffset.UtcNow)
+        {
+            throw new ArgumentException("زمان تقسیم باید پس از شروع و پیش از پایان برنامه‌ریزی‌شده و حداکثر تا زمان جاری باشد.");
+        }
+
+        SetOdometerEnd(odometerEndKm);
+        ActualEndAtUtc = splitAtUtc;
+        PlannedEndAtUtc = splitAtUtc;
+        SplitAtUtc = splitAtUtc;
+        SplitReason = Required(reason, 1000, nameof(reason));
+        SplitBy = Required(actor, 64, nameof(actor));
+        DecisionReason = SplitReason;
+        Status = MissionStatus.Completed;
+    }
+
+    /// <summary>ثبت شناسه مأموریت مستقل مرتبط با این بخش.</summary>
+    public void SetRelatedMission(Guid relatedMissionId)
+    {
+        if (relatedMissionId == Guid.Empty || relatedMissionId == Id)
+        {
+            throw new ArgumentException("شناسه مأموریت مرتبط معتبر نیست.", nameof(relatedMissionId));
+        }
+
+        RelatedMissionId = relatedMissionId;
+    }
+
+    /// <summary>ثبت نشانگر تقسیم برای بخش دوم بدون ایجاد رابطه والد و فرزند.</summary>
+    public void MarkAsSecondSplitSegment(
+        Guid relatedMissionId,
+        DateTimeOffset splitAtUtc,
+        string reason,
+        string actor)
+    {
+        SetRelatedMission(relatedMissionId);
+        SplitAtUtc = splitAtUtc;
+        SplitReason = Required(reason, 1000, nameof(reason));
+        SplitBy = Required(actor, 64, nameof(actor));
+        DecisionReason = SplitReason;
+    }
+
     /// <summary>خواندن مقصدهای میانی با حفظ ترتیب ثبت.</summary>
     public IReadOnlyList<string> GetIntermediateStops()
         => JsonSerializer.Deserialize<List<string>>(RouteJson) ?? [];
