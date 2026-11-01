@@ -1,5 +1,6 @@
 @page "/timeline"
 @rendermode InteractiveServer
+@implements IDisposable
 @attribute [FleetPermission("missions.timeline.view")]
 @using System.Globalization
 @using FleetManagement.Domain.Drivers
@@ -7,6 +8,10 @@
 @using FleetManagement.Domain.Vehicles
 @using FleetManagement.Infrastructure.Configuration
 @using FleetManagement.Web.Security
+@using FleetManagement.Web.Notifications
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NotificationEventBus NotificationEvents
 @inject MissionManagementService MissionService
 @inject DriverManagementService DriverService
 @inject VehicleManagementService VehicleService
@@ -120,6 +125,7 @@
 @code {
     private bool _isLoading = true;
     private string? _error;
+    private string _username = string.Empty;
     private string _scale = "Day";
     private DateTimeOffset _windowStart = GetCurrentTehranHour();
     private IReadOnlyList<Driver> _drivers = [];
@@ -137,15 +143,27 @@
         _ => 24
     };
 
-    /// <summary>بارگذاری اولیه اطلاعات جدول زمانی.</summary>
-    protected override Task OnInitializedAsync() => LoadAsync();
+    /// <summary>بارگذاری اولیه و اتصال جدول زمانی به رویدادهای زنده مأموریت.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _username = state.User.FindFirst("fleet:username")?.Value
+            ?? state.User.Identity?.Name
+            ?? string.Empty;
+        NotificationEvents.Published += OnNotificationPublished;
+        await LoadAsync();
+    }
 
     /// <summary>دریافت رانندگان و مأموریت‌های هم‌پوشان با بازه فعلی.</summary>
-    private async Task LoadAsync()
+    private async Task LoadAsync(bool preserveSelection = false)
     {
+        var selectedId = preserveSelection ? _selectedMission?.Id : null;
         _isLoading = true;
         _error = null;
-        _selectedMission = null;
+        if (!preserveSelection)
+        {
+            _selectedMission = null;
+        }
 
         try
         {
@@ -160,6 +178,10 @@
             _missions = await missionsTask;
             _vehicles = await vehiclesTask;
             BuildTicks();
+            if (selectedId.HasValue)
+            {
+                _selectedMission = _missions.FirstOrDefault(mission => mission.Id == selectedId.Value);
+            }
         }
         catch (Exception exception)
         {
@@ -238,6 +260,24 @@
             ? args.Value.ToString()!
             : "Day";
         await LoadAsync();
+    }
+
+    /// <summary>به‌روزرسانی جدول پس از اعلان زنده مربوط به مأموریت.</summary>
+    private void OnNotificationPublished(
+        string username,
+        FleetManagement.Application.Notifications.NotificationPush notification)
+    {
+        if (string.Equals(username, _username, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(notification.ReferenceType, "Mission", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = InvokeAsync(() => LoadAsync(preserveSelection: true));
+        }
+    }
+
+    /// <summary>قطع اشتراک از رویدادها هنگام خروج از صفحه.</summary>
+    public void Dispose()
+    {
+        NotificationEvents.Published -= OnNotificationPublished;
     }
 
     /// <summary>انتخاب مأموریت برای نمایش جزئیات.</summary>
