@@ -1472,3 +1472,14 @@ h1 {
     font-size: 1.15rem;
     line-height: 1;
 }
+
+
+.organization-logo {
+    display: block;
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    border-radius: 8px;
+    background: #fff;
+    padding: 3px;
+}
