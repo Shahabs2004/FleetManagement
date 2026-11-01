@@ -263,6 +263,10 @@ public sealed class MissionManagementService(
             mission.RequesterPhoneSnapshot
         });
 
+        var previousStartAtUtc = mission.PlannedStartAtUtc;
+        var previousDriverId = mission.DriverId;
+        var previousVehicleId = mission.VehicleId;
+
         mission.ApplyApprovedChanges(
             proposal.Title,
             proposal.Type,
@@ -318,6 +322,31 @@ public sealed class MissionManagementService(
             "Mission",
             mission.Id.ToString(),
             cancellationToken);
+
+        await QueueSmsSafelyAsync(mission, SmsEventType.MissionChanged, change.Reason, cancellationToken);
+
+        if (previousDriverId != mission.DriverId || previousVehicleId != mission.VehicleId)
+        {
+            await QueueSmsSafelyAsync(
+                mission,
+                SmsEventType.DriverOrVehicleChanged,
+                change.Reason,
+                cancellationToken);
+        }
+
+        if (previousStartAtUtc != mission.PlannedStartAtUtc)
+        {
+            await CancelUnsentRemindersSafelyAsync(
+                mission.Id,
+                "زمان شروع مأموریت تغییر کرد.",
+                reviewer,
+                cancellationToken);
+            await QueueSmsSafelyAsync(
+                mission,
+                SmsEventType.MissionStartReminder,
+                null,
+                cancellationToken);
+        }
     }
 
     /// <summary>رد درخواست تغییر بدون دست‌زدن به مقادیر مأموریت اصلی.</summary>
