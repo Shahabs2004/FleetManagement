@@ -41,7 +41,7 @@
 
 `C:\ProgramData\FleetManagement`
 
-فایل وضعیت bootstrap با DPAPI و محدوده LocalMachine محافظت می‌شود. فایل کد خام مدیر فنی فقط تا پایان ویزارد وجود دارد و پس از تکمیل، محتوای آن پاک می‌شود.
+فایل وضعیت bootstrap با DPAPI و محدوده LocalMachine محافظت می‌شود. کد خام مدیر فنی در فایل جداگانه `technical-administrator-code.txt` تولید می‌شود. پس از تکمیل ویزارد، اعتبار کد در وضعیت bootstrap باطل می‌شود؛ اما نسخه خام فایل در نسخه فعلی برنامه به‌صورت خودکار حذف نمی‌شود و باید پس از پایان راه‌اندازی توسط مدیر Windows به‌صورت امن حذف شود.
 
 پس از ایجاد Application Pool با نام نمونه `FleetManagement`، مجوزهای پوشه را از PowerShell با دسترسی Administrator محدود کنید. نام Application Pool را با نام واقعی جایگزین کنید:
 
@@ -52,4 +52,18 @@ icacls $path /inheritance:r
 icacls $path /grant "SYSTEM:(OI)(CI)F" "BUILTIN\Administrators:(OI)(CI)F" "IIS APPPOOL\FleetManagement:(OI)(CI)M"
 ```
 
-حساب Application Pool برای ایجاد، خواندن و به‌روزرسانی فایل‌ها به Modify نیاز دارد؛ کاربران عادی نباید به این پوشه دسترسی داشته باشند.
+Application Pool برای اجرای برنامه به دسترسی پوشه bootstrap نیاز دارد. فایل کد خام مدیر فنی را بلافاصله پس از تولید، با دستورهای زیر فقط برای SYSTEM و مدیران Windows قابل خواندن کنید. کاربران عادی و هویت Application Pool نباید مجوز خواندن این فایل را داشته باشند:
+
+```powershell
+$codeFile = Join-Path $path "technical-administrator-code.txt"
+icacls $codeFile /inheritance:r
+icacls $codeFile /grant:r "SYSTEM:F" "BUILTIN\Administrators:F"
+```
+
+پس از تکمیل ویزارد، فایل را با دسترسی مدیر Windows حذف کنید:
+
+```powershell
+Remove-Item -LiteralPath $codeFile -Force
+```
+
+این حذف دستی در نسخه فعلی لازم است؛ صرف باطل‌شدن هش کد در bootstrap به معنی حذف فایل خام نیست.
