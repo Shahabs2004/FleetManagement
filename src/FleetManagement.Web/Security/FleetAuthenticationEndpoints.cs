@@ -5,6 +5,7 @@ using FleetManagement.Domain.Sessions;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace FleetManagement.Web.Security;
 
@@ -18,9 +19,12 @@ public static class FleetAuthenticationEndpoints
     /// </summary>
     public static IEndpointRouteBuilder MapFleetAuthentication(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapPost("/auth/ad", SignInWithDirectoryPasswordAsync);
-        endpoints.MapPost("/auth/local-admin", SignInWithLocalAdministratorAsync);
-        endpoints.MapPost("/auth/windows", SignInWithWindowsAsync);
+        endpoints.MapPost("/auth/ad", SignInWithDirectoryPasswordAsync)
+            .RequireRateLimiting("authentication");
+        endpoints.MapPost("/auth/local-admin", SignInWithLocalAdministratorAsync)
+            .RequireRateLimiting("authentication");
+        endpoints.MapPost("/auth/windows", SignInWithWindowsAsync)
+            .RequireRateLimiting("authentication");
         endpoints.MapPost("/auth/logout", SignOutAsync);
 
         return endpoints;
