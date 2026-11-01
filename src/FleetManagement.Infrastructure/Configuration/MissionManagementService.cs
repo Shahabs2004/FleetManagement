@@ -1,6 +1,7 @@
 using FleetManagement.Domain.Locations;
 using Microsoft.Extensions.Logging;
 using System.Data;
+using System.Globalization;
 using System.Text.Json;
 using FleetManagement.Application.Configuration;
 using FleetManagement.Domain.Drivers;
@@ -885,6 +886,38 @@ public sealed class MissionManagementService(
             .OrderByDescending(mission => mission.CreatedAtUtc)
             .Take(Math.Clamp(take, 1, 500))
             .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>تولید شماره یکتای سالانه بر اساس تقویم جلالی در تراکنش سریال‌پذیر؛ برای ایجاد بخش دوم مأموریت تقسیم‌شده.</summary>
+    private static async Task<string> GenerateMissionNumberAsync(
+        FleetDbContext db,
+        DateTimeOffset nowUtc,
+        CancellationToken cancellationToken)
+    {
+        TimeZoneInfo tehranZone;
+        try
+        {
+            tehranZone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            tehranZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran");
+        }
+
+        var localNow = TimeZoneInfo.ConvertTime(nowUtc, tehranZone);
+        var jalaliYear = new PersianCalendar().GetYear(localNow.DateTime);
+        var prefix = $"{jalaliYear}-";
+        var numbers = await db.Missions
+            .Where(mission => mission.MissionNumber.StartsWith(prefix))
+            .Select(mission => mission.MissionNumber)
+            .ToListAsync(cancellationToken);
+
+        var lastNumber = numbers
+            .Select(number => int.TryParse(number.AsSpan(prefix.Length), out var value) ? value : 0)
+            .DefaultIfEmpty(0)
+            .Max();
+
+        return $"{jalaliYear}-{lastNumber + 1:000}";
     }
 
     /// <summary>بررسی هم‌پوشانی یا فاصله ناکافی برای راننده و خودرو.</summary>
