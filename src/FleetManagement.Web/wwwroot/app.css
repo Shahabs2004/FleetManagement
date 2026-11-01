@@ -1918,3 +1918,173 @@ h1 {
     border-color: #405a4a;
     color: #e5eee8;
 }
+
+
+.jalali-picker {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.jalali-picker > label {
+    color: #455c50;
+    font-size: .9rem;
+    font-weight: 600;
+}
+
+.jalali-picker-display {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 42px;
+    padding: 8px 11px;
+    border: 1px solid #d6e0d9;
+    border-radius: 8px;
+    background: #fff;
+    color: #263d32;
+    font: inherit;
+    text-align: right;
+    cursor: pointer;
+}
+
+.jalali-picker-popover {
+    position: relative;
+    z-index: 20;
+    display: grid;
+    gap: 12px;
+    width: min(100%, 340px);
+    margin-top: 4px;
+    padding: 13px;
+    border: 1px solid #d8e3dc;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 10px 28px rgba(20, 48, 34, .15);
+}
+
+.jalali-picker-month {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #24513f;
+}
+
+.jalali-picker-month button {
+    width: 32px;
+    height: 30px;
+    border: 1px solid #e0e8e2;
+    border-radius: 6px;
+    background: #f6f9f7;
+    color: #315c49;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+.jalali-picker-weekdays,
+.jalali-picker-days {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.jalali-picker-weekdays span {
+    padding: 4px 0;
+    color: #718078;
+    font-size: .7rem;
+    text-align: center;
+}
+
+.jalali-picker-day {
+    min-width: 0;
+    min-height: 34px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: #f3f7f4;
+    color: #2e4d3d;
+    font: inherit;
+    font-size: .8rem;
+    cursor: pointer;
+}
+
+.jalali-picker-day.outside-month {
+    color: #a4aea8;
+    background: #fafbfa;
+}
+
+.jalali-picker-day.selected {
+    border-color: #b18d3c;
+    background: #ead7a8;
+    color: #453516;
+    font-weight: 700;
+}
+
+.jalali-picker-day:disabled {
+    color: #c0c8c3;
+    background: #f0f2f0;
+    cursor: not-allowed;
+}
+
+.jalali-picker-hour {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.jalali-picker-hour select {
+    min-width: 110px;
+    min-height: 36px;
+    padding: 5px 8px;
+    border: 1px solid #d6e0d9;
+    border-radius: 6px;
+    background: #fff;
+    color: #263d32;
+    font: inherit;
+}
+
+.jalali-picker-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.jalali-picker-actions button {
+    margin: 0;
+}
+
+.theme-dark .jalali-picker > label {
+    color: #dbe9df;
+}
+
+.theme-dark .jalali-picker-display,
+.theme-dark .jalali-picker-popover,
+.theme-dark .jalali-picker-hour select {
+    color: #e5eee8;
+    background: #1b2b23;
+    border-color: #405a4a;
+}
+
+.theme-dark .jalali-picker-month {
+    color: #dbe9df;
+}
+
+.theme-dark .jalali-picker-month button,
+.theme-dark .jalali-picker-day {
+    color: #dbe9df;
+    background: #24392d;
+    border-color: #30483b;
+}
+
+.theme-dark .jalali-picker-day.outside-month,
+.theme-dark .jalali-picker-day:disabled {
+    color: #89998f;
+    background: #1b2b23;
+}
+
+.theme-dark .jalali-picker-day.selected {
+    color: #f7edcf;
+    background: #6d5a31;
+    border-color: #b18d3c;
+}
