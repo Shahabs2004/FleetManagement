@@ -1458,3 +1458,17 @@ h1 {
         flex: 1;
     }
 }
+
+
+.timeline-zoom-controls {
+    display: inline-flex;
+    gap: 5px;
+}
+
+.timeline-zoom-controls button {
+    min-width: 38px;
+    min-height: 38px;
+    padding: 4px 10px;
+    font-size: 1.15rem;
+    line-height: 1;
+}
