@@ -258,13 +258,13 @@ public sealed class BootstrapSetupService(
         state.TechnicalAdministratorCodeHash = null;
         state.TechnicalAdministratorCodeExpiresAtUtc = null;
 
-        await stateStore.WriteAsync(state, cancellationToken);
-
-        // پس از قفل شدن ویزارد، کد خام مدیر فنی نیز از فایل سرور پاک می‌شود.
+        // پیش از قفل شدن ویزارد، کد خام مدیر فنی باید از فایل سرور حذف شود.
         if (File.Exists(_technicalAdministratorCodePath))
         {
             File.Delete(_technicalAdministratorCodePath);
         }
+
+        await stateStore.WriteAsync(state, cancellationToken);
     }
 
     /// <summary>
