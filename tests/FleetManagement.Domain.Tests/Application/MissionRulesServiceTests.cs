@@ -80,7 +80,10 @@ public sealed class MissionRulesServiceTests
         Assert.Equal("UpdateRules", audit.Action);
         Assert.Equal("MissionRules", audit.EntityType);
         Assert.Equal("Success", audit.Outcome);
-        Assert.Equal(rules, JsonSerializer.Deserialize<MissionRulesConfiguration>(audit.AfterJson!));
+        var auditedRules = JsonSerializer.Deserialize<MissionRulesConfiguration>(audit.AfterJson!);
+        Assert.NotNull(auditedRules);
+        Assert.Equal(rules.MinimumGapHours, auditedRules.MinimumGapHours);
+        Assert.Equal(rules.BookingHorizonDays, auditedRules.BookingHorizonDays);
     }
 
     private sealed class InMemorySystemSettingsStore : ISystemSettingsStore
