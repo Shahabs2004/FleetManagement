@@ -569,6 +569,11 @@ public sealed class MissionManagementService(
             mission.Id.ToString(),
             cancellationToken);
 
+        await CancelUnsentRemindersSafelyAsync(
+            mission.Id,
+            "مأموریت لغو شد.",
+            actor,
+            cancellationToken);
         await QueueSmsSafelyAsync(mission, SmsEventType.MissionCancelled, reason, cancellationToken);
     }
 
@@ -679,6 +684,11 @@ public sealed class MissionManagementService(
             mission.Id.ToString(),
             cancellationToken);
 
+        await CancelUnsentRemindersSafelyAsync(
+            mission.Id,
+            "درخواست انصراف تأیید شد.",
+            reviewer,
+            cancellationToken);
         await QueueSmsSafelyAsync(mission, SmsEventType.WithdrawalApproved, null, cancellationToken);
     }
 
@@ -1070,6 +1080,20 @@ public sealed class MissionManagementService(
                 item.Mission,
                 "Success",
                 cancellationToken);
+            if (item.Action == "AutoCloseWithdrawal")
+            {
+                await CancelUnsentRemindersSafelyAsync(
+                    item.Mission.Id,
+                    "مهلت مأموریت هنگام بررسی انصراف به پایان رسید.",
+                    "system",
+                    cancellationToken);
+                await QueueSmsSafelyAsync(
+                    item.Mission,
+                    SmsEventType.MissionCancelled,
+                    "پایان زمان برنامه‌ریزی‌شده در زمان بررسی انصراف",
+                    cancellationToken);
+            }
+
             if (item.Action == "AutoComplete")
             {
                 await notificationService.CreateForRolesAsync(
