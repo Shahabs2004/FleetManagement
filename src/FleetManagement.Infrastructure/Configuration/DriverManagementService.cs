@@ -109,7 +109,7 @@ public sealed class DriverManagementService(
         {
             var hasActiveMission = await db.Missions.AnyAsync(mission =>
                 mission.DriverId == driverId
-                && mission.Status is MissionStatus.Confirmed or MissionStatus.Running,
+                && (mission.Status == MissionStatus.Confirmed || mission.Status == MissionStatus.Running),
                 cancellationToken);
 
             if (hasActiveMission)
@@ -168,7 +168,7 @@ public sealed class DriverManagementService(
         {
             var hasActiveMission = await db.Missions.AnyAsync(mission =>
                 mission.DriverId == driverId
-                && mission.Status is MissionStatus.Confirmed or MissionStatus.Running,
+                && (mission.Status == MissionStatus.Confirmed || mission.Status == MissionStatus.Running),
                 cancellationToken);
 
             if (hasActiveMission)
@@ -202,7 +202,7 @@ public sealed class DriverManagementService(
 
         var hasActiveMission = await db.Missions.AnyAsync(mission =>
             mission.DriverId == driverId
-            && mission.Status is MissionStatus.Confirmed or MissionStatus.Running,
+            && (mission.Status == MissionStatus.Confirmed || mission.Status == MissionStatus.Running),
             cancellationToken);
 
         if (hasActiveMission)
