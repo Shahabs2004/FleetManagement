@@ -126,7 +126,12 @@
                                         </select>
                                     </Authorized>
                                     <NotAuthorized>
-                                        @GetDefaultVehicleName(driver.Id)
+                                        <AuthorizeView Policy="Permission:vehicles.view">
+                                            <Authorized Context="vehicleViewPermissionContext">
+                                                @GetDefaultVehicleName(driver.Id)
+                                            </Authorized>
+                                            <NotAuthorized>—</NotAuthorized>
+                                        </AuthorizeView>
                                     </NotAuthorized>
                                 </AuthorizeView>
                             </td>
