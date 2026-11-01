@@ -95,7 +95,8 @@ public sealed class NotificationService(
         string username,
         bool unreadOnly = false,
         int take = 100,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int skip = 0)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var query = db.UserNotifications.AsNoTracking()
@@ -108,8 +109,28 @@ public sealed class NotificationService(
 
         return await query
             .OrderByDescending(notification => notification.CreatedAtUtc)
+            .ThenByDescending(notification => notification.Id)
+            .Skip(Math.Max(0, skip))
             .Take(Math.Clamp(take, 1, 200))
             .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>تعداد کل اعلان‌های کاربر، با امکان محدودکردن به خوانده‌نشده‌ها.</summary>
+    public async Task<int> GetCountAsync(
+        string username,
+        bool unreadOnly = false,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var query = db.UserNotifications.AsNoTracking()
+            .Where(notification => notification.RecipientUsername == username);
+
+        if (unreadOnly)
+        {
+            query = query.Where(notification => notification.ReadAtUtc == null);
+        }
+
+        return await query.CountAsync(cancellationToken);
     }
 
     /// <summary>تعداد اعلان‌های خوانده‌نشده کاربر.</summary>
