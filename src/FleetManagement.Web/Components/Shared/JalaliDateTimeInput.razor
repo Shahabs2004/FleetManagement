@@ -114,14 +114,14 @@
 
     /// <summary>متن قابل مشاهده با تقویم جلالی و رقم فارسی.</summary>
     private string DisplayValue => _selectedDate.HasValue
-        ? IncludeTime
+        ? ToPersianDigits(IncludeTime
             ? $"{FormatPersianDate(_selectedDate.Value)} {_hour:00}:00"
-            : FormatPersianDate(_selectedDate.Value)
+            : FormatPersianDate(_selectedDate.Value))
         : IncludeTime ? "انتخاب تاریخ و ساعت" : "انتخاب تاریخ";
 
     /// <summary>عنوان ماه و سال جاری در تقویم جلالی.</summary>
     private string MonthTitle =>
-        $"{PersianMonthNames[_persianCalendar.GetMonth(_visibleMonth) - 1]} {_persianCalendar.GetYear(_visibleMonth)}";
+        $"{PersianMonthNames[_persianCalendar.GetMonth(_visibleMonth) - 1]} {ToPersianDigits(_persianCalendar.GetYear(_visibleMonth).ToString(CultureInfo.InvariantCulture))}";
 
     /// <summary>امکان تأیید تاریخ و ساعت انتخاب‌شده.</summary>
     private bool CanConfirm =>
