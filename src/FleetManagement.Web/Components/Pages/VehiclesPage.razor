@@ -16,7 +16,7 @@
 <section class="admin-panel">
     <div class="eyebrow">مدیریت ناوگان</div>
     <h1>خودروها</h1>
-    <p>ثبت مشخصات پایه و بایگانی خودروها. وضعیت «در مأموریت» پس از تکمیل گردش مأموریت از روی مأموریت فعال محاسبه خواهد شد.</p>
+    <p>ثبت مشخصات، وضعیت دستی و بایگانی خودروها. وضعیت «در مأموریت» از روی مأموریت فعال محاسبه می‌شود و منابع درگیر قابل بایگانی یا غیرفعال‌سازی نیستند.</p>
 
     <div class="session-filters">
         <div>
@@ -318,6 +318,12 @@
     /// <summary>ثبت خطای فنی و نمایش شناسه پیگیری.</summary>
     private void ReportError(Exception exception, string operation)
     {
+        if (exception is InvalidOperationException or ArgumentException or KeyNotFoundException)
+        {
+            _error = exception.Message;
+            return;
+        }
+
         var trackingId = Guid.NewGuid().ToString("N");
         Logger.LogError(exception, "{Operation} ناموفق بود. شناسه پیگیری: {TrackingId}", operation, trackingId);
         _error = $"عملیات انجام نشد. شناسه پیگیری: {trackingId}";
