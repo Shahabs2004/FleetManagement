@@ -10,7 +10,14 @@
 
 <section class="login-panel">
     <div class="login-brand">
-        <div class="brand-mark" aria-hidden="true">ن</div>
+        @if (!string.IsNullOrWhiteSpace(_logoDataUri))
+        {
+            <img class="organization-logo" src="@_logoDataUri" alt="نشان سازمان" />
+        }
+        else
+        {
+            <div class="brand-mark" aria-hidden="true">ن</div>
+        }
         <div>
             <span class="eyebrow">سامانه مدیریت ناوگان</span>
             <h1>@_organizationName</h1>
@@ -75,6 +82,7 @@
 @code {
     private string? _requestToken;
     private string _organizationName = "سامانه مدیریت ناوگان";
+    private string? _logoDataUri;
     private string? _errorMessage;
 
     /// <summary>
@@ -108,6 +116,12 @@
             _organizationName = organization.OrganizationName;
         }
 
+        if (!string.IsNullOrWhiteSpace(organization?.LogoBase64)
+            && !string.IsNullOrWhiteSpace(organization.LogoContentType))
+        {
+            _logoDataUri = $"data:{organization.LogoContentType};base64,{organization.LogoBase64}";
+        }
+
         _errorMessage = Error switch
         {
             "ad-not-configured" => "اتصال Active Directory هنوز تنظیم یا تأیید نشده است.",
@@ -116,6 +130,7 @@
             "account-locked" => "حساب کاربری شما در دایرکتوری قفل شده است.",
             "account-expired" => "اعتبار زمانی حساب کاربری شما پایان یافته است.",
             "app-disabled" => "حساب شما توسط مدیر سامانه غیرفعال شده است. برای فعال‌سازی با مدیر سامانه تماس بگیرید.",
+            "directory-revoked" => "وضعیت حساب یا عضویت شما در گروه‌های مجاز دامنه تغییر کرده است؛ برای ادامه با مدیر سامانه تماس بگیرید.",
             "local-admin-invalid" => "اطلاعات مدیر محلی صحیح نیست یا حساب موقتاً قفل شده است.",
             "not-allowed" => "حساب شما عضو هیچ‌یک از گروه‌های مجاز سامانه نیست.",
             "directory-unavailable" => "ارتباط با Active Directory برقرار نشد. بعداً دوباره تلاش کنید.",
