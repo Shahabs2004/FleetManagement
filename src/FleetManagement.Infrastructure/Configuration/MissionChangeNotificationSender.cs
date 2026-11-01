@@ -6,7 +6,7 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// اتصال اعلان‌های Application به سرویس اعلان پایدار و انتشار لحظه‌ای زیرساخت.
 /// </summary>
 public sealed class MissionChangeNotificationSender(NotificationService notificationService)
-    : IMissionChangeNotificationSender
+    : IMissionChangeNotificationSender, IMissionNotificationSender
 {
     /// <inheritdoc />
     public Task CreateAsync(
