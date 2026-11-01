@@ -24,5 +24,8 @@ public enum SmsQueueStatus
     Failed = 6,
 
     /// <summary>خطای دائمی ارائه‌دهنده.</summary>
-    PermanentFailure = 7
+    PermanentFailure = 7,
+
+    /// <summary>یادآوری زمان‌بندی‌شده که پیش از ارسال لغو شده است.</summary>
+    Cancelled = 8
 }
