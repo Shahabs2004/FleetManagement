@@ -5,6 +5,7 @@
 @using FleetManagement.Infrastructure.Reporting
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject FleetDashboardService DashboardService
+@inject DashboardLayoutSettingsService DashboardLayoutSettings
 @inject ILogger<Home> Logger
 
 <PageTitle>داشبورد مدیریت ناوگان</PageTitle>
@@ -33,53 +34,43 @@
     else if (_summary is not null)
     {
         <div class="dashboard-grid">
-            <article class="dashboard-card">
-                <span>در انتظار بررسی</span>
-                <strong>@ToPersianDigits(_summary.PendingMissions)</strong>
-                <a href="@(_canReviewMissions ? "/admin/missions" : "/missions")">مشاهده درخواست‌ها</a>
-            </article>
-            <article class="dashboard-card">
-                <span>تأییدشده و در انتظار شروع</span>
-                <strong>@ToPersianDigits(_summary.ConfirmedMissions)</strong>
-                <a href="/missions">فهرست مأموریت‌ها</a>
-            </article>
-            <article class="dashboard-card dashboard-card-active">
-                <span>در حال اجرا</span>
-                <strong>@ToPersianDigits(_summary.RunningMissions)</strong>
-                <a href="/missions">مشاهده مأموریت‌ها</a>
-            </article>
-            <article class="dashboard-card">
-                <span>پایان‌یافته</span>
-                <strong>@ToPersianDigits(_summary.CompletedMissions)</strong>
-                <a href="@(_canViewReports ? "/reports/missions" : "/missions")">@(_canViewReports ? "گزارش عملکرد" : "مشاهده مأموریت‌ها")</a>
-            </article>
-            <article class="dashboard-card">
-                <span>لغوشده</span>
-                <strong>@ToPersianDigits(_summary.CancelledMissions)</strong>
-                <a href="@(_canViewReports ? "/reports/missions" : "/missions")">@(_canViewReports ? "گزارش لغوها" : "مشاهده مأموریت‌ها")</a>
-            </article>
-            <article class="dashboard-card">
-                <span>شروع برنامه‌ریزی‌شده امروز</span>
-                <strong>@ToPersianDigits(_summary.TodayMissions)</strong>
-                <small>بر اساس ساعت تهران</small>
-            </article>
-
-            @if (_summary.ActiveDrivers.HasValue)
+            @foreach (var card in _cards)
             {
-                <article class="dashboard-card">
-                    <span>رانندگان فعال</span>
-                    <strong>@ToPersianDigits(_summary.ActiveDrivers.Value)</strong>
-                    <small>از @ToPersianDigits(_summary.TotalDrivers ?? 0) راننده ثبت‌شده</small>
-                    <a href="/drivers">مدیریت رانندگان</a>
-                </article>
-                <article class="dashboard-card">
-                    <span>خودروهای آماده تخصیص</span>
-                    <strong>@ToPersianDigits(_summary.ReadyVehicles ?? 0)</strong>
-                    <small>از @ToPersianDigits(_summary.TotalVehicles ?? 0) خودرو</small>
-                    <a href="/vehicles">مدیریت خودروها</a>
+                <article class="dashboard-card @(card.Highlight ? "dashboard-card-active" : string.Empty)" @key="card.Key">
+                    <div class="dashboard-card-toolbar">
+                        <button type="button" title="انتقال به بالا" @onclick="() => MoveCardAsync(card.Key, -1)" disabled="@IsFirstCard(card.Key)">↑</button>
+                        <button type="button" title="انتقال به پایین" @onclick="() => MoveCardAsync(card.Key, 1)" disabled="@IsLastCard(card.Key)">↓</button>
+                        <button type="button" title="پنهان‌کردن کارت" @onclick="() => HideCardAsync(card.Key)">×</button>
+                    </div>
+                    <span>@card.Title</span>
+                    <strong>@card.Value</strong>
+                    @if (!string.IsNullOrWhiteSpace(card.Description))
+                    {
+                        <small>@card.Description</small>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(card.Link))
+                    {
+                        <a href="@card.Link">@card.LinkText</a>
+                    }
                 </article>
             }
         </div>
+
+        @if (_hiddenCards.Count > 0)
+        {
+            <section class="dashboard-hidden-cards">
+                <h2>کارت‌های پنهان‌شده</h2>
+                <div class="dashboard-links">
+                    @foreach (var card in _hiddenCards)
+                    {
+                        <span>
+                            @card.Title
+                            <button type="button" class="secondary-button" @onclick="() => ShowCardAsync(card.Key)">نمایش</button>
+                        </span>
+                    }
+                </div>
+            </section>
+        }
 
         <section class="dashboard-shortcuts">
             <h2>دسترسی سریع</h2>
@@ -99,6 +90,7 @@
                 <a href="/locations">فهرست مکان‌های مأموریت</a>
             </div>
         </section>
+        <p class="session-count">چیدمان کارت‌ها برای حساب شما ذخیره می‌شود.</p>
     }
 </section>
 
@@ -106,12 +98,17 @@
     private bool _isLoading = true;
     private string? _error;
     private string? _displayName;
+    private string _username = string.Empty;
     private bool _canCreateMission;
     private bool _canReviewMissions;
     private bool _canViewReports;
     private FleetDashboardSummary? _summary;
+    private DashboardLayoutConfiguration _layout = new();
+    private List<DashboardCard> _allCards = [];
+    private List<DashboardCard> _cards = [];
+    private List<DashboardCard> _hiddenCards = [];
 
-    /// <summary>دریافت آمار متناسب با نقش و هویت کاربر جاری.</summary>
+    /// <summary>دریافت آمار و چیدمان متناسب با کاربر جاری.</summary>
     protected override async Task OnInitializedAsync()
     {
         try
@@ -122,6 +119,9 @@
                 .Select(claim => claim.Value)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+            _username = user.FindFirst("fleet:username")?.Value
+                ?? user.Identity?.Name
+                ?? "Unknown";
             _displayName = user.FindFirst("fleet:display-name")?.Value
                 ?? user.Identity?.Name;
 
@@ -130,9 +130,7 @@
                 || roles.Contains("Operator")
                 || roles.Contains("Viewer");
 
-            var requesterUsername = isFleetStaff
-                ? null
-                : user.FindFirst("fleet:username")?.Value ?? user.Identity?.Name;
+            var requesterUsername = isFleetStaff ? null : _username;
 
             _canCreateMission = roles.Contains("SystemAdministrator")
                 || roles.Contains("FleetManager")
@@ -150,6 +148,9 @@
             _summary = await DashboardService.BuildAsync(
                 requesterUsername,
                 includeFleetAssets: isFleetStaff);
+
+            _layout = await DashboardLayoutSettings.GetAsync(_username);
+            BuildCards();
         }
         catch (Exception exception)
         {
@@ -162,6 +163,125 @@
             _isLoading = false;
         }
     }
+
+    /// <summary>ساخت مجموعه کارت‌های مجاز برای نقش جاری.</summary>
+    private void BuildCards()
+    {
+        if (_summary is null)
+        {
+            return;
+        }
+
+        var missionsLink = _canReviewMissions ? "/admin/missions" : "/missions";
+        var reportsLink = _canViewReports ? "/reports/missions" : "/missions";
+        var reportsText = _canViewReports ? "گزارش عملکرد" : "مشاهده مأموریت‌ها";
+
+        _allCards =
+        [
+            new("pending", "در انتظار بررسی", ToPersianDigits(_summary.PendingMissions), null, missionsLink, "مشاهده درخواست‌ها", false),
+            new("confirmed", "تأییدشده و در انتظار شروع", ToPersianDigits(_summary.ConfirmedMissions), null, "/missions", "فهرست مأموریت‌ها", false),
+            new("running", "در حال اجرا", ToPersianDigits(_summary.RunningMissions), null, "/missions", "مشاهده مأموریت‌ها", true),
+            new("completed", "پایان‌یافته", ToPersianDigits(_summary.CompletedMissions), null, reportsLink, reportsText, false),
+            new("cancelled", "لغوشده", ToPersianDigits(_summary.CancelledMissions), null, reportsLink, _canViewReports ? "گزارش لغوها" : "مشاهده مأموریت‌ها", false),
+            new("today", "شروع برنامه‌ریزی‌شده امروز", ToPersianDigits(_summary.TodayMissions), "بر اساس ساعت تهران", null, null, false)
+        ];
+
+        if (_summary.ActiveDrivers.HasValue)
+        {
+            _allCards.Add(new(
+                "activeDrivers",
+                "رانندگان فعال",
+                ToPersianDigits(_summary.ActiveDrivers.Value),
+                $"از {ToPersianDigits(_summary.TotalDrivers ?? 0)} راننده ثبت‌شده",
+                "/drivers",
+                "مدیریت رانندگان",
+                false));
+
+            _allCards.Add(new(
+                "readyVehicles",
+                "خودروهای آماده تخصیص",
+                ToPersianDigits(_summary.ReadyVehicles ?? 0),
+                $"از {ToPersianDigits(_summary.TotalVehicles ?? 0)} خودرو",
+                "/vehicles",
+                "مدیریت خودروها",
+                false));
+        }
+
+        var order = _layout.CardOrder
+            .Concat(_allCards.Select(card => card.Key))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var hidden = _layout.HiddenCards.ToHashSet(StringComparer.Ordinal);
+
+        _cards = _allCards
+            .Where(card => !hidden.Contains(card.Key))
+            .OrderBy(card => order.IndexOf(card.Key))
+            .ToList();
+
+        _hiddenCards = _allCards
+            .Where(card => hidden.Contains(card.Key))
+            .OrderBy(card => order.IndexOf(card.Key))
+            .ToList();
+    }
+
+    /// <summary>جابجایی کارت در ترتیب نمایش.</summary>
+    private async Task MoveCardAsync(string key, int offset)
+    {
+        var index = _cards.FindIndex(card => card.Key == key);
+        var target = index + offset;
+        if (index < 0 || target < 0 || target >= _cards.Count)
+        {
+            return;
+        }
+
+        var card = _cards[index];
+        _cards.RemoveAt(index);
+        _cards.Insert(target, card);
+        await SaveLayoutAsync();
+    }
+
+    /// <summary>پنهان‌کردن کارت در چیدمان شخصی.</summary>
+    private async Task HideCardAsync(string key)
+    {
+        if (!_layout.HiddenCards.Contains(key, StringComparer.Ordinal))
+        {
+            _layout.HiddenCards.Add(key);
+        }
+        BuildCards();
+        await SaveLayoutAsync();
+    }
+
+    /// <summary>بازگرداندن کارت پنهان‌شده به داشبورد.</summary>
+    private async Task ShowCardAsync(string key)
+    {
+        _layout.HiddenCards.RemoveAll(item => item == key);
+        BuildCards();
+        await SaveLayoutAsync();
+    }
+
+    /// <summary>ذخیره ترتیب فعلی و فهرست کارت‌های پنهان.</summary>
+    private async Task SaveLayoutAsync()
+    {
+        try
+        {
+            _layout.CardOrder = _cards.Select(card => card.Key)
+                .Concat(_hiddenCards.Select(card => card.Key))
+                .ToList();
+            await DashboardLayoutSettings.SaveAsync(_username, _layout);
+        }
+        catch (Exception exception)
+        {
+            var trackingId = Guid.NewGuid().ToString("N");
+            Logger.LogError(exception, "ذخیره چیدمان داشبورد ناموفق بود. شناسه پیگیری: {TrackingId}", trackingId);
+            _error = $"ذخیره چیدمان انجام نشد. شناسه پیگیری: {trackingId}";
+        }
+    }
+
+    /// <summary>بررسی اولین کارت برای غیرفعال‌کردن جابجایی به بالا.</summary>
+    private bool IsFirstCard(string key) => _cards.FindIndex(card => card.Key == key) <= 0;
+
+    /// <summary>بررسی آخرین کارت برای غیرفعال‌کردن جابجایی به پایین.</summary>
+    private bool IsLastCard(string key) => _cards.FindIndex(card => card.Key == key) >= _cards.Count - 1;
 
     /// <summary>نمایش اعداد با رقم فارسی.</summary>
     private static string ToPersianDigits(int value)
@@ -179,4 +299,13 @@
             }
         });
     }
+
+    private sealed record DashboardCard(
+        string Key,
+        string Title,
+        string Value,
+        string? Description,
+        string? Link,
+        string? LinkText,
+        bool Highlight);
 }
