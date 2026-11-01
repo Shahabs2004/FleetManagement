@@ -727,7 +727,9 @@
     {
         if (!HasCurrentTechnicalAdministratorAccess())
         {
-            throw new UnauthorizedAccessException("برای تغییر تنظیمات پیامک، دسترسی مدیر فنی لازم است.");
+            _isError = true;
+            _message = "مهلت دسترسی مدیر فنی پایان یافته است. برای ادامه دوباره کد مدیر فنی را تأیید کنید.";
+            return;
         }
 
         _isBusy = true;
@@ -777,7 +779,9 @@
     {
         if (!HasCurrentTechnicalAdministratorAccess())
         {
-            throw new UnauthorizedAccessException("فقط مدیر فنی می‌تواند از مرحله پیامک عبور کند.");
+            _isError = true;
+            _message = "مهلت دسترسی مدیر فنی پایان یافته است. برای ادامه دوباره کد مدیر فنی را تأیید کنید.";
+            return Task.CompletedTask;
         }
 
         return MarkSmsSkippedAsync();
