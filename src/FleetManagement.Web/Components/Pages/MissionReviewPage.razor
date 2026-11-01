@@ -510,7 +510,7 @@
 
         if (!string.IsNullOrWhiteSpace(startText))
         {
-            if (!long.TryParse(startText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedStart))
+            if (!TryParseOdometer(startText, out var parsedStart))
             {
                 _error = "مقدار کیلومترشمار شروع معتبر نیست.";
                 return;
@@ -521,7 +521,7 @@
 
         if (!string.IsNullOrWhiteSpace(endText))
         {
-            if (!long.TryParse(endText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedEnd))
+            if (!TryParseOdometer(endText, out var parsedEnd))
             {
                 _error = "مقدار کیلومترشمار پایان معتبر نیست.";
                 return;
@@ -585,7 +585,7 @@
         if (!_splitMissionId.HasValue
             || !Guid.TryParse(_splitDriver, out var driverId)
             || !Guid.TryParse(_splitVehicle, out var vehicleId)
-            || !long.TryParse(_splitEndOdometer, out var endOdometer))
+            || !TryParseOdometer(_splitEndOdometer, out var endOdometer))
         {
             _error = "راننده، خودرو، زمان تقسیم و کیلومترشمار پایان بخش اول را کامل کنید.";
             return;
@@ -594,7 +594,7 @@
         long? secondStart = null;
         if (!string.IsNullOrWhiteSpace(_splitStartOdometer))
         {
-            if (!long.TryParse(_splitStartOdometer, out var parsedStart))
+            if (!TryParseOdometer(_splitStartOdometer, out var parsedStart))
             {
                 _error = "کیلومترشمار شروع خودروی جدید معتبر نیست.";
                 return;
@@ -630,6 +630,30 @@
         {
             _busy = false;
         }
+    }
+
+    /// <summary>خواندن کیلومترشمار با پشتیبانی از ارقام فارسی و عربی و جداکننده هزارگان.</summary>
+    private static bool TryParseOdometer(string? value, out long result)
+    {
+        result = 0;
+        if (string.IsNullOrWhiteSpace(value)) return false;
+
+        var normalized = string.Create(value.Length, value, (destination, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                destination[index] = source[index] switch
+                {
+                    >= '۰' and <= '۹' => (char)('0' + source[index] - '۰'),
+                    >= '٠' and <= '٩' => (char)('0' + source[index] - '٠'),
+                    _ => source[index]
+                };
+            }
+        }).Replace(",", string.Empty, StringComparison.Ordinal)
+          .Replace("٬", string.Empty, StringComparison.Ordinal)
+          .Trim();
+
+        return long.TryParse(normalized, NumberStyles.None, CultureInfo.InvariantCulture, out result);
     }
 
     /// <summary>تبدیل زمان محلی تهران به UTC.</summary>
