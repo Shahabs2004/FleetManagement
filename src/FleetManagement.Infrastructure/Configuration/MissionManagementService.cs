@@ -1080,6 +1080,12 @@ public sealed class MissionManagementService(
                     "Mission",
                     item.Mission.Id.ToString(),
                     cancellationToken);
+
+                await QueueSmsSafelyAsync(
+                    item.Mission,
+                    SmsEventType.MissionCompleted,
+                    null,
+                    cancellationToken);
             }
         }
 
