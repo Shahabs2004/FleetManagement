@@ -195,13 +195,14 @@ public sealed class SmsQueueItem : Entity
     }
 
     /// <summary>تلاش مجدد دستی پس از اصلاح علت خطا.</summary>
-    public void RetryManually(DateTimeOffset nowUtc)
+    public void RetryManually(DateTimeOffset nowUtc, string correctionReason)
     {
         if (Status is not (SmsQueueStatus.Failed or SmsQueueStatus.PermanentFailure))
         {
             throw new InvalidOperationException("ارسال دستی فقط برای پیام ناموفق مجاز است.");
         }
 
+        _ = Required(correctionReason, 1000, nameof(correctionReason));
         Status = SmsQueueStatus.Queued;
         NextAttemptAtUtc = nowUtc;
         ErrorReason = null;
