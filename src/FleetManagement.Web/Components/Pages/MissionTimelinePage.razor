@@ -326,6 +326,10 @@
         catch (TimeZoneNotFoundException) { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
     }
 
+    /// <summary>نمایش عدد صحیح با رقم‌های فارسی.</summary>
+    private static string ToPersianDigits(int value) =>
+        ToPersianDigits(value.ToString(CultureInfo.InvariantCulture));
+
     /// <summary>تبدیل رقم‌های لاتین به فارسی.</summary>
     private static string ToPersianDigits(string value)
     {
