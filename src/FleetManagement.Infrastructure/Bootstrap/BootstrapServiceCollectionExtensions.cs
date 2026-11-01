@@ -1,4 +1,6 @@
 using FleetManagement.Application.Configuration;
+using FleetManagement.Application.Missions;
+using FleetManagement.Application.Notifications;
 using FleetManagement.Infrastructure.Configuration;
 using FleetManagement.Infrastructure.Persistence;
 using FleetManagement.Infrastructure.Reporting;
@@ -38,6 +40,10 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<UserSessionService>();
         services.AddScoped<SessionPolicySettingsService>();
         services.AddScoped<AuditLogService>();
+        services.AddScoped<IAuditLogWriter>(provider => provider.GetRequiredService<AuditLogService>());
+        services.AddScoped<IMissionChangeRequestStore, EfMissionChangeRequestStore>();
+        services.AddScoped<IMissionChangeNotificationSender, MissionChangeNotificationSender>();
+        services.AddScoped<MissionChangeRequestService>();
         services.AddScoped<DriverManagementService>();
         services.AddScoped<DriverVehiclePreferenceService>();
         services.AddScoped<VehicleManagementService>();
