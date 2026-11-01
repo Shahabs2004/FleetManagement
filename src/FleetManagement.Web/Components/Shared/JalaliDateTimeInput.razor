@@ -1,0 +1,301 @@
+@using System.Globalization
+@using Microsoft.AspNetCore.Components
+
+<div class="jalali-picker" dir="rtl">
+    <label for="@Id">@Label</label>
+    <button id="@Id" type="button" class="jalali-picker-display" @onclick="ToggleCalendar">
+        @DisplayValue
+        <span aria-hidden="true">▾</span>
+    </button>
+
+    @if (_isOpen)
+    {
+        <div class="jalali-picker-popover">
+            <div class="jalali-picker-month">
+                <button type="button" aria-label="ماه قبل" @onclick="PreviousMonth">‹</button>
+                <strong>@MonthTitle</strong>
+                <button type="button" aria-label="ماه بعد" @onclick="NextMonth">›</button>
+            </div>
+            <div class="jalali-picker-weekdays">
+                @foreach (var dayName in WeekdayNames)
+                {
+                    <span>@dayName</span>
+                }
+            </div>
+            <div class="jalali-picker-days">
+                @foreach (var day in _days)
+                {
+                    <button type="button"
+                            class="@GetDayClass(day)"
+                            disabled="@IsDayDisabled(day.Date)"
+                            @onclick="() => SelectDay(day.Date)">
+                        @ToPersianDigits(_persianCalendar.GetDayOfMonth(day.Date).ToString(CultureInfo.InvariantCulture))
+                    </button>
+                }
+            </div>
+            <div class="jalali-picker-hour">
+                <label for="@($"{Id}-hour")">ساعت</label>
+                <select id="@($"{Id}-hour")" @bind="_hour">
+                    @for (var hour = 0; hour < 24; hour++)
+                    {
+                        <option value="@hour" disabled="@IsHourDisabled(hour)">@ToPersianDigits($"{hour:00}:00")</option>
+                    }
+                </select>
+            </div>
+            <div class="jalali-picker-actions">
+                <button type="button" class="secondary-button" @onclick="CloseCalendar">انصراف</button>
+                <button type="button" class="primary-button" @onclick="ConfirmSelection" disabled="@(!CanConfirm)">تأیید زمان</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly string[] WeekdayNames =
+    [
+        "شنبه",
+        "یکشنبه",
+        "دوشنبه",
+        "سه‌شنبه",
+        "چهارشنبه",
+        "پنجشنبه",
+        "جمعه"
+    ];
+
+    private static readonly string[] PersianMonthNames =
+    [
+        "فروردین",
+        "اردیبهشت",
+        "خرداد",
+        "تیر",
+        "مرداد",
+        "شهریور",
+        "مهر",
+        "آبان",
+        "آذر",
+        "دی",
+        "بهمن",
+        "اسفند"
+    ];
+
+    private readonly PersianCalendar _persianCalendar = new();
+    private DateTime _visibleMonth = new(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+    private DateTime? _selectedDate;
+    private IReadOnlyList<CalendarDay> _days = [];
+    private int _hour;
+    private bool _isOpen;
+
+    /// <summary>شناسه یکتای ورودی.</summary>
+    [Parameter, EditorRequired]
+    public string Id { get; set; } = string.Empty;
+
+    /// <summary>عنوان فیلد.</summary>
+    [Parameter]
+    public string Label { get; set; } = "تاریخ و ساعت";
+
+    /// <summary>مقدار محلی تهران با قالب میلادی داخلی برای سازگاری فرم.</summary>
+    [Parameter]
+    public string? Value { get; set; }
+
+    /// <summary>رویداد تغییر مقدار انتخاب‌شده.</summary>
+    [Parameter]
+    public EventCallback<string?> ValueChanged { get; set; }
+
+    /// <summary>کمترین مقدار مجاز در قالب داخلی yyyy-MM-ddTHH:mm.</summary>
+    [Parameter]
+    public string? MinValue { get; set; }
+
+    /// <summary>متن قابل مشاهده با تقویم جلالی و رقم فارسی.</summary>
+    private string DisplayValue => _selectedDate.HasValue
+        ? $"{FormatPersianDate(_selectedDate.Value)} {_hour:00}:00"
+        : "انتخاب تاریخ و ساعت";
+
+    /// <summary>عنوان ماه و سال جاری در تقویم جلالی.</summary>
+    private string MonthTitle =>
+        $"{PersianMonthNames[_persianCalendar.GetMonth(_visibleMonth) - 1]} {_persianCalendar.GetYear(_visibleMonth)}";
+
+    /// <summary>امکان تأیید تاریخ و ساعت انتخاب‌شده.</summary>
+    private bool CanConfirm =>
+        _selectedDate.HasValue
+        && !IsDateTimeBeforeMinimum(_selectedDate.Value.AddHours(_hour));
+
+    /// <summary>همگام‌سازی انتخاب داخلی با مقدار فرم.</summary>
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrWhiteSpace(Value)
+            && DateTime.TryParseExact(
+                Value,
+                "yyyy-MM-dd'T'HH:mm",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsed))
+        {
+            _selectedDate = parsed.Date;
+            _hour = parsed.Hour;
+            _visibleMonth = new DateTime(parsed.Year, parsed.Month, 1);
+        }
+        else if (_selectedDate is null)
+        {
+            var current = GetTehranNow();
+            _visibleMonth = new DateTime(current.Year, current.Month, 1);
+        }
+
+        BuildDays();
+    }
+
+    /// <summary>باز یا بسته کردن تقویم.</summary>
+    private void ToggleCalendar()
+    {
+        _isOpen = !_isOpen;
+        if (_isOpen && _selectedDate.HasValue)
+        {
+            _visibleMonth = new DateTime(_selectedDate.Value.Year, _selectedDate.Value.Month, 1);
+        }
+        BuildDays();
+    }
+
+    /// <summary>رفتن به ماه جلالی قبل.</summary>
+    private void PreviousMonth()
+    {
+        var previous = _persianCalendar.AddMonths(_visibleMonth, -1);
+        _visibleMonth = new DateTime(previous.Year, previous.Month, 1);
+        BuildDays();
+    }
+
+    /// <summary>رفتن به ماه جلالی بعد.</summary>
+    private void NextMonth()
+    {
+        var next = _persianCalendar.AddMonths(_visibleMonth, 1);
+        _visibleMonth = new DateTime(next.Year, next.Month, 1);
+        BuildDays();
+    }
+
+    /// <summary>انتخاب یک روز از تقویم.</summary>
+    private void SelectDay(DateTime date)
+    {
+        if (IsDayDisabled(date))
+        {
+            return;
+        }
+
+        _selectedDate = date.Date;
+        if (IsHourDisabled(_hour))
+        {
+            _hour = GetMinimumHour();
+        }
+    }
+
+    /// <summary>ثبت تاریخ و ساعت انتخاب‌شده به قالب داخلی فرم.</summary>
+    private async Task ConfirmSelection()
+    {
+        if (!CanConfirm || !_selectedDate.HasValue)
+        {
+            return;
+        }
+
+        var localValue = _selectedDate.Value.Date.AddHours(_hour);
+        Value = localValue.ToString("yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture);
+        await ValueChanged.InvokeAsync(Value);
+        _isOpen = false;
+    }
+
+    /// <summary>بستن تقویم بدون تغییر مقدار فرم.</summary>
+    private void CloseCalendar() => _isOpen = false;
+
+    /// <summary>ساخت خانه‌های تقویم با شروع هفته از شنبه.</summary>
+    private void BuildDays()
+    {
+        var firstDay = new DateTime(_visibleMonth.Year, _visibleMonth.Month, 1);
+        var offset = ((int)firstDay.DayOfWeek + 1) % 7;
+        var gridStart = firstDay.AddDays(-offset);
+
+        _days = Enumerable.Range(0, 42)
+            .Select(index => new CalendarDay(
+                gridStart.AddDays(index),
+                gridStart.AddDays(index).Month == _visibleMonth.Month))
+            .ToArray();
+    }
+
+    /// <summary>تعیین ظاهر روز انتخاب‌شده یا روزهای خارج از ماه.</summary>
+    private string GetDayClass(CalendarDay day)
+    {
+        var classes = "jalali-picker-day";
+        if (!day.IsInMonth) classes += " outside-month";
+        if (_selectedDate?.Date == day.Date.Date) classes += " selected";
+        return classes;
+    }
+
+    /// <summary>غیرفعال‌کردن روزهای قبل از حداقل تاریخ مجاز.</summary>
+    private bool IsDayDisabled(DateTime date)
+    {
+        if (!TryGetMinimum(out var minimum))
+        {
+            return false;
+        }
+
+        return date.Date < minimum.Date;
+    }
+
+    /// <summary>غیرفعال‌کردن ساعت‌های پیش از حداقل ساعت در همان روز.</summary>
+    private bool IsHourDisabled(int hour)
+    {
+        if (!_selectedDate.HasValue || !TryGetMinimum(out var minimum))
+        {
+            return false;
+        }
+
+        return _selectedDate.Value.Date == minimum.Date && hour < minimum.Hour;
+    }
+
+    /// <summary>بررسی حداقل زمان برای تاریخ و ساعت نهایی.</summary>
+    private bool IsDateTimeBeforeMinimum(DateTime value) =>
+        TryGetMinimum(out var minimum) && value < minimum;
+
+    /// <summary>خواندن حداقل مقدار محلی فرم.</summary>
+    private bool TryGetMinimum(out DateTime minimum)
+    {
+        return DateTime.TryParseExact(
+            MinValue,
+            "yyyy-MM-dd'T'HH:mm",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out minimum);
+    }
+
+    /// <summary>ساعت حداقلی برای روز جاری.</summary>
+    private int GetMinimumHour() =>
+        TryGetMinimum(out var minimum) ? minimum.Hour : 0;
+
+    /// <summary>تاریخ جلالی با ارقام فارسی.</summary>
+    private string FormatPersianDate(DateTime date)
+    {
+        var value = $"{_persianCalendar.GetYear(date):0000}/{_persianCalendar.GetMonth(date):00}/{_persianCalendar.GetDayOfMonth(date):00}";
+        return ToPersianDigits(value);
+    }
+
+    /// <summary>تبدیل ارقام لاتین به فارسی.</summary>
+    private static string ToPersianDigits(string value)
+    {
+        const string latin = "0123456789";
+        const string persian = "۰۱۲۳۴۵۶۷۸۹";
+        return string.Create(value.Length, value, (destination, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                var digit = latin.IndexOf(source[index]);
+                destination[index] = digit >= 0 ? persian[digit] : source[index];
+            }
+        });
+    }
+
+    /// <summary>گرفتن تاریخ جاری تهران برای نمایش ماه پیش‌فرض.</summary>
+    private static DateTime GetTehranNow()
+    {
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+        return TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone).DateTime;
+    }
+
+    private sealed record CalendarDay(DateTime Date, bool IsInMonth);
+}
