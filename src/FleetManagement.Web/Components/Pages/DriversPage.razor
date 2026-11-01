@@ -6,10 +6,12 @@
 @using FleetManagement.Infrastructure.Configuration
 @using FleetManagement.Web.Security
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Authorization
 @inject DriverManagementService DriverService
 @inject VehicleManagementService VehicleService
 @inject DriverVehiclePreferenceService DriverVehiclePreferences
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IAuthorizationService AuthorizationService
 @inject ILogger<DriversPage> Logger
 
 <PageTitle>مدیریت رانندگان</PageTitle>
@@ -43,6 +45,8 @@
         <div class="setup-error">@_error</div>
     }
 
+    <AuthorizeView Policy="Permission:drivers.manage">
+        <Authorized Context="driverManageContext">
     <section class="driver-editor">
         <h2>@(_editingId.HasValue ? "ویرایش راننده" : "ثبت راننده جدید")</h2>
         <div class="driver-form-grid">
@@ -81,6 +85,8 @@
             }
         </div>
     </section>
+        </Authorized>
+    </AuthorizeView>
 
     @if (_loading)
     {
@@ -136,15 +142,19 @@
                                 </AuthorizeView>
                             </td>
                             <td>
-                                <button type="button" class="secondary-button" @onclick="() => Edit(driver)">ویرایش</button>
-                                @if (!driver.IsArchived)
-                                {
-                                    <button type="button" class="secondary-button" @onclick="() => ArchiveAsync(driver.Id)" disabled="@_busy">بایگانی</button>
-                                }
-                                else
-                                {
-                                    <button type="button" class="secondary-button" @onclick="() => ReactivateAsync(driver.Id)" disabled="@_busy">بازگردانی</button>
-                                }
+                                <AuthorizeView Policy="Permission:drivers.manage">
+                                    <Authorized Context="driverActionsContext">
+                                        <button type="button" class="secondary-button" @onclick="() => Edit(driver)">ویرایش</button>
+                                        @if (!driver.IsArchived)
+                                        {
+                                            <button type="button" class="secondary-button" @onclick="() => ArchiveAsync(driver.Id)" disabled="@_busy">بایگانی</button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="secondary-button" @onclick="() => ReactivateAsync(driver.Id)" disabled="@_busy">بازگردانی</button>
+                                        }
+                                    </Authorized>
+                                </AuthorizeView>
                             </td>
                         </tr>
                     }
@@ -221,6 +231,11 @@
     /// <summary>ثبت یا حذف خودروی پیش‌فرض راننده.</summary>
     private async Task SetDefaultVehicleAsync(Guid driverId, ChangeEventArgs args)
     {
+        if (!await HasPermissionAsync("Permission:drivers.default-vehicle.manage"))
+        {
+            return;
+        }
+
         _busy = true;
         _error = string.Empty;
         try
@@ -262,6 +277,11 @@
     /// <summary>ثبت راننده جدید یا ذخیره تغییرات راننده موجود.</summary>
     private async Task SaveAsync()
     {
+        if (!await HasPermissionAsync("Permission:drivers.manage"))
+        {
+            return;
+        }
+
         _busy = true;
         _message = string.Empty;
         _error = string.Empty;
@@ -297,6 +317,11 @@
     /// <summary>بایگانی راننده بدون حذف اطلاعات او.</summary>
     private async Task ArchiveAsync(Guid driverId)
     {
+        if (!await HasPermissionAsync("Permission:drivers.manage"))
+        {
+            return;
+        }
+
         _busy = true;
         try
         {
@@ -317,6 +342,11 @@
     /// <summary>بازگرداندن راننده بایگانی‌شده.</summary>
     private async Task ReactivateAsync(Guid driverId)
     {
+        if (!await HasPermissionAsync("Permission:drivers.manage"))
+        {
+            return;
+        }
+
         _busy = true;
         try
         {
@@ -342,6 +372,20 @@
         _lastName = string.Empty;
         _mobile = string.Empty;
         _status = DriverEmploymentStatus.Active;
+    }
+
+    /// <summary>بررسی مجوز عملیاتی در سمت سرور، مستقل از مخفی‌سازی کنترل‌های رابط.</summary>
+    private async Task<bool> HasPermissionAsync(string policy)
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var authorization = await AuthorizationService.AuthorizeAsync(state.User, policy);
+        if (authorization.Succeeded)
+        {
+            return true;
+        }
+
+        _error = "شما مجوز لازم برای انجام این عملیات را ندارید.";
+        return false;
     }
 
     /// <summary>استخراج نام کاربری عامل از هویت احرازشده.</summary>
