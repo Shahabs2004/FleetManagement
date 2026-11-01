@@ -385,7 +385,7 @@ public sealed class MissionManagementService(
         string actor,
         CancellationToken cancellationToken = default)
     {
-        var rules = await GetRulesAsync(cancellationToken);
+        var rules = await missionRulesService.GetRulesAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
         if (plannedStartAtUtc < now)
         {
@@ -473,7 +473,7 @@ public sealed class MissionManagementService(
         DateOnly? missionOrderDate,
         CancellationToken cancellationToken = default)
     {
-        var rules = await GetRulesAsync(cancellationToken);
+        var rules = await missionRulesService.GetRulesAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
         if (plannedStartAtUtc < now)
         {
@@ -604,7 +604,7 @@ public sealed class MissionManagementService(
         string actor,
         CancellationToken cancellationToken = default)
     {
-        var rules = await GetRulesAsync(cancellationToken);
+        var rules = await missionRulesService.GetRulesAsync(cancellationToken);
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
@@ -907,7 +907,7 @@ public sealed class MissionManagementService(
         string actor,
         CancellationToken cancellationToken = default)
     {
-        var rules = await GetRulesAsync(cancellationToken);
+        var rules = await missionRulesService.GetRulesAsync(cancellationToken);
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var mission = await GetMissionAsync(db, missionId, cancellationToken);
@@ -1050,7 +1050,7 @@ public sealed class MissionManagementService(
         string actor,
         CancellationToken cancellationToken = default)
     {
-        var rules = await GetRulesAsync(cancellationToken);
+        var rules = await missionRulesService.GetRulesAsync(cancellationToken);
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
