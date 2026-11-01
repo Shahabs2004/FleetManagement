@@ -1,0 +1,257 @@
+@page "/admin/sms"
+@rendermode InteractiveServer
+@attribute [FleetPermission("notifications.sms.view")]
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.Authorization
+@using FleetManagement.Domain.Notifications
+@using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Web.Security
+@inject SmsQueueService SmsQueue
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<SmsQueuePage> Logger
+
+<PageTitle>گزارش پیامک‌ها</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">ارتباطات و اعلان‌ها</div>
+    <h1>گزارش پیامک‌ها</h1>
+    <p>سوابق پیامک‌ها به تفکیک گیرنده، رویداد، زمان و وضعیت. پذیرش پیام توسط ارائه‌دهنده به معنی تحویل قطعی نیست. این گزارش خروجی فایل ندارد.</p>
+
+    <div class="session-filters">
+        <div>
+            <label for="sms-phone">شماره گیرنده</label>
+            <input id="sms-phone" @bind="_phone" placeholder="جست‌وجوی شماره همراه" dir="ltr" />
+        </div>
+        <div>
+            <label for="sms-event">رویداد</label>
+            <select id="sms-event" @bind="_eventType">
+                <option value="">همه رویدادها</option>
+                @foreach (var eventValue in Enum.GetValues<SmsEventType>())
+                {
+                    <option value="@eventValue.ToString()">@GetEventName(eventValue)</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label for="sms-status">وضعیت</label>
+            <select id="sms-status" @bind="_status">
+                <option value="">همه وضعیت‌ها</option>
+                @foreach (var statusValue in Enum.GetValues<SmsQueueStatus>())
+                {
+                    <option value="@statusValue.ToString()">@GetStatusName(statusValue)</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label for="sms-mission">شناسه مأموریت</label>
+            <input id="sms-mission" @bind="_missionId" placeholder="شناسه GUID" dir="ltr" />
+        </div>
+        <label class="sms-error-filter">
+            <input type="checkbox" @bind="_errorsOnly" />
+            فقط پیامک‌های ناموفق
+        </label>
+        <button type="button" class="primary-button" @onclick="LoadAsync" disabled="@_isBusy">جست‌وجو</button>
+    </div>
+
+    @if (_error is not null)
+    {
+        <div class="setup-error">@_error</div>
+    }
+    else if (_isLoading)
+    {
+        <p>در حال دریافت گزارش پیامک‌ها...</p>
+    }
+    else if (_items.Count == 0)
+    {
+        <div class="setup-info">رکوردی برای نمایش وجود ندارد.</div>
+    }
+    else
+    {
+        <div class="session-table-wrap">
+            <table class="session-table">
+                <thead>
+                    <tr>
+                        <th>گیرنده</th>
+                        <th>شماره همراه</th>
+                        <th>رویداد</th>
+                        <th>زمان ایجاد</th>
+                        <th>تعداد تلاش</th>
+                        <th>وضعیت ارسال</th>
+                        <th>وضعیت تحویل</th>
+                        <th>شناسه ارائه‌دهنده</th>
+                        <th>علت خطا</th>
+                        <th>عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in _items)
+                    {
+                        <tr @key="item.Id">
+                            <td>@item.RecipientName</td>
+                            <td dir="ltr">@item.RecipientPhone</td>
+                            <td>@GetEventName(item.EventType)</td>
+                            <td>@FormatTehranTime(item.CreatedAtUtc)</td>
+                            <td>@ToPersianDigits(item.AttemptCount)</td>
+                            <td>@GetStatusName(item.Status)</td>
+                            <td>@(item.ProviderDeliveryStatus ?? "نامشخص")</td>
+                            <td dir="ltr">@item.ProviderMessageId</td>
+                            <td>@item.ErrorReason</td>
+                            <td>
+                                @if (item.Status is SmsQueueStatus.Failed or SmsQueueStatus.PermanentFailure)
+                                {
+                                    <AuthorizeView Policy="Permission:notifications.sms.retry">
+                                        <Authorized Context="retryPermissionContext">
+                                            <button type="button" class="secondary-button" @onclick="() => RetryAsync(item.Id)" disabled="@_isBusy">
+                                                تلاش مجدد
+                                            </button>
+                                        </Authorized>
+                                    </AuthorizeView>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="session-count">نمایش @_items.Count رکورد اخیر؛ حداکثر ۵۰۰ رکورد در هر جست‌وجو.</p>
+    }
+</section>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private bool _errorsOnly;
+    private string _phone = string.Empty;
+    private string _eventType = string.Empty;
+    private string _status = string.Empty;
+    private string _missionId = string.Empty;
+    private string? _error;
+    private IReadOnlyList<SmsQueueItem> _items = [];
+
+    /// <summary>بارگذاری اولیه گزارش پیامک‌ها.</summary>
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    /// <summary>اعمال فیلترهای گزارش پیامک.</summary>
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _isBusy = true;
+        _error = null;
+
+        try
+        {
+            SmsEventType? eventType = Enum.TryParse<SmsEventType>(_eventType, true, out var parsedEvent)
+                ? parsedEvent
+                : null;
+            SmsQueueStatus? status = Enum.TryParse<SmsQueueStatus>(_status, true, out var parsedStatus)
+                ? parsedStatus
+                : null;
+            Guid? missionId = Guid.TryParse(_missionId, out var parsedMission)
+                ? parsedMission
+                : null;
+
+            _items = await SmsQueue.SearchAsync(
+                recipientPhone: _phone,
+                eventType: eventType,
+                status: status,
+                missionId: missionId,
+                errorsOnly: _errorsOnly,
+                take: 500);
+        }
+        catch (Exception exception)
+        {
+            var trackingId = Guid.NewGuid().ToString("N");
+            Logger.LogError(exception, "دریافت گزارش پیامک ناموفق بود. شناسه پیگیری: {TrackingId}", trackingId);
+            _error = $"دریافت گزارش پیامک انجام نشد. شناسه پیگیری: {trackingId}";
+            _items = [];
+        }
+        finally
+        {
+            _isLoading = false;
+            _isBusy = false;
+        }
+    }
+
+    /// <summary>ثبت تلاش مجدد دستی با هویت کاربر جاری.</summary>
+    private async Task RetryAsync(Guid itemId)
+    {
+        _isBusy = true;
+        _error = null;
+        try
+        {
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var actor = state.User.FindFirst("fleet:username")?.Value
+                ?? state.User.Identity?.Name
+                ?? "Unknown";
+
+            await SmsQueue.RetryManuallyAsync(itemId, actor);
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            var trackingId = Guid.NewGuid().ToString("N");
+            Logger.LogError(exception, "تلاش مجدد پیامک ناموفق بود. شناسه پیگیری: {TrackingId}", trackingId);
+            _error = $"تلاش مجدد انجام نشد. شناسه پیگیری: {trackingId}";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    /// <summary>عنوان فارسی نوع رویداد پیامکی.</summary>
+    private static string GetEventName(SmsEventType value) => value switch
+    {
+        SmsEventType.MissionApproved => "تأیید مأموریت",
+        SmsEventType.MissionRejected => "رد درخواست",
+        SmsEventType.MissionChanged => "تغییر جزئیات",
+        SmsEventType.DriverOrVehicleChanged => "تغییر راننده یا خودرو",
+        SmsEventType.MissionCancelled => "لغو مأموریت",
+        SmsEventType.WithdrawalApproved => "تأیید انصراف",
+        SmsEventType.WithdrawalRejected => "رد انصراف",
+        SmsEventType.MissionStartReminder => "یادآوری شروع",
+        SmsEventType.MissionCompleted => "پایان مأموریت",
+        _ => "نامشخص"
+    };
+
+    /// <summary>عنوان فارسی وضعیت صف پیامک.</summary>
+    private static string GetStatusName(SmsQueueStatus value) => value switch
+    {
+        SmsQueueStatus.Queued => "در صف",
+        SmsQueueStatus.Sending => "در حال ارسال",
+        SmsQueueStatus.Accepted => "پذیرفته‌شده",
+        SmsQueueStatus.Delivered => "تحویل‌شده",
+        SmsQueueStatus.RetryScheduled => "تلاش مجدد زمان‌بندی‌شده",
+        SmsQueueStatus.Failed => "ناموفق",
+        SmsQueueStatus.PermanentFailure => "خطای دائمی",
+        _ => "نامشخص"
+    };
+
+    /// <summary>نمایش زمان ثبت بر اساس ساعت تهران و تقویم جلالی.</summary>
+    private static string FormatTehranTime(DateTimeOffset utc)
+    {
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+
+        var local = TimeZoneInfo.ConvertTime(utc, zone);
+        var calendar = new PersianCalendar();
+        return ToPersianDigits($"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} {local.Hour:00}:00");
+    }
+
+    /// <summary>تبدیل اعداد به رقم فارسی.</summary>
+    private static string ToPersianDigits(int value)
+    {
+        const string latin = "0123456789";
+        const string persian = "۰۱۲۳۴۵۶۷۸۹";
+        var source = value.ToString(CultureInfo.InvariantCulture);
+        return string.Create(source.Length, source, (destination, text) =>
+        {
+            for (var index = 0; index < text.Length; index++)
+            {
+                var digit = latin.IndexOf(text[index]);
+                destination[index] = digit >= 0 ? persian[digit] : text[index];
+            }
+        });
+    }
+}
