@@ -137,10 +137,6 @@ public sealed class MissionReportService(IDbContextFactory<FleetDbContext> dbCon
     }
 
     /// <summary>
-    /// محاسبه ساعت مأموریت بر اساس قواعد پایان عادی، خاتمه زودهنگام و لغو.
-    /// </summary>
-
-    /// <summary>
     /// دریافت دفتر سوابق کیلومترشمار مأموریت‌ها به تفکیک خودرو؛ فقط مأموریت‌هایی که
     /// حداقل یکی از مقادیر کیلومترشمار آن‌ها ثبت شده است نمایش داده می‌شوند.
     /// </summary>
@@ -203,6 +199,9 @@ public sealed class MissionReportService(IDbContextFactory<FleetDbContext> dbCon
         }).ToList();
     }
 
+    /// <summary>
+    /// محاسبه ساعت مأموریت بر اساس قواعد پایان عادی، خاتمه زودهنگام و لغو.
+    /// </summary>
     private static decimal GetMissionHours(Mission mission)
     {
         if (mission.Status == MissionStatus.Cancelled && !mission.ActualStartAtUtc.HasValue)
