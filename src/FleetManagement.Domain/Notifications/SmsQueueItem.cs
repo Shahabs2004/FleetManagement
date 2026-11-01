@@ -200,6 +200,23 @@ public sealed class SmsQueueItem : Entity
     }
 
     /// <summary>
+    /// تعیین تکلیف ارسال نیمه‌تمام پس از توقف یا Crash پردازش.
+    /// چون نتیجه درخواست شبکه ممکن است نامشخص باشد، ارسال خودکار تکرار نمی‌شود.
+    /// </summary>
+    public void MarkInterruptedSendingAsPermanentFailure(DateTimeOffset detectedAtUtc)
+    {
+        if (Status != SmsQueueStatus.Sending)
+        {
+            throw new InvalidOperationException("فقط پیام نیمه‌تمام در وضعیت ارسال قابل تعیین تکلیف است.");
+        }
+
+        Status = SmsQueueStatus.PermanentFailure;
+        ErrorReason = "پردازش هنگام ارسال متوقف شد و نتیجه نزد ارائه‌دهنده نامشخص است؛ پیش از تلاش مجدد دستی، پنل ارائه‌دهنده بررسی شود.";
+        NextAttemptAtUtc = null;
+        LastAttemptAtUtc ??= detectedAtUtc;
+    }
+
+    /// <summary>
     /// ثبت شکست یا پاسخ نامشخص استعلام وضعیت و زمان‌بندی استعلام بعدی.
     /// تلاش ناموفق نیز از سقف استعلام‌ها محسوب می‌شود تا رکورد برای همیشه در صف نماند.
     /// </summary>
