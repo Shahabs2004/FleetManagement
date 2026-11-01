@@ -36,9 +36,13 @@ public sealed class AdpSmsSoapClient(HttpClient httpClient)
             ],
             cancellationToken);
 
-        var result = ReadRows(response, "ID", "Mobile").SingleOrDefault()
-            ?? throw new InvalidDataException("پاسخ سرویس پیامک فاقد نتیجه ارسال است.");
+        var results = ReadRows(response, "ID", "Mobile");
+        if (results.Count != 1)
+        {
+            throw new InvalidDataException("پاسخ سرویس پیامک باید دقیقاً یک نتیجه ارسال داشته باشد.");
+        }
 
+        var result = results[0];
         return new AdpSmsSendResult(result.First, result.Second);
     }
 
