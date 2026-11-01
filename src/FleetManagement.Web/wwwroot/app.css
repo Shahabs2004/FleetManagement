@@ -1096,3 +1096,114 @@ h1 {
         break-after: avoid;
     }
 }
+
+
+/* داشبورد نقش‌محور */
+.dashboard-page {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.dashboard-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.dashboard-heading h1 {
+    margin: 8px 0;
+    color: #183f34;
+}
+
+.dashboard-heading p {
+    margin: 0;
+    color: #718078;
+}
+
+.dashboard-user {
+    padding: 12px 16px;
+    border: 1px solid #e2eae5;
+    border-radius: 10px;
+    background: #f7faf8;
+    color: #4f6258;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 16px;
+}
+
+.dashboard-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    min-height: 150px;
+    padding: 20px;
+    border: 1px solid #e2eae5;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgb(20 50 38 / 4%);
+}
+
+.dashboard-card > span {
+    color: #62746a;
+    font-size: .9rem;
+}
+
+.dashboard-card > strong {
+    color: #214f40;
+    font-size: 2rem;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+}
+
+.dashboard-card > small {
+    color: #829087;
+}
+
+.dashboard-card > a,
+.dashboard-links a {
+    color: #386b57;
+    text-decoration: none;
+    font-size: .88rem;
+}
+
+.dashboard-card > a:hover,
+.dashboard-links a:hover {
+    text-decoration: underline;
+}
+
+.dashboard-card-active {
+    border-color: #c6a75b;
+    background: #fffdf7;
+}
+
+.dashboard-shortcuts {
+    padding: 20px;
+    border: 1px solid #e2eae5;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.dashboard-shortcuts h2 {
+    margin: 0 0 16px;
+    color: #214f40;
+    font-size: 1.1rem;
+}
+
+.dashboard-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+}
+
+@media (max-width: 650px) {
+    .dashboard-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
