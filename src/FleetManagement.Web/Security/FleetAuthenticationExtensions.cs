@@ -47,6 +47,7 @@ public static class FleetAuthenticationExtensions
         services.AddSingleton<IAuthorizationHandler, FleetPermissionAuthorizationHandler>();
         services.AddCascadingAuthenticationState();
         services.AddSingleton<SessionActivityTracker>();
+        services.AddSingleton<DirectorySessionValidationTracker>();
         services.AddHttpContextAccessor();
         services.AddAntiforgery();
 
