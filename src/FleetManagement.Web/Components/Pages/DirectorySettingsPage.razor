@@ -1,0 +1,199 @@
+@page "/admin/directory-settings"
+@rendermode InteractiveServer
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "SystemAdministrator")]
+@using FleetManagement.Infrastructure.Configuration
+@using Microsoft.AspNetCore.Components.Forms
+@inject ActiveDirectorySettingsService DirectorySettings
+@inject ActiveDirectoryConnectionTester ConnectionTester
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<DirectorySettingsPage> Logger
+
+<PageTitle>تنظیمات Active Directory</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">اتصال به دایرکتوری سازمان</div>
+    <h1>تنظیمات Active Directory</h1>
+    <p>این تنظیمات اتصال LDAP/LDAPS و گروه‌های مجاز ورود را کنترل می‌کنند. رمز حساب سرویس نمایش داده نمی‌شود و در گزارش ممیزی ثبت نخواهد شد.</p>
+
+    @if (_loading)
+    {
+        <p>در حال دریافت تنظیمات...</p>
+    }
+    else
+    {
+        <EditForm Model="_model" OnValidSubmit="TestAndSaveAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="admin-section">
+                <label for="ad-domain">نام DNS دامنه</label>
+                <InputText id="ad-domain" @bind-Value="_model.DomainDnsName" />
+
+                <label for="ad-server">نام سرور LDAP</label>
+                <InputText id="ad-server" @bind-Value="_model.LdapServer" />
+
+                <label for="ad-port">درگاه LDAP/LDAPS</label>
+                <InputNumber id="ad-port" @bind-Value="_model.Port" />
+
+                <label class="checkbox-line">
+                    <InputCheckbox @bind-Value="_model.UseLdaps" />
+                    استفاده از LDAPS و TLS
+                </label>
+
+                <label for="ad-base">Base Distinguished Name</label>
+                <InputText id="ad-base" @bind-Value="_model.BaseDistinguishedName" />
+
+                <label for="ad-user">نام کاربری حساب سرویس</label>
+                <InputText id="ad-user" @bind-Value="_model.ServiceAccountUsername" />
+
+                <label for="ad-password">رمز حساب سرویس (برای حفظ رمز فعلی خالی بماند)</label>
+                <InputText id="ad-password" type="password" @bind-Value="_newPassword" autocomplete="new-password" />
+
+                <label for="ad-ou-attribute">ویژگی واحد سازمانی</label>
+                <InputText id="ad-ou-attribute" @bind-Value="_model.OrganizationalUnitAttribute" />
+
+                <label class="checkbox-line">
+                    <InputCheckbox @bind-Value="_model.UseWindowsIntegratedAuthentication" />
+                    ورود یکپارچه ویندوز از طریق IIS
+                </label>
+
+                <label class="checkbox-line">
+                    <InputCheckbox @bind-Value="_model.AllowUsernamePasswordFallback" />
+                    ورود جایگزین با نام کاربری و رمز AD
+                </label>
+            </div>
+
+            <div class="admin-section">
+                <h2>گروه‌های مجاز ورود</h2>
+                <p>هر خط به شکل نام گروه|Distinguished Name ثبت شود. حداقل یک گروه الزامی است.</p>
+                <InputTextArea @bind-Value="_allowedGroupsText" />
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <div class="setup-error" role="alert">@_error</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(_message))
+            {
+                <div class="setup-info" role="status">@_message</div>
+            }
+
+            <div class="driver-actions">
+                <button type="submit" class="primary-button" disabled="@_busy">
+                    @(_busy ? "در حال آزمون اتصال و ذخیره..." : "آزمون اتصال و ذخیره")
+                </button>
+            </div>
+        </EditForm>
+    }
+</section>
+
+@code {
+    private bool _loading = true;
+    private bool _busy;
+    private string _actor = string.Empty;
+    private string _newPassword = string.Empty;
+    private string _allowedGroupsText = string.Empty;
+    private string _error = string.Empty;
+    private string _message = string.Empty;
+    private ActiveDirectoryConfiguration _model = new();
+    private string _existingPassword = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _actor = state.User.FindFirst("fleet:username")?.Value
+            ?? state.User.Identity?.Name
+            ?? "unknown";
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var configuration = await DirectorySettings.GetAsync();
+            _model = configuration ?? new ActiveDirectoryConfiguration();
+            _existingPassword = _model.ServiceAccountPassword;
+            _model.ServiceAccountPassword = string.Empty;
+            _allowedGroupsText = string.Join(
+                Environment.NewLine,
+                _model.AllowedGroups.Select(group => $"{group.Name}|{group.DistinguishedName}"));
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "دریافت تنظیمات Active Directory");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task TestAndSaveAsync()
+    {
+        _busy = true;
+        _error = string.Empty;
+        _message = string.Empty;
+        try
+        {
+            var groups = _allowedGroupsText
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(line => line.Split('|', 2, StringSplitOptions.TrimEntries))
+                .Where(parts => parts.Length == 2)
+                .Select(parts => new ActiveDirectoryGroup
+                {
+                    Name = parts[0],
+                    DistinguishedName = parts[1]
+                })
+                .ToList();
+
+            var password = string.IsNullOrWhiteSpace(_newPassword)
+                ? _existingPassword
+                : _newPassword;
+            var configuration = new ActiveDirectoryConfiguration
+            {
+                DomainDnsName = _model.DomainDnsName.Trim(),
+                LdapServer = _model.LdapServer.Trim(),
+                Port = _model.Port,
+                UseLdaps = _model.UseLdaps,
+                BaseDistinguishedName = _model.BaseDistinguishedName.Trim(),
+                ServiceAccountUsername = _model.ServiceAccountUsername.Trim(),
+                ServiceAccountPassword = password,
+                OrganizationalUnitAttribute = _model.OrganizationalUnitAttribute.Trim(),
+                UseWindowsIntegratedAuthentication = _model.UseWindowsIntegratedAuthentication,
+                AllowUsernamePasswordFallback = _model.AllowUsernamePasswordFallback,
+                AllowedGroups = groups,
+                IsConnectionVerified = false
+            };
+
+            await ConnectionTester.TestAsync(configuration);
+            configuration.IsConnectionVerified = true;
+            await DirectorySettings.SaveAsync(configuration, _actor);
+
+            _model = configuration;
+            _model.ServiceAccountPassword = string.Empty;
+            _existingPassword = password;
+            _newPassword = string.Empty;
+            _message = "اتصال Active Directory تأیید و تنظیمات ذخیره شد.";
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "آزمون اتصال یا ذخیره تنظیمات Active Directory");
+        }
+        finally
+        {
+            _newPassword = string.Empty;
+            _busy = false;
+        }
+    }
+
+    private void ReportError(Exception exception, string operation)
+    {
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "{Operation} ناموفق بود. شناسه پیگیری: {TrackingId}", operation, trackingId);
+        _error = exception is ArgumentException or InvalidOperationException
+            ? exception.Message
+            : $"عملیات انجام نشد. شناسه پیگیری: {trackingId}";
+    }
+}
