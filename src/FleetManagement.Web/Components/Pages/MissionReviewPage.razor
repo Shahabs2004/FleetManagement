@@ -10,6 +10,7 @@
 @inject MissionManagementService MissionService
 @inject DriverManagementService DriverService
 @inject VehicleManagementService VehicleService
+@inject DriverVehiclePreferenceService DriverVehiclePreferences
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ILogger<MissionReviewPage> Logger
 
@@ -88,7 +89,7 @@
                     <div class="mission-assignment-grid">
                         <div>
                             <label>راننده</label>
-                            <select @bind="_driverSelection[mission.Id]">
+                            <select value="@_driverSelection[mission.Id]" @onchange="args => OnDriverChangedAsync(mission.Id, args)">
                                 <option value="">انتخاب راننده</option>
                                 @foreach (var driver in _drivers)
                                 {
@@ -332,6 +333,38 @@
         finally
         {
             _loading = false;
+        }
+    }
+
+    /// <summary>
+    /// با انتخاب راننده، خودروی پیش‌فرض او فقط به‌عنوان پیشنهاد اولیه انتخاب می‌شود.
+    /// </summary>
+    private async Task OnDriverChangedAsync(Guid missionId, ChangeEventArgs args)
+    {
+        var selectedDriver = args.Value?.ToString() ?? string.Empty;
+        _driverSelection[missionId] = selectedDriver;
+        _vehicleSelection[missionId] = string.Empty;
+
+        if (!Guid.TryParse(selectedDriver, out var driverId))
+        {
+            return;
+        }
+
+        try
+        {
+            var defaultVehicleId = await DriverVehiclePreferences.GetDefaultVehicleIdAsync(driverId);
+            if (defaultVehicleId.HasValue
+                && _vehicles.Any(vehicle => vehicle.Id == defaultVehicleId.Value
+                    && !vehicle.IsArchived
+                    && vehicle.ManualStatus == ManualVehicleStatus.Ready))
+            {
+                _vehicleSelection[missionId] = defaultVehicleId.Value.ToString();
+                _message = "خودروی پیش‌فرض راننده به‌عنوان پیشنهاد انتخاب شد؛ می‌توانید برای این مأموریت خودروی دیگری تعیین کنید.";
+            }
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "دریافت خودروی پیش‌فرض راننده");
         }
     }
 
