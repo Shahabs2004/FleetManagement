@@ -67,12 +67,13 @@ public sealed class MissionChangeRequestServiceTests
     [Fact]
     public async Task رد_درخواست_علت_را_ثبت_و_به_درخواست_کننده_اعلان_می_کند()
     {
-        var request = CreateChangeRequest();
+        var mission = CreateConfirmedMission();
+        var request = CreateChangeRequest(mission.Id);
         request.StartReview("reviewer", DateTimeOffset.UtcNow);
         var store = new FakeStore
         {
             ChangeRequest = request,
-            Mission = CreateConfirmedMission()
+            Mission = mission
         };
         var audit = new RecordingAuditLogWriter();
         var notifications = new RecordingNotificationSender();
@@ -115,10 +116,10 @@ public sealed class MissionChangeRequestServiceTests
         return mission;
     }
 
-    private static MissionChangeRequest CreateChangeRequest()
+    private static MissionChangeRequest CreateChangeRequest(Guid missionId)
     {
         var request = new MissionChangeRequest(
-            Guid.NewGuid(),
+            missionId,
             "a.user",
             "اصلاح مقصد",
             "{}");
