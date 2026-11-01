@@ -398,6 +398,9 @@ public sealed class Mission : Entity
     /// <summary>اصلاح اطلاعات درخواست تا پیش از شروع بررسی.</summary>
     public void EditPendingRequest(
         string title,
+        string requesterPhoneSnapshot,
+        string requestingGroup,
+        MissionType type,
         string purpose,
         string origin,
         string destination,
@@ -405,10 +408,20 @@ public sealed class Mission : Entity
         DateTimeOffset plannedStartAtUtc,
         DateTimeOffset plannedEndAtUtc,
         string? description,
-        int? passengerCount)
+        int? passengerCount,
+        string? missionOrderNumber,
+        DateOnly? missionOrderDate)
     {
         EnsureStatus(MissionStatus.Pending);
+        if (!Enum.IsDefined(type))
+        {
+            throw new ArgumentOutOfRangeException(nameof(type));
+        }
+
         Title = Required(title, 200, nameof(title));
+        RequesterPhoneSnapshot = Required(requesterPhoneSnapshot, 20, nameof(requesterPhoneSnapshot));
+        RequestingGroup = Required(requestingGroup, 200, nameof(requestingGroup));
+        Type = type;
         Purpose = Required(purpose, 500, nameof(purpose));
         Origin = Required(origin, 200, nameof(origin));
         Destination = Required(destination, 200, nameof(destination));
@@ -429,6 +442,8 @@ public sealed class Mission : Entity
         RouteJson = JsonSerializer.Serialize(NormalizeStops(intermediateStops));
         Description = Optional(description, 2000);
         PassengerCount = passengerCount;
+        MissionOrderNumber = Optional(missionOrderNumber, 50);
+        MissionOrderDate = missionOrderDate;
     }
 
     /// <summary>
