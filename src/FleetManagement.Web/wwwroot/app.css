@@ -1483,3 +1483,112 @@ h1 {
     background: #fff;
     padding: 3px;
 }
+
+
+/* انتخاب زمان عمومی مأموریت بدون نمایش نام منابع */
+.public-availability {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 16px 0 20px;
+    padding: 16px;
+    border: 1px solid #dfe8e2;
+    border-radius: 10px;
+    background: #fbfcfb;
+}
+
+.public-availability > p {
+    margin: 0;
+    color: #687970;
+    font-size: .86rem;
+}
+
+.availability-selection {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    color: #315c49;
+    font-size: .88rem;
+}
+
+.availability-grid-wrap {
+    overflow-x: auto;
+    border: 1px solid #e0e8e2;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.availability-grid {
+    min-width: 900px;
+}
+
+.availability-grid-header,
+.availability-grid-row {
+    display: grid;
+    grid-template-columns: 76px repeat(7, minmax(110px, 1fr));
+    gap: 1px;
+    background: #e7ede9;
+}
+
+.availability-grid-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.availability-grid-header > *,
+.availability-grid-row > * {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    padding: 5px;
+    background: #fff;
+    font-size: .76rem;
+}
+
+.availability-grid-header > * {
+    min-height: 42px;
+    color: #315c49;
+    background: #f1f6f2;
+    font-weight: 700;
+    text-align: center;
+}
+
+.availability-hour {
+    color: #66776e;
+    direction: ltr;
+}
+
+.availability-slot {
+    min-height: 30px;
+    border: 0;
+    border-radius: 4px;
+    font: inherit;
+    font-size: .72rem;
+    cursor: pointer;
+}
+
+.availability-slot.free {
+    color: #24563f;
+    background: #e4f1e8;
+}
+
+.availability-slot.free:hover {
+    outline: 2px solid #8fb89a;
+}
+
+.availability-slot.busy {
+    color: #9a9f9b;
+    background: #f0f2f0;
+    cursor: not-allowed;
+}
+
+.availability-slot.selected {
+    color: #3e3216;
+    background: #e8d39a;
+    outline: 2px solid #b18d3c;
+    font-weight: 700;
+}
