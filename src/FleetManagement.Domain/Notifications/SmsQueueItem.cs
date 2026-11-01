@@ -1,5 +1,4 @@
 using FleetManagement.Domain.Common;
-using FleetManagement.Infrastructure.Configuration;
 
 namespace FleetManagement.Domain.Notifications;
 
