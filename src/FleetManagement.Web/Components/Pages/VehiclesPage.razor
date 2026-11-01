@@ -60,6 +60,18 @@
                 <input id="vehicle-plate" @bind="_plate" maxlength="30" placeholder="۱۲ ب ۳۴۵ ۶۷" />
                 <small>پلاک پس از ثبت نرمال‌سازی و اعتبارسنجی می‌شود.</small>
             </div>
+            @if (_editingId.HasValue)
+            {
+                <div>
+                    <label for="vehicle-manual-status">وضعیت دستی خودرو</label>
+                    <select id="vehicle-manual-status" @bind="_manualStatus">
+                        <option value="@ManualVehicleStatus.Ready">آماده به کار</option>
+                        <option value="@ManualVehicleStatus.RepairShop">تعمیرگاه</option>
+                        <option value="@ManualVehicleStatus.OutOfService">خارج از سرویس</option>
+                    </select>
+                    <small>در صورت وجود مأموریت فعال، تغییر وضعیت به تعمیرگاه یا خارج از سرویس مجاز نیست.</small>
+                </div>
+            }
         </div>
         <div class="driver-actions">
             <button type="button" class="primary-button" @onclick="SaveAsync" disabled="@_busy">
@@ -139,6 +151,7 @@
     private string _message = string.Empty;
     private string _error = string.Empty;
     private Guid? _editingId;
+    private ManualVehicleStatus _manualStatus = ManualVehicleStatus.Ready;
     private IReadOnlyList<Vehicle> _vehicles = [];
 
     /// <summary>بارگذاری اولیه خودروها.</summary>
@@ -169,6 +182,7 @@
         _brand = vehicle.Brand;
         _model = vehicle.Model;
         _plate = vehicle.LicensePlate;
+        _manualStatus = vehicle.ManualStatus;
         _message = string.Empty;
         _error = string.Empty;
     }
@@ -190,8 +204,14 @@
             var actor = await GetActorAsync();
             if (_editingId.HasValue)
             {
-                await VehicleService.UpdateAsync(_editingId.Value, _brand, _model, _plate, actor);
-                _message = "مشخصات خودرو اصلاح شد.";
+                await VehicleService.UpdateAsync(
+                    _editingId.Value,
+                    _brand,
+                    _model,
+                    _plate,
+                    _manualStatus,
+                    actor);
+                _message = "مشخصات و وضعیت خودرو اصلاح شد.";
             }
             else
             {
@@ -269,6 +289,7 @@
         _brand = string.Empty;
         _model = string.Empty;
         _plate = string.Empty;
+        _manualStatus = ManualVehicleStatus.Ready;
     }
 
     /// <summary>بررسی مجوز عملیاتی در سمت سرور، مستقل از مخفی‌سازی کنترل‌های رابط.</summary>
