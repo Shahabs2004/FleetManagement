@@ -58,8 +58,11 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<UserAppearanceSettingsService>();
         services.AddScoped<SmsSettingsService>();
         services.AddScoped<SmsQueueService>();
+        services.AddSingleton<AdpSmsSoapClient>(_ =>
+            new AdpSmsSoapClient(new HttpClient { Timeout = TimeSpan.FromSeconds(30) }));
         services.AddSingleton<ActiveDirectoryConnectionTester>();
 
         return services;
     }
 }
+
