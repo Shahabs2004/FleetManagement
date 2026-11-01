@@ -88,7 +88,7 @@ public sealed class ActiveDirectorySettingsService(
                     value.Port,
                     value.UseLdaps,
                     value.BaseDistinguishedName,
-                    value.ServiceAccountUsername,
+                    ServiceAccountConfigured = !string.IsNullOrWhiteSpace(value.ServiceAccountUsername),
                     value.OrganizationalUnitAttribute,
                     value.UseWindowsIntegratedAuthentication,
                     value.AllowUsernamePasswordFallback,
