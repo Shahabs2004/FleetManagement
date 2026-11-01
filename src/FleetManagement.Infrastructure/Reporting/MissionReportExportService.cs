@@ -198,7 +198,7 @@ public sealed class MissionReportExportService
 
     private static string BuildContentTypes(int sheetCount)
     {
-        var builder = new StringBuilder();
+        using var builder = new Utf8StringWriter();
         using var writer = XmlWriter.Create(builder, CreateXmlSettings());
         writer.WriteStartDocument();
         writer.WriteStartElement("Types", "http://schemas.openxmlformats.org/package/2006/content-types");
@@ -230,7 +230,7 @@ public sealed class MissionReportExportService
 
     private static string BuildRootRelationships()
     {
-        var builder = new StringBuilder();
+        using var builder = new Utf8StringWriter();
         using var writer = XmlWriter.Create(builder, CreateXmlSettings());
         writer.WriteStartDocument();
         writer.WriteStartElement("Relationships", "http://schemas.openxmlformats.org/package/2006/relationships");
@@ -246,7 +246,7 @@ public sealed class MissionReportExportService
 
     private static string BuildWorkbook(IReadOnlyList<SheetData> sheets)
     {
-        var builder = new StringBuilder();
+        using var builder = new Utf8StringWriter();
         using var writer = XmlWriter.Create(builder, CreateXmlSettings());
         writer.WriteStartDocument();
         writer.WriteStartElement("workbook", SpreadsheetNamespace);
@@ -270,7 +270,7 @@ public sealed class MissionReportExportService
 
     private static string BuildWorkbookRelationships(int sheetCount)
     {
-        var builder = new StringBuilder();
+        using var builder = new Utf8StringWriter();
         using var writer = XmlWriter.Create(builder, CreateXmlSettings());
         writer.WriteStartDocument();
         writer.WriteStartElement("Relationships", "http://schemas.openxmlformats.org/package/2006/relationships");
@@ -305,6 +305,11 @@ public sealed class MissionReportExportService
         OmitXmlDeclaration = false,
         Indent = false
     };
+
+    private sealed class Utf8StringWriter : StringWriter
+    {
+        public override Encoding Encoding => new UTF8Encoding(false);
+    }
 
     private sealed record SheetData(string Name, IReadOnlyList<object?[]> Rows);
 }
