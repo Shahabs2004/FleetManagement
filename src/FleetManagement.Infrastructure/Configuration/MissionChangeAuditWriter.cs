@@ -5,7 +5,7 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// <summary>
 /// آداپتور ممیزی سناریوهای تغییر که ثبت را به سرویس ممیزی مشترک واگذار می‌کند.
 /// </summary>
-public sealed class MissionChangeAuditWriter(AuditLogService auditLog) : IMissionChangeAuditWriter
+public sealed class MissionChangeAuditWriter(AuditLogService auditLog) : IMissionChangeAuditWriter, IMissionAuditWriter
 {
     /// <inheritdoc />
     public Task<Guid> RecordAsync(
