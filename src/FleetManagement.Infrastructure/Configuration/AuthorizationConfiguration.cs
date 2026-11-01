@@ -43,6 +43,7 @@ public sealed class AuthorizationConfiguration
                     Permissions =
                     [
                         new() { Permission = "drivers.*" },
+                        new() { Permission = "drivers.default-vehicle.manage" },
                         new() { Permission = "vehicles.*" },
                         new() { Permission = "missions.*" },
                         new() { Permission = "reports.view" },
