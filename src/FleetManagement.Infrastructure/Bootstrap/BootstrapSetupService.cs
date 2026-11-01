@@ -20,6 +20,10 @@ public sealed class BootstrapSetupService(
 
     private static readonly ConcurrentDictionary<string, LoginAttemptState> LoginAttempts = new();
 
+    // عملیات تغییر وضعیت bootstrap باید در کل فرایند سریالی باشند؛ خواندن و نوشتن فایل
+    // به‌تنهایی کافی نیست، چون دو درخواست می‌توانند هم‌زمان یک کد یک‌بارمصرف را مصرف کنند.
+    private static readonly SemaphoreSlim BootstrapMutationGate = new(1, 1);
+
     private readonly string _technicalAdministratorCodePath =
         configuration["Bootstrap:TechnicalAdministratorCodePath"]
         ?? Path.Combine(
@@ -100,35 +104,43 @@ public sealed class BootstrapSetupService(
             throw new ArgumentException("رمز مدیر محلی باید حداقل ۱۴ نویسه داشته باشد.", nameof(password));
         }
 
-        var state = await stateStore.ReadAsync(cancellationToken);
-
-        if (state.SetupCompleted || state.HasLocalAdministrator)
+        await BootstrapMutationGate.WaitAsync(cancellationToken);
+        try
         {
-            throw new InvalidOperationException("حساب مدیر محلی قبلاً ایجاد شده است.");
+            var state = await stateStore.ReadAsync(cancellationToken);
+
+            if (state.SetupCompleted || state.HasLocalAdministrator)
+            {
+                throw new InvalidOperationException("حساب مدیر محلی قبلاً ایجاد شده است.");
+            }
+
+            if (string.IsNullOrWhiteSpace(state.SetupCodeHash)
+                || state.SetupCodeExpiresAtUtc is null
+                || state.SetupCodeExpiresAtUtc <= DateTimeOffset.UtcNow
+                || !FixedTimeSetupCodeEquals(state.SetupCodeHash, setupCode))
+            {
+                throw new UnauthorizedAccessException("کد راه‌اندازی نامعتبر یا منقضی شده است.");
+            }
+
+            var passwordHash = LocalPasswordHasher.HashPassword(password);
+
+            state.LocalAdministratorUsername = username.Trim();
+            state.LocalAdministratorPasswordHash = passwordHash.Hash;
+            state.LocalAdministratorPasswordSalt = passwordHash.Salt;
+            state.SetupCodeHash = null;
+            state.SetupCodeExpiresAtUtc = null;
+
+            await stateStore.WriteAsync(state, cancellationToken);
+
+            // حذف کد خام بلافاصله پس از استفاده موفق.
+            if (File.Exists(_setupCodePath))
+            {
+                File.Delete(_setupCodePath);
+            }
         }
-
-        if (string.IsNullOrWhiteSpace(state.SetupCodeHash)
-            || state.SetupCodeExpiresAtUtc is null
-            || state.SetupCodeExpiresAtUtc <= DateTimeOffset.UtcNow
-            || !FixedTimeSetupCodeEquals(state.SetupCodeHash, setupCode))
+        finally
         {
-            throw new UnauthorizedAccessException("کد راه‌اندازی نامعتبر یا منقضی شده است.");
-        }
-
-        var passwordHash = LocalPasswordHasher.HashPassword(password);
-
-        state.LocalAdministratorUsername = username.Trim();
-        state.LocalAdministratorPasswordHash = passwordHash.Hash;
-        state.LocalAdministratorPasswordSalt = passwordHash.Salt;
-        state.SetupCodeHash = null;
-        state.SetupCodeExpiresAtUtc = null;
-
-        await stateStore.WriteAsync(state, cancellationToken);
-
-        // حذف کد خام بلافاصله پس از استفاده موفق.
-        if (File.Exists(_setupCodePath))
-        {
-            File.Delete(_setupCodePath);
+            BootstrapMutationGate.Release();
         }
     }
 
@@ -243,28 +255,36 @@ public sealed class BootstrapSetupService(
     /// </summary>
     public async Task CompleteSetupAsync(CancellationToken cancellationToken = default)
     {
-        var state = await stateStore.ReadAsync(cancellationToken);
-
-        if (!state.HasLocalAdministrator
-            || string.IsNullOrWhiteSpace(state.SqlConnectionString))
+        await BootstrapMutationGate.WaitAsync(cancellationToken);
+        try
         {
-            throw new InvalidOperationException(
-                "برای تکمیل راه‌اندازی، مدیر محلی و اتصال SQL باید آماده باشند.");
+            var state = await stateStore.ReadAsync(cancellationToken);
+
+            if (!state.HasLocalAdministrator
+                || string.IsNullOrWhiteSpace(state.SqlConnectionString))
+            {
+                throw new InvalidOperationException(
+                    "برای تکمیل راه‌اندازی، مدیر محلی و اتصال SQL باید آماده باشند.");
+            }
+
+            state.SetupCompleted = true;
+            state.SetupCodeHash = null;
+            state.SetupCodeExpiresAtUtc = null;
+            state.TechnicalAdministratorCodeHash = null;
+            state.TechnicalAdministratorCodeExpiresAtUtc = null;
+
+            // پیش از قفل شدن ویزارد، کد خام مدیر فنی باید از فایل سرور حذف شود.
+            if (File.Exists(_technicalAdministratorCodePath))
+            {
+                File.Delete(_technicalAdministratorCodePath);
+            }
+
+            await stateStore.WriteAsync(state, cancellationToken);
         }
-
-        state.SetupCompleted = true;
-        state.SetupCodeHash = null;
-        state.SetupCodeExpiresAtUtc = null;
-        state.TechnicalAdministratorCodeHash = null;
-        state.TechnicalAdministratorCodeExpiresAtUtc = null;
-
-        // پیش از قفل شدن ویزارد، کد خام مدیر فنی باید از فایل سرور حذف شود.
-        if (File.Exists(_technicalAdministratorCodePath))
+        finally
         {
-            File.Delete(_technicalAdministratorCodePath);
+            BootstrapMutationGate.Release();
         }
-
-        await stateStore.WriteAsync(state, cancellationToken);
     }
 
     /// <summary>
