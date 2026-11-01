@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FleetManagement.Application.Configuration;
 
 namespace FleetManagement.Infrastructure.Configuration;
@@ -5,7 +6,9 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// <summary>
 /// مدیریت تنظیمات اتصال و قالب‌های پیامکی در SQL.
 /// </summary>
-public sealed class SmsSettingsService(ISystemSettingsStore settingsStore)
+public sealed class SmsSettingsService(
+    ISystemSettingsStore settingsStore,
+    AuditLogService auditLog)
 {
     private const string SettingKey = "Notifications.Sms.ADP";
     private const string SkippedSettingKey = "Notifications.Sms.SetupSkipped";
@@ -26,9 +29,17 @@ public sealed class SmsSettingsService(ISystemSettingsStore settingsStore)
     }
 
     /// <summary>ثبت عبور از مرحله پیامک بدون فعال‌سازی سرویس.</summary>
-    public Task MarkSkippedAsync(CancellationToken cancellationToken = default)
+    public async Task MarkSkippedAsync(CancellationToken cancellationToken = default)
     {
-        return settingsStore.SetAsync(SkippedSettingKey, true, cancellationToken);
+        await settingsStore.SetAsync(SkippedSettingKey, true, cancellationToken);
+        await auditLog.RecordAsync(
+            "TechnicalAdministrator",
+            "SkipSmsSetup",
+            "SmsConfiguration",
+            null,
+            "Success",
+            reason: "مرحله تنظیم پیامک در ویزارد رد شد.",
+            cancellationToken: cancellationToken);
     }
 
     /// <summary>اعتبارسنجی و ذخیره تنظیمات سرویس پیامک.</summary>
@@ -79,6 +90,8 @@ public sealed class SmsSettingsService(ISystemSettingsStore settingsStore)
             throw new ArgumentException("برای هر رویداد فقط یک قالب پیامک تعریف شود.");
         }
 
+        var previous = await GetAsync(cancellationToken);
+
         await settingsStore.SetAsync(
             SettingKey,
             configuration,
@@ -88,5 +101,40 @@ public sealed class SmsSettingsService(ISystemSettingsStore settingsStore)
             SkippedSettingKey,
             false,
             cancellationToken);
+
+        // هیچ رمز، نام کاربری یا محتوای محرمانه در سوابق ممیزی ذخیره نمی‌شود.
+        static object? SafeSummary(SmsProviderConfiguration? value)
+        {
+            return value is null
+                ? null
+                : new
+                {
+                    value.Organization,
+                    value.SourceNumber,
+                    value.MaximumRetryCount,
+                    value.RetryIntervalSeconds,
+                    value.StatusPollingIntervalSeconds,
+                    value.MaximumStatusPollingAttempts,
+                    value.ReminderLeadMinutes,
+                    EventTemplates = value.EventTemplates.Select(template => new
+                    {
+                        template.EventType,
+                        template.IsEnabled,
+                        template.RecipientRule,
+                        template.Template
+                    }).ToArray(),
+                    CredentialsConfigured = !string.IsNullOrWhiteSpace(value.Password)
+                };
+        }
+
+        await auditLog.RecordAsync(
+            "TechnicalAdministrator",
+            "UpdateSmsSettings",
+            "SmsConfiguration",
+            null,
+            "Success",
+            beforeJson: JsonSerializer.Serialize(SafeSummary(previous)),
+            afterJson: JsonSerializer.Serialize(SafeSummary(configuration)),
+            cancellationToken: cancellationToken);
     }
 }
