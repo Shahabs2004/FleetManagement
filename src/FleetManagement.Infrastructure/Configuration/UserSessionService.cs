@@ -7,7 +7,9 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// <summary>
 /// ثبت دائمی تلاش‌های ورود، نشست‌های موفق، فعالیت، خروج و انقضای خودکار.
 /// </summary>
-public sealed class UserSessionService(IDbContextFactory<FleetDbContext> dbContextFactory)
+public sealed class UserSessionService(
+    IDbContextFactory<FleetDbContext> dbContextFactory,
+    SessionPolicySettingsService sessionPolicySettings)
 {
     /// <summary>ثبت یک تلاش ورود موفق و بازگرداندن شناسه نشست.</summary>
     public async Task<Guid> RecordSuccessfulLoginAsync(
@@ -110,11 +112,12 @@ public sealed class UserSessionService(IDbContextFactory<FleetDbContext> dbConte
             return false;
         }
 
+        var policy = await sessionPolicySettings.GetAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
         if (session.ExpireIfNeeded(
             now,
-            TimeSpan.FromMinutes(30),
-            TimeSpan.FromHours(8)))
+            TimeSpan.FromMinutes(policy.IdleTimeoutMinutes),
+            TimeSpan.FromHours(policy.AbsoluteTimeoutHours)))
         {
             await dbContext.SaveChangesAsync(cancellationToken);
             return false;
@@ -134,9 +137,10 @@ public sealed class UserSessionService(IDbContextFactory<FleetDbContext> dbConte
         await using var dbContext =
             await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
+        var policy = await sessionPolicySettings.GetAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
-        var idleCutoff = now.AddMinutes(-30);
-        var absoluteCutoff = now.AddHours(-8);
+        var idleCutoff = now.AddMinutes(-policy.IdleTimeoutMinutes);
+        var absoluteCutoff = now.AddHours(-policy.AbsoluteTimeoutHours);
 
         var staleSessions = await dbContext.UserSessions
             .Where(session => session.Status == UserSessionStatus.Active
@@ -148,8 +152,8 @@ public sealed class UserSessionService(IDbContextFactory<FleetDbContext> dbConte
         {
             session.ExpireIfNeeded(
                 now,
-                TimeSpan.FromMinutes(30),
-                TimeSpan.FromHours(8));
+                TimeSpan.FromMinutes(policy.IdleTimeoutMinutes),
+                TimeSpan.FromHours(policy.AbsoluteTimeoutHours));
         }
 
         if (staleSessions.Count > 0)
