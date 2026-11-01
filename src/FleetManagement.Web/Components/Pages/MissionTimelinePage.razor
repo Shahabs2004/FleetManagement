@@ -1,0 +1,344 @@
+@page "/timeline"
+@rendermode InteractiveServer
+@attribute [FleetPermission("missions.timeline.view")]
+@using System.Globalization
+@using FleetManagement.Domain.Drivers
+@using FleetManagement.Domain.Missions
+@using FleetManagement.Domain.Vehicles
+@using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Web.Security
+@inject MissionManagementService MissionService
+@inject DriverManagementService DriverService
+@inject VehicleManagementService VehicleService
+@inject ILogger<MissionTimelinePage> Logger
+
+<PageTitle>جدول زمانی رانندگان</PageTitle>
+
+<section class="admin-panel timeline-page">
+    <div class="eyebrow">برنامه‌ریزی ناوگان</div>
+    <h1>جدول زمانی رانندگان</h1>
+    <p>مأموریت‌های تخصیص‌یافته به هر راننده در بازه انتخابی نمایش داده می‌شوند. با انتخاب هر مأموریت، جزئیات آن در پنل کناری باز می‌شود.</p>
+
+    <div class="timeline-toolbar">
+        <div class="timeline-navigation">
+            <button type="button" class="secondary-button" @onclick="() => MoveWindow(-1)">بازه قبل</button>
+            <strong>@FormatWindow()</strong>
+            <button type="button" class="secondary-button" @onclick="() => MoveWindow(1)">بازه بعد</button>
+            <button type="button" class="secondary-button" @onclick="MoveToToday">امروز</button>
+        </div>
+        <label>
+            مقیاس نمایش
+            <select value="@_scale" @onchange="ChangeScale">
+                <option value="Hour">ساعتی</option>
+                <option value="Day">روزانه</option>
+                <option value="Week">هفتگی</option>
+                <option value="Month">ماهانه</option>
+            </select>
+        </label>
+    </div>
+
+    @if (_error is not null)
+    {
+        <div class="setup-error">@_error</div>
+    }
+    else if (_isLoading)
+    {
+        <p>در حال بارگذاری جدول زمانی...</p>
+    }
+    else
+    {
+        <div class="timeline-legend">
+            <span><i class="timeline-dot status-confirmed"></i> تأییدشده</span>
+            <span><i class="timeline-dot status-running"></i> در حال اجرا</span>
+            <span><i class="timeline-dot status-completed"></i> پایان‌یافته</span>
+            <span><i class="timeline-dot status-cancelled"></i> لغوشده</span>
+        </div>
+
+        <div class="timeline-scroll">
+            <div class="timeline-board" style="@($"--tick-count:{_ticks.Count};")">
+                <div class="timeline-header">
+                    <div class="timeline-driver-heading">راننده</div>
+                    <div class="timeline-tick-area">
+                        @foreach (var tick in _ticks)
+                        {
+                            <span style="@($"left:{tick.PositionPercent:0.##}%")">@FormatTick(tick.AtUtc)</span>
+                        }
+                    </div>
+                </div>
+
+                @foreach (var driver in _drivers)
+                {
+                    <div class="timeline-row" @key="driver.Id">
+                        <div class="timeline-driver">
+                            <strong>@driver.FirstName @driver.LastName</strong>
+                            <span dir="ltr">@driver.MobilePhone</span>
+                            <small>@GetDriverStatus(driver)</small>
+                        </div>
+                        <div class="timeline-track">
+                            @foreach (var mission in GetDriverMissions(driver.Id))
+                            {
+                                <button type="button"
+                                        class="@GetMissionCssClass(mission)"
+                                        style="@GetMissionStyle(mission)"
+                                        title="@mission.Title"
+                                        @onclick="() => SelectMission(mission)">
+                                    @mission.Title
+                                </button>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+        <p class="session-count">تعداد رانندگان: @ToPersianDigits(_drivers.Count) | مأموریت‌های نمایش‌داده‌شده: @ToPersianDigits(_missions.Count)</p>
+
+        @if (_selectedMission is not null)
+        {
+            <aside class="timeline-detail">
+                <div class="timeline-detail-heading">
+                    <h2>جزئیات مأموریت</h2>
+                    <button type="button" class="secondary-button" @onclick="() => _selectedMission = null">بستن</button>
+                </div>
+                <h3>@_selectedMission.Title</h3>
+                <p><strong>شماره مأموریت:</strong> @_selectedMission.MissionNumber</p>
+                <p><strong>وضعیت:</strong> @GetMissionStatus(_selectedMission.Status)</p>
+                <p><strong>راننده:</strong> @GetDriverName(_selectedMission.DriverId)</p>
+                <p><strong>خودرو:</strong> @GetVehicleName(_selectedMission.VehicleId)</p>
+                <p><strong>مسیر:</strong> @_selectedMission.Origin ← @_selectedMission.Destination</p>
+                <p><strong>شروع:</strong> @FormatTehranTime(_selectedMission.PlannedStartAtUtc)</p>
+                <p><strong>پایان:</strong> @FormatTehranTime(_selectedMission.PlannedEndAtUtc)</p>
+                <a href="@($"/missions?missionId={_selectedMission.Id}")">باز کردن درخواست مأموریت</a>
+            </aside>
+        }
+    }
+</section>
+
+@code {
+    private bool _isLoading = true;
+    private string? _error;
+    private string _scale = "Day";
+    private DateTimeOffset _windowStart = GetCurrentTehranHour();
+    private IReadOnlyList<Driver> _drivers = [];
+    private IReadOnlyList<Mission> _missions = [];
+    private IReadOnlyList<Vehicle> _vehicles = [];
+    private IReadOnlyList<TimelineTick> _ticks = [];
+    private Mission? _selectedMission;
+
+    private int WindowHours => _scale switch
+    {
+        "Hour" => 12,
+        "Day" => 24,
+        "Week" => 24 * 7,
+        "Month" => 24 * 30,
+        _ => 24
+    };
+
+    /// <summary>بارگذاری اولیه اطلاعات جدول زمانی.</summary>
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    /// <summary>دریافت رانندگان و مأموریت‌های هم‌پوشان با بازه فعلی.</summary>
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _error = null;
+        _selectedMission = null;
+
+        try
+        {
+            var end = _windowStart.AddHours(WindowHours);
+            var results = await Task.WhenAll(
+                DriverService.SearchAsync(includeArchived: true),
+                MissionService.GetTimelineAsync(_windowStart, end),
+                VehicleService.SearchAsync(includeArchived: true));
+
+            _drivers = (IReadOnlyList<Driver>)results[0];
+            _missions = (IReadOnlyList<Mission>)results[1];
+            _vehicles = (IReadOnlyList<Vehicle>)results[2];
+            BuildTicks();
+        }
+        catch (Exception exception)
+        {
+            var trackingId = Guid.NewGuid().ToString("N");
+            Logger.LogError(exception, "بارگذاری جدول زمانی ناموفق بود. شناسه پیگیری: {TrackingId}", trackingId);
+            _error = $"دریافت جدول زمانی انجام نشد. شناسه پیگیری: {trackingId}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    /// <summary>ساخت برچسب‌های محور زمان متناسب با مقیاس انتخابی.</summary>
+    private void BuildTicks()
+    {
+        var stepHours = _scale switch
+        {
+            "Hour" => 1,
+            "Day" => 2,
+            "Week" => 24,
+            "Month" => 72,
+            _ => 2
+        };
+
+        var count = WindowHours / stepHours;
+        _ticks = Enumerable.Range(0, count)
+            .Select(index => new TimelineTick(
+                _windowStart.AddHours(index * stepHours),
+                index * 100d / count))
+            .ToArray();
+    }
+
+    /// <summary>جابجایی بازه زمانی به عقب یا جلو.</summary>
+    private async Task MoveWindow(int direction)
+    {
+        _windowStart = _windowStart.AddHours(WindowHours * direction);
+        await LoadAsync();
+    }
+
+    /// <summary>بازگشت به ابتدای ساعت جاری تهران.</summary>
+    private async Task MoveToToday()
+    {
+        _windowStart = GetCurrentTehranHour();
+        await LoadAsync();
+    }
+
+    /// <summary>تغییر مقیاس و بارگذاری دوباره داده‌های بازه.</summary>
+    private async Task ChangeScale(ChangeEventArgs args)
+    {
+        _scale = args.Value?.ToString() is "Hour" or "Day" or "Week" or "Month"
+            ? args.Value.ToString()!
+            : "Day";
+        await LoadAsync();
+    }
+
+    /// <summary>انتخاب مأموریت برای نمایش جزئیات.</summary>
+    private void SelectMission(Mission mission) => _selectedMission = mission;
+
+    /// <summary>دریافت مأموریت‌های یک راننده.</summary>
+    private IEnumerable<Mission> GetDriverMissions(Guid driverId) =>
+        _missions.Where(mission => mission.DriverId == driverId);
+
+    /// <summary>محاسبه موقعیت و عرض نوار مأموریت در بازه قابل مشاهده.</summary>
+    private string GetMissionStyle(Mission mission)
+    {
+        var windowEnd = _windowStart.AddHours(WindowHours);
+        var visibleStart = mission.PlannedStartAtUtc < _windowStart
+            ? _windowStart
+            : mission.PlannedStartAtUtc;
+        var visibleEnd = mission.PlannedEndAtUtc > windowEnd
+            ? windowEnd
+            : mission.PlannedEndAtUtc;
+
+        var totalMinutes = TimeSpan.FromHours(WindowHours).TotalMinutes;
+        var left = (visibleStart - _windowStart).TotalMinutes / totalMinutes * 100d;
+        var width = (visibleEnd - visibleStart).TotalMinutes / totalMinutes * 100d;
+
+        return $"left:{left.ToString("0.###", CultureInfo.InvariantCulture)}%;width:{Math.Max(width, 0.5).ToString("0.###", CultureInfo.InvariantCulture)}%;";
+    }
+
+    /// <summary>کلاس رنگ نوار بر اساس وضعیت مأموریت.</summary>
+    private static string GetMissionCssClass(Mission mission) =>
+        $"timeline-bar status-{mission.Status.ToString().ToLowerInvariant()}";
+
+    /// <summary>نمایش وضعیت استخدامی راننده.</summary>
+    private static string GetDriverStatus(Driver driver) =>
+        driver.IsArchived ? "بایگانی‌شده" : driver.EmploymentStatus switch
+        {
+            DriverEmploymentStatus.Active => "فعال",
+            DriverEmploymentStatus.OnLeave => "مرخصی",
+            DriverEmploymentStatus.EmploymentTerminated => "خاتمه کار",
+            DriverEmploymentStatus.Inactive => "غیرفعال",
+            _ => "نامشخص"
+        };
+
+    /// <summary>عنوان فارسی وضعیت مأموریت.</summary>
+    private static string GetMissionStatus(MissionStatus status) => status switch
+    {
+        MissionStatus.Pending => "در انتظار بررسی",
+        MissionStatus.UnderReview => "در حال بررسی",
+        MissionStatus.Confirmed => "تأییدشده",
+        MissionStatus.Running => "در حال اجرا",
+        MissionStatus.Completed => "پایان‌یافته",
+        MissionStatus.Cancelled => "لغوشده",
+        MissionStatus.Rejected => "ردشده",
+        MissionStatus.WithdrawalPending => "درخواست انصراف",
+        _ => "نامشخص"
+    };
+
+    /// <summary>نام کامل راننده مأموریت انتخاب‌شده.</summary>
+    private string GetDriverName(Guid? driverId)
+    {
+        var driver = _drivers.FirstOrDefault(item => item.Id == driverId);
+        return driver is null ? "—" : $"{driver.FirstName} {driver.LastName}";
+    }
+
+    /// <summary>نام و پلاک خودروی مأموریت انتخاب‌شده.</summary>
+    private string GetVehicleName(Guid? vehicleId)
+    {
+        var vehicle = _vehicles.FirstOrDefault(item => item.Id == vehicleId);
+        return vehicle is null ? "—" : $"{vehicle.Brand} {vehicle.Model} - {vehicle.LicensePlate}";
+    }
+
+    /// <summary>عنوان بازه با تقویم جلالی.</summary>
+    private string FormatWindow()
+    {
+        var end = _windowStart.AddHours(WindowHours);
+        return $"{FormatTehranDate(_windowStart)} تا {FormatTehranDate(end)}";
+    }
+
+    /// <summary>برچسب محور زمان بر اساس مقیاس انتخابی.</summary>
+    private string FormatTick(DateTimeOffset utc)
+    {
+        var local = TimeZoneInfo.ConvertTime(utc, GetTehranTimeZone());
+        return _scale is "Hour" or "Day"
+            ? ToPersianDigits($"{local.Hour:00}:00")
+            : FormatTehranDate(utc);
+    }
+
+    /// <summary>نمایش تاریخ و ساعت در منطقه زمانی تهران و تقویم جلالی.</summary>
+    private static string FormatTehranTime(DateTimeOffset utc)
+    {
+        var local = TimeZoneInfo.ConvertTime(utc, GetTehranTimeZone());
+        return ToPersianDigits($"{FormatTehranDate(utc)} {local.Hour:00}:00");
+    }
+
+    /// <summary>نمایش تاریخ جلالی در ساعت تهران.</summary>
+    private static string FormatTehranDate(DateTimeOffset utc)
+    {
+        var local = TimeZoneInfo.ConvertTime(utc, GetTehranTimeZone());
+        var calendar = new PersianCalendar();
+        return ToPersianDigits($"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00}");
+    }
+
+    /// <summary>تعیین شروع بازه بر اساس ساعت جاری تهران.</summary>
+    private static DateTimeOffset GetCurrentTehranHour()
+    {
+        var local = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, GetTehranTimeZone());
+        var rounded = new DateTime(local.Year, local.Month, local.Day, local.Hour, 0, 0, DateTimeKind.Unspecified);
+        return new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(rounded, GetTehranTimeZone()));
+    }
+
+    /// <summary>یافتن منطقه زمانی تهران در Windows یا Linux.</summary>
+    private static TimeZoneInfo GetTehranTimeZone()
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+    }
+
+    /// <summary>تبدیل رقم‌های لاتین به فارسی.</summary>
+    private static string ToPersianDigits(string value)
+    {
+        const string latin = "0123456789";
+        const string persian = "۰۱۲۳۴۵۶۷۸۹";
+        return string.Create(value.Length, value, (destination, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                var digit = latin.IndexOf(source[index]);
+                destination[index] = digit >= 0 ? persian[digit] : source[index];
+            }
+        });
+    }
+
+    private sealed record TimelineTick(DateTimeOffset AtUtc, double PositionPercent);
+}
