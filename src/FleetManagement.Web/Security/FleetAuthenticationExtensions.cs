@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -41,6 +43,22 @@ public static class FleetAuthenticationExtensions
                     }
                 };
             });
+
+        // محدودسازی تلاش‌های ورود بر اساس IP برای کاهش brute-force روی AD و حساب اضطراری.
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.AddPolicy("authentication", httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+        });
 
         services.AddAuthorization();
         services.AddSingleton<IAuthorizationPolicyProvider, FleetAuthorizationPolicyProvider>();
