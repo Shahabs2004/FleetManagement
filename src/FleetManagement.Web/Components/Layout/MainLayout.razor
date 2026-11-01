@@ -27,6 +27,11 @@
                         <a href="/admin/missions">بررسی مأموریت‌ها</a>
                     </Authorized>
                 </AuthorizeView>
+                <AuthorizeView Policy="Permission:missions.timeline.view">
+                    <Authorized Context="timelinePermissionContext">
+                        <a href="/timeline">جدول زمانی رانندگان</a>
+                    </Authorized>
+                </AuthorizeView>
                 <AuthorizeView Policy="Permission:missions.view.own">
                     <Authorized Context="missionsPermissionContext">
                         <a href="/missions">درخواست‌های مأموریت</a>
