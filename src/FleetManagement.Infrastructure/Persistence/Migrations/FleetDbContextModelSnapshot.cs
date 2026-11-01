@@ -395,6 +395,49 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
             entity.ToTable("AuditEntries");
         });
 
+        modelBuilder.Entity("FleetManagement.Domain.Notifications.SmsQueueItem", entity =>
+        {
+            entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uniqueidentifier");
+            entity.Property<int>("EventType").HasColumnType("int");
+            entity.Property<string>("RecipientName").IsRequired().HasMaxLength(200).HasColumnType("nvarchar(200)");
+            entity.Property<string>("RecipientPhone").IsRequired().HasMaxLength(20).HasColumnType("nvarchar(20)");
+            entity.Property<string>("Body").IsRequired().HasMaxLength(2000).HasColumnType("nvarchar(2000)");
+            entity.Property<Guid>("MissionId").HasColumnType("uniqueidentifier");
+            entity.Property<DateTimeOffset>("ScheduledAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<int>("Status").HasColumnType("int");
+            entity.Property<int>("AttemptCount").HasColumnType("int");
+            entity.Property<int>("MaximumRetryCount").HasColumnType("int");
+            entity.Property<int>("RetryIntervalSeconds").HasColumnType("int");
+            entity.Property<DateTimeOffset?>("NextAttemptAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<DateTimeOffset?>("LastAttemptAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<DateTimeOffset?>("AcceptedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<DateTimeOffset?>("DeliveredAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<string>("ProviderMessageId").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            entity.Property<string>("ProviderDeliveryStatus").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            entity.Property<string>("ErrorReason").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            entity.Property<int>("StatusPollCount").HasColumnType("int");
+            entity.Property<int>("MaximumStatusPollingAttempts").HasColumnType("int");
+            entity.Property<DateTimeOffset?>("NextStatusPollAtUtc").HasColumnType("datetimeoffset");
+            entity.HasKey("Id");
+            entity.HasIndex("MissionId", "CreatedAtUtc");
+            entity.HasIndex("ProviderMessageId");
+            entity.HasIndex("Status", "NextAttemptAtUtc");
+            entity.HasIndex("Status", "NextStatusPollAtUtc");
+            entity.HasIndex("Status", "ScheduledAtUtc");
+            entity.ToTable("SmsQueueItems");
+        });
+
+        modelBuilder.Entity("FleetManagement.Domain.Notifications.SmsQueueItem", entity =>
+        {
+            entity.HasOne("FleetManagement.Domain.Missions.Mission", null)
+                .WithMany()
+                .HasForeignKey("MissionId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("FK_SmsQueueItems_Missions_MissionId");
+        });
+
         modelBuilder.Entity("FleetManagement.Domain.Configuration.SystemSetting", entity =>
         {
             entity.Property<Guid>("Id")
