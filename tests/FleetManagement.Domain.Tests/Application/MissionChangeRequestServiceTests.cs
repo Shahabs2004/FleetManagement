@@ -10,8 +10,8 @@ namespace FleetManagement.Domain.Tests.Application;
 /// </summary>
 public sealed class MissionChangeRequestServiceTests
 {
-    private static readonly DateTimeOffset PlannedStart = new(2026, 11, 2, 10, 0, 0, TimeSpan.Zero);
-    private static readonly DateTimeOffset PlannedEnd = new(2026, 11, 2, 14, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset PlannedStart = new(2026, 11, 2, 10, 30, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset PlannedEnd = new(2026, 11, 2, 14, 30, 0, TimeSpan.Zero);
 
     [Fact]
     public async Task ثبت_درخواست_تغییر_برای_درخواست_کننده_مجاز_انجام_می_شود()
