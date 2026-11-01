@@ -133,6 +133,7 @@
     private bool _appearanceLoaded;
     private string _theme = "Light";
     private string _username = string.Empty;
+    private string _appearanceUsername = string.Empty;
 
     /// <summary>تغییر حالت روشن یا تاریک و ذخیره آن برای کاربر جاری.</summary>
     private async Task ToggleThemeAsync()
@@ -198,9 +199,18 @@
             var principal = authenticationState.User;
             if (principal.Identity?.IsAuthenticated == true)
             {
-                _username = principal.FindFirst("fleet:username")?.Value
+                var currentUsername = principal.FindFirst("fleet:username")?.Value
                     ?? principal.Identity.Name
                     ?? string.Empty;
+
+                if (!string.Equals(currentUsername, _appearanceUsername, StringComparison.OrdinalIgnoreCase))
+                {
+                    _appearanceUsername = currentUsername;
+                    _appearanceLoaded = false;
+                    _theme = "Light";
+                }
+
+                _username = currentUsername;
 
                 if (!_appearanceLoaded && !string.IsNullOrWhiteSpace(_username))
                 {
