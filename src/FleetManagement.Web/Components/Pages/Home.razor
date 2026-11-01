@@ -1,50 +1,182 @@
 @page "/"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
-@inject FleetManagement.Infrastructure.Bootstrap.IBootstrapStateStore BootstrapStateStore
-@inject NavigationManager Navigation
+@using Microsoft.AspNetCore.Components.Authorization
+@using FleetManagement.Infrastructure.Reporting
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject FleetDashboardService DashboardService
+@inject ILogger<Home> Logger
 
-<PageTitle>مدیریت ناوگان</PageTitle>
+<PageTitle>داشبورد مدیریت ناوگان</PageTitle>
 
-<section class="welcome-panel">
-    <span class="eyebrow">سامانه مدیریت ناوگان</span>
-    <h1>به سامانه مدیریت ناوگان خوش آمدید</h1>
+<section class="dashboard-page">
+    <div class="dashboard-heading">
+        <div>
+            <span class="eyebrow">سامانه مدیریت ناوگان</span>
+            <h1>داشبورد</h1>
+            <p>نمای کلی درخواست‌ها، مأموریت‌ها و وضعیت منابع ناوگان</p>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(_displayName))
+        {
+            <div class="dashboard-user">خوش آمدید، <strong>@_displayName</strong></div>
+        }
+    </div>
 
     @if (_isLoading)
     {
-        <p>در حال بررسی وضعیت سامانه...</p>
+        <div class="setup-info">در حال دریافت اطلاعات داشبورد...</div>
     }
-    else if (_setupCompleted)
+    else if (_error is not null)
     {
-        <p>
-            راه‌اندازی اولیه تکمیل شده است. بخش ورود کاربران و ماژول‌های عملیاتی
-            در مراحل بعدی توسعه به این صفحه متصل می‌شوند.
-        </p>
-        <div class="status-line">
-            <span class="status-dot"></span>
-            زیرساخت اولیه آماده است
+        <div class="setup-error">@_error</div>
+    }
+    else if (_summary is not null)
+    {
+        <div class="dashboard-grid">
+            <article class="dashboard-card">
+                <span>در انتظار بررسی</span>
+                <strong>@ToPersianDigits(_summary.PendingMissions)</strong>
+                <a href="/admin/missions">مشاهده درخواست‌ها</a>
+            </article>
+            <article class="dashboard-card">
+                <span>تأییدشده و در انتظار شروع</span>
+                <strong>@ToPersianDigits(_summary.ConfirmedMissions)</strong>
+                <a href="/missions">فهرست مأموریت‌ها</a>
+            </article>
+            <article class="dashboard-card dashboard-card-active">
+                <span>در حال اجرا</span>
+                <strong>@ToPersianDigits(_summary.RunningMissions)</strong>
+                <a href="/missions">مشاهده مأموریت‌ها</a>
+            </article>
+            <article class="dashboard-card">
+                <span>پایان‌یافته</span>
+                <strong>@ToPersianDigits(_summary.CompletedMissions)</strong>
+                <a href="/reports/missions">گزارش عملکرد</a>
+            </article>
+            <article class="dashboard-card">
+                <span>لغوشده</span>
+                <strong>@ToPersianDigits(_summary.CancelledMissions)</strong>
+                <a href="/reports/missions">گزارش لغوها</a>
+            </article>
+            <article class="dashboard-card">
+                <span>شروع برنامه‌ریزی‌شده امروز</span>
+                <strong>@ToPersianDigits(_summary.TodayMissions)</strong>
+                <small>بر اساس ساعت تهران</small>
+            </article>
+
+            @if (_summary.ActiveDrivers.HasValue)
+            {
+                <article class="dashboard-card">
+                    <span>رانندگان فعال</span>
+                    <strong>@ToPersianDigits(_summary.ActiveDrivers.Value)</strong>
+                    <small>از @ToPersianDigits(_summary.TotalDrivers ?? 0) راننده ثبت‌شده</small>
+                    <a href="/drivers">مدیریت رانندگان</a>
+                </article>
+                <article class="dashboard-card">
+                    <span>خودروهای آماده تخصیص</span>
+                    <strong>@ToPersianDigits(_summary.ReadyVehicles ?? 0)</strong>
+                    <small>از @ToPersianDigits(_summary.TotalVehicles ?? 0) خودرو</small>
+                    <a href="/vehicles">مدیریت خودروها</a>
+                </article>
+            }
         </div>
-    }
-    else
-    {
-        <p>سامانه برای اولین اجرا آماده می‌شود و شما را به ویزارد راه‌اندازی هدایت می‌کند.</p>
+
+        <section class="dashboard-shortcuts">
+            <h2>دسترسی سریع</h2>
+            <div class="dashboard-links">
+                @if (_canCreateMission)
+                {
+                    <a href="/missions">ثبت درخواست مأموریت</a>
+                }
+                @if (_canReviewMissions)
+                {
+                    <a href="/admin/missions">بررسی و تأیید مأموریت‌ها</a>
+                }
+                @if (_canViewReports)
+                {
+                    <a href="/reports/missions">گزارش‌های ناوگان</a>
+                }
+                <a href="/locations">فهرست مکان‌های مأموریت</a>
+            </div>
+        </section>
     }
 </section>
 
 @code {
     private bool _isLoading = true;
-    private bool _setupCompleted;
+    private string? _error;
+    private string? _displayName;
+    private bool _canCreateMission;
+    private bool _canReviewMissions;
+    private bool _canViewReports;
+    private FleetDashboardSummary? _summary;
 
+    /// <summary>دریافت آمار متناسب با نقش و هویت کاربر جاری.</summary>
     protected override async Task OnInitializedAsync()
     {
-        var state = await BootstrapStateStore.ReadAsync();
-        _setupCompleted = state.SetupCompleted;
-        _isLoading = false;
-
-        // تا زمان تکمیل ویزارد، صفحه اصلی به راه‌اندازی اولیه هدایت می‌شود.
-        if (!_setupCompleted)
+        try
         {
-            Navigation.NavigateTo("/setup", replace: true);
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = state.User;
+            var roles = user.FindAll(System.Security.Claims.ClaimTypes.Role)
+                .Select(claim => claim.Value)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            _displayName = user.FindFirst("fleet:display-name")?.Value
+                ?? user.Identity?.Name;
+
+            var isFleetStaff = roles.Contains("SystemAdministrator")
+                || roles.Contains("FleetManager")
+                || roles.Contains("Operator")
+                || roles.Contains("Viewer");
+
+            var requesterUsername = isFleetStaff
+                ? null
+                : user.FindFirst("fleet:username")?.Value ?? user.Identity?.Name;
+
+            _canCreateMission = roles.Contains("SystemAdministrator")
+                || roles.Contains("FleetManager")
+                || roles.Contains("Operator")
+                || roles.Contains("Requester");
+
+            _canReviewMissions = roles.Contains("SystemAdministrator")
+                || roles.Contains("FleetManager")
+                || roles.Contains("Operator");
+
+            _canViewReports = roles.Contains("SystemAdministrator")
+                || roles.Contains("FleetManager")
+                || user.HasClaim("fleet:permission", "reports.view");
+
+            _summary = await DashboardService.BuildAsync(
+                requesterUsername,
+                includeFleetAssets: isFleetStaff);
         }
+        catch (Exception exception)
+        {
+            var trackingId = Guid.NewGuid().ToString("N");
+            Logger.LogError(exception, "بارگذاری داشبورد ناموفق بود. شناسه پیگیری: {TrackingId}", trackingId);
+            _error = $"بارگذاری داشبورد انجام نشد. شناسه پیگیری: {trackingId}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    /// <summary>نمایش اعداد با رقم فارسی.</summary>
+    private static string ToPersianDigits(int value)
+    {
+        const string latin = "0123456789";
+        const string persian = "۰۱۲۳۴۵۶۷۸۹";
+        var text = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        return string.Create(text.Length, text, (destination, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                var digit = latin.IndexOf(source[index]);
+                destination[index] = digit >= 0 ? persian[digit] : source[index];
+            }
+        });
     }
 }
