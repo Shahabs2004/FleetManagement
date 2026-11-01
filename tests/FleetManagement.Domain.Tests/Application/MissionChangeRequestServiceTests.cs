@@ -1,6 +1,7 @@
 using FleetManagement.Application.Auditing;
 using FleetManagement.Application.Missions;
 using FleetManagement.Application.Notifications;
+using System.Text.Json;
 using FleetManagement.Domain.Missions;
 
 namespace FleetManagement.Domain.Tests.Application;
@@ -87,6 +88,38 @@ public sealed class MissionChangeRequestServiceTests
         Assert.Equal("RejectChange", audit.LastAction);
         Assert.Equal("a.user", notifications.LastRecipient);
         Assert.Equal("MissionChangeRejected", notifications.LastEventKey);
+    }
+
+    [Fact]
+    public async Task تأیید_پیشنهاد_با_زمان_پایان_نامعتبر_بدون_تغییر_وضعیت_رد_می_شود()
+    {
+        var mission = CreateConfirmedMission();
+        var invalidProposal = CreateProposal() with { PlannedEndAtUtc = PlannedStart };
+        var request = new MissionChangeRequest(
+            mission.Id,
+            "a.user",
+            "اصلاح مقصد",
+            JsonSerializer.Serialize(invalidProposal));
+        request.StartReview("reviewer", DateTimeOffset.UtcNow);
+
+        var store = new FakeStore { Mission = mission, ChangeRequest = request };
+        var audit = new RecordingAuditLogWriter();
+        var notifications = new RecordingNotificationSender();
+        var sms = new RecordingSmsScheduler();
+        var service = new MissionChangeApprovalService(
+            store,
+            new FixedApprovalRulesProvider(),
+            audit,
+            notifications,
+            sms);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ApproveChangeAsync(request.Id, "reviewer"));
+
+        Assert.Equal(MissionChangeRequestStatus.UnderReview, request.Status);
+        Assert.Equal(0, audit.CallCount);
+        Assert.Equal(0, notifications.CallCount);
+        Assert.Equal(0, sms.QueueCallCount);
     }
 
     private static MissionChangeRequestService CreateService(
@@ -259,6 +292,7 @@ public sealed class MissionChangeRequestServiceTests
     {
         public string? LastRecipient { get; private set; }
         public string? LastEventKey { get; private set; }
+        public int CallCount { get; private set; }
 
         public Task CreateAsync(
             string recipientUsername,
@@ -271,7 +305,49 @@ public sealed class MissionChangeRequestServiceTests
         {
             LastRecipient = recipientUsername;
             LastEventKey = eventKey;
+            CallCount++;
             return Task.CompletedTask;
         }
+
+        public Task<int> CreateForRolesAsync(
+            IEnumerable<string> roleKeys,
+            string title,
+            string message,
+            string eventKey,
+            string? referenceType = null,
+            string? referenceId = null,
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return Task.FromResult(1);
+        }
+    }
+
+    private sealed class FixedApprovalRulesProvider : IMissionChangeApprovalRulesProvider
+    {
+        public Task<MissionChangeApprovalRules> GetAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MissionChangeApprovalRules(1));
+    }
+
+    private sealed class RecordingSmsScheduler : IMissionChangeSmsScheduler
+    {
+        public int QueueCallCount { get; private set; }
+
+        public Task QueueSafelyAsync(
+            Mission mission,
+            FleetManagement.Domain.Notifications.SmsEventType eventType,
+            string? reason,
+            CancellationToken cancellationToken = default)
+        {
+            QueueCallCount++;
+            return Task.CompletedTask;
+        }
+
+        public Task CancelUnsentRemindersSafelyAsync(
+            Guid missionId,
+            string reason,
+            string actor,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 }
