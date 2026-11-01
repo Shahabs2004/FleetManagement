@@ -38,11 +38,12 @@ public sealed class AdpSmsSoapClient(HttpClient httpClient)
 
         var results = ReadRows(response, "ID", "Mobile");
         if (results.Count != 1)
-        {
             throw new InvalidDataException("پاسخ سرویس پیامک باید دقیقاً یک نتیجه ارسال داشته باشد.");
-        }
 
         var result = results[0];
+        if (TryGetProviderErrorCode(result.First, out var errorCode))
+            throw new AdpSmsProviderException(errorCode);
+
         return new AdpSmsSendResult(result.First, result.Second);
     }
 
@@ -108,14 +109,25 @@ public sealed class AdpSmsSoapClient(HttpClient httpClient)
         var body = document.Root?.Element(Soap + "Body")
             ?? throw new InvalidDataException("ساختار پاسخ SOAP سرویس پیامک معتبر نیست.");
 
-        var fault = body.Elements().FirstOrDefault(element => element.Name.LocalName == "Fault");
-        if (fault is not null)
-        {
+        if (body.Elements().Any(element => element.Name.LocalName == "Fault"))
             throw new InvalidDataException("سرویس پیامک SOAP Fault برگرداند.");
-        }
 
         return body.Elements().FirstOrDefault(element => element.Name.LocalName == operation + "Response")
             ?? throw new InvalidDataException("پاسخ SOAP عملیات پیامک پیدا نشد.");
+    }
+
+    private static bool TryGetProviderErrorCode(string id, out string errorCode)
+    {
+        var value = id.Trim();
+        if (value.Length is >= 2 and <= 4 && value[0] == 'E'
+            && value.Skip(1).All(char.IsAsciiDigit))
+        {
+            errorCode = value;
+            return true;
+        }
+
+        errorCode = string.Empty;
+        return false;
     }
 
     private static IReadOnlyList<(string First, string Second, string Third)> ReadRows(
@@ -167,3 +179,8 @@ public sealed record AdpSmsSendResult(string Id, string Mobile);
 
 public sealed record AdpSmsDeliveryResult(string Id, string CheckId, string Status);
 
+public sealed class AdpSmsProviderException(string code)
+    : InvalidOperationException($"ارائه‌دهنده پیامک کد خطای {code} برگرداند.")
+{
+    public string Code { get; } = code;
+}
