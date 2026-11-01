@@ -67,7 +67,8 @@ public sealed class DirectorySessionValidationMiddleware(RequestDelegate next)
                     result.Status.ToString(),
                     sessionService,
                     tracker,
-                    auditLog);
+                    auditLog,
+                    logger);
                 return;
             }
 
@@ -83,7 +84,8 @@ public sealed class DirectorySessionValidationMiddleware(RequestDelegate next)
                     "ApplicationDisabled",
                     sessionService,
                     tracker,
-                    auditLog);
+                    auditLog,
+                    logger);
                 return;
             }
 
@@ -169,29 +171,44 @@ public sealed class DirectorySessionValidationMiddleware(RequestDelegate next)
         string reason,
         UserSessionService sessionService,
         DirectorySessionValidationTracker tracker,
-        AuditLogService auditLog)
+        AuditLogService auditLog,
+        ILogger<DirectorySessionValidationMiddleware> logger)
     {
         var sessionIdValue = context.User.FindFirstValue("fleet:session-id");
         if (Guid.TryParse(sessionIdValue, out var sessionId))
         {
-            await sessionService.EndSessionAsync(
-                sessionId,
-                UserSessionStatus.DirectoryRevoked,
-                context.RequestAborted);
+            try
+            {
+                await sessionService.EndSessionAsync(
+                    sessionId,
+                    UserSessionStatus.DirectoryRevoked,
+                    context.RequestAborted);
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "ثبت پایان نشست لغوشده در پایگاه داده انجام نشد.");
+            }
         }
-
-        await auditLog.RecordAsync(
-            username,
-            "DirectorySessionRevoked",
-            "Authentication",
-            sessionIdValue,
-            "Success",
-            reason,
-            clientIpAddress: context.Connection.RemoteIpAddress?.ToString(),
-            cancellationToken: context.RequestAborted);
 
         tracker.Forget(username);
         await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        context.Response.Redirect($"/login?error=directory-revoked");
+        context.Response.Redirect("/login?error=directory-revoked");
+
+        try
+        {
+            await auditLog.RecordAsync(
+                username,
+                "DirectorySessionRevoked",
+                "Authentication",
+                sessionIdValue,
+                "Success",
+                reason,
+                clientIpAddress: context.Connection.RemoteIpAddress?.ToString(),
+                cancellationToken: context.RequestAborted);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "ثبت رویداد لغو نشست AD در ممیزی انجام نشد.");
+        }
     }
 }
