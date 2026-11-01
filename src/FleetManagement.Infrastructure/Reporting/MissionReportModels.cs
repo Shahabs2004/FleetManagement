@@ -70,3 +70,16 @@ public sealed record MissionReportResult(
     MissionDecisionSummary Decisions,
     int FreightMissionCount,
     int PassengerMissionCount);
+
+
+/// <summary>یک ردیف از دفتر سوابق کیلومترشمار مأموریت‌ها.</summary>
+public sealed record MileageHistoryRow(
+    string MissionNumber,
+    string MissionTitle,
+    string VehicleName,
+    string DriverName,
+    DateTimeOffset PlannedStartAtUtc,
+    long? OdometerStartKm,
+    long? OdometerEndKm,
+    long? DistanceKm,
+    FleetManagement.Domain.Missions.MissionStatus Status);
