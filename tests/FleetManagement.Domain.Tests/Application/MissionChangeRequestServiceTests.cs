@@ -52,8 +52,9 @@ public sealed class MissionChangeRequestServiceTests
     [Fact]
     public async Task شروع_بررسی_درخواست_را_برای_بازبین_قفل_می_کند()
     {
-        var request = CreateChangeRequest();
-        var store = new FakeStore { ChangeRequest = request };
+        var mission = CreateConfirmedMission();
+        var request = CreateChangeRequest(mission.Id);
+        var store = new FakeStore { ChangeRequest = request, Mission = mission };
         var audit = new RecordingAuditLogWriter();
         var service = CreateService(store, audit, new RecordingNotificationSender());
 
