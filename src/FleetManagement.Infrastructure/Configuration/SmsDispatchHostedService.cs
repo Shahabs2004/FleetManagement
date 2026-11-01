@@ -172,7 +172,7 @@ public sealed class SmsDispatchHostedService(
         }
     }
 
-    internal static bool IsDeliveredStatus(string status) =>
+    public static bool IsDeliveredStatus(string status) =>
         string.Equals(status.Trim(), "Delivered", StringComparison.OrdinalIgnoreCase)
         || string.Equals(status.Trim(), "DELIVRD", StringComparison.OrdinalIgnoreCase);
 }
