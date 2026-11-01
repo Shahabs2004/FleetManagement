@@ -41,9 +41,7 @@
 
 `C:\ProgramData\FleetManagement`
 
-فایل وضعیت bootstrap با DPAPI و محدوده LocalMachine محافظت می‌شود. کد خام مدیر فنی در فایل جداگانه `technical-administrator-code.txt` تولید می‌شود. پس از تکمیل ویزارد، اعتبار کد در وضعیت bootstrap باطل می‌شود؛ اما نسخه خام فایل در نسخه فعلی برنامه به‌صورت خودکار حذف نمی‌شود و باید پس از پایان راه‌اندازی توسط مدیر Windows به‌صورت امن حذف شود.
-
-پس از ایجاد Application Pool با نام نمونه `FleetManagement`، مجوزهای پوشه را از PowerShell با دسترسی Administrator محدود کنید. نام Application Pool را با نام واقعی جایگزین کنید:
+فایل وضعیت bootstrap با DPAPI و محدوده LocalMachine محافظت می‌شود. کد خام مدیر فنی در فایل جداگانه `technical-administrator-code.txt` تولید می‌شود. پیش از اولین اجرای برنامه، اسکریپت آماده‌سازی زیر را با نام واقعی Application Pool و دسترسی Administrator اجرا کنید تا پوشه خارج از ریشه وب و ACL آن آماده شود.
 
 ```powershell
 $path = "$env:ProgramData\FleetManagement"
@@ -52,21 +50,9 @@ icacls $path /inheritance:r
 icacls $path /grant "SYSTEM:(OI)(CI)F" "BUILTIN\Administrators:(OI)(CI)F" "IIS APPPOOL\FleetManagement:(OI)(CI)M"
 ```
 
-Application Pool برای اجرای برنامه به دسترسی پوشه bootstrap نیاز دارد. فایل کد خام مدیر فنی را بلافاصله پس از تولید، با دستورهای زیر فقط برای SYSTEM و مدیران Windows قابل خواندن کنید. کاربران عادی و هویت Application Pool نباید مجوز خواندن این فایل را داشته باشند:
+Application Pool برای ایجاد و حذف فایل‌های راه‌اندازی به دسترسی Modify روی پوشه نیاز دارد. این مجوز را روی خود پوشه تنظیم کنید و ACL فایل کد را جداگانه تغییر ندهید؛ برنامه باید بتواند در صورت انقضا کد تازه بسازد.
 
-```powershell
-$codeFile = Join-Path $path "technical-administrator-code.txt"
-icacls $codeFile /inheritance:r
-icacls $codeFile /grant:r "SYSTEM:F" "BUILTIN\Administrators:F"
-```
-
-پس از تکمیل ویزارد، فایل را با دسترسی مدیر Windows حذف کنید:
-
-```powershell
-Remove-Item -LiteralPath $codeFile -Force
-```
-
-این حذف دستی در نسخه فعلی لازم است؛ صرف باطل‌شدن هش کد در bootstrap به معنی حذف فایل خام نیست.
+پس از تکمیل موفق ویزارد، برنامه ابتدا فایل کد خام مدیر فنی را حذف می‌کند و سپس وضعیت نهایی راه‌اندازی را ثبت می‌کند. اگر حذف به‌دلیل مجوز سیستم‌عامل ناموفق باشد، تکمیل راه‌اندازی انجام نمی‌شود؛ مجوز پوشه را اصلاح و عملیات را دوباره اجرا کنید.
 
 
 ## بازبینی نشست‌های فعال پس از بازیابی AD
