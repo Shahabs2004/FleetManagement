@@ -37,6 +37,14 @@ public sealed class BootstrapSetupServiceTests
             }
 
             Assert.False(await service.VerifyTechnicalAdministratorAccessAsync(code, "lockout-test"));
+
+            stateStore.State.LocalAdministratorUsername = "administrator";
+            stateStore.State.LocalAdministratorPasswordHash = "hash";
+            stateStore.State.LocalAdministratorPasswordSalt = "salt";
+            stateStore.State.SqlConnectionString = "Server=localhost;Database=Fleet;";
+            await service.CompleteSetupAsync();
+
+            Assert.False(File.Exists(Path.Combine(directory, "technical.txt")));
         }
         finally
         {
@@ -46,10 +54,10 @@ public sealed class BootstrapSetupServiceTests
 
     private sealed class InMemoryBootstrapStateStore : IBootstrapStateStore
     {
-        private readonly BootstrapState _state = new();
+        public BootstrapState State { get; } = new();
 
         public Task<BootstrapState> ReadAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(_state);
+            Task.FromResult(State);
 
         public Task WriteAsync(BootstrapState state, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
