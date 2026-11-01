@@ -1207,3 +1207,254 @@ h1 {
         flex-direction: column;
     }
 }
+
+
+/* جدول زمانی رانندگان */
+.timeline-page {
+    gap: 18px;
+}
+
+.timeline-toolbar {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 14px;
+    border: 1px solid #e1e9e3;
+    border-radius: 10px;
+    background: #f8faf8;
+}
+
+.timeline-navigation {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 9px;
+}
+
+.timeline-navigation strong {
+    min-width: 180px;
+    color: #244e40;
+    text-align: center;
+}
+
+.timeline-toolbar label {
+    display: grid;
+    gap: 5px;
+    color: #62746a;
+    font-size: .9rem;
+}
+
+.timeline-toolbar select {
+    min-width: 130px;
+    min-height: 38px;
+    padding: 6px 10px;
+    border: 1px solid #d6e0d9;
+    border-radius: 8px;
+    background: #fff;
+    font: inherit;
+}
+
+.timeline-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 22px;
+    color: #617269;
+    font-size: .85rem;
+}
+
+.timeline-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.timeline-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.timeline-scroll {
+    overflow-x: auto;
+    border: 1px solid #dfe8e2;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.timeline-board {
+    min-width: 1050px;
+}
+
+.timeline-header,
+.timeline-row {
+    display: grid;
+    grid-template-columns: 230px minmax(800px, 1fr);
+}
+
+.timeline-header {
+    min-height: 48px;
+    background: #f3f7f4;
+    border-bottom: 1px solid #dfe8e2;
+}
+
+.timeline-driver-heading {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    color: #285343;
+    font-weight: 700;
+    border-left: 1px solid #dfe8e2;
+}
+
+.timeline-tick-area {
+    position: relative;
+    min-height: 48px;
+    direction: ltr;
+}
+
+.timeline-tick-area span {
+    position: absolute;
+    bottom: 8px;
+    transform: translateX(-50%);
+    color: #6d7c73;
+    font-size: .75rem;
+    white-space: nowrap;
+}
+
+.timeline-row {
+    min-height: 66px;
+    border-bottom: 1px solid #edf1ee;
+}
+
+.timeline-row:last-child {
+    border-bottom: 0;
+}
+
+.timeline-driver {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    padding: 8px 14px;
+    border-left: 1px solid #e5ece7;
+    background: #fbfcfb;
+}
+
+.timeline-driver strong {
+    color: #284e40;
+    font-size: .9rem;
+}
+
+.timeline-driver span,
+.timeline-driver small {
+    color: #77877e;
+    font-size: .76rem;
+}
+
+.timeline-track {
+    position: relative;
+    min-height: 66px;
+    direction: ltr;
+    background-image: repeating-linear-gradient(
+        to right,
+        transparent 0,
+        transparent calc(100% / var(--tick-count) - 1px),
+        #edf1ee calc(100% / var(--tick-count) - 1px),
+        #edf1ee calc(100% / var(--tick-count))
+    );
+}
+
+.timeline-bar {
+    position: absolute;
+    top: 16px;
+    height: 34px;
+    overflow: hidden;
+    padding: 5px 9px;
+    border: 0;
+    border-radius: 7px;
+    color: #173b30;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: rtl;
+    cursor: pointer;
+    font: inherit;
+    font-size: .78rem;
+    box-shadow: 0 1px 3px rgb(20 50 38 / 12%);
+}
+
+.timeline-bar:hover {
+    filter: brightness(.96);
+    outline: 2px solid #c8aa64;
+    outline-offset: 1px;
+}
+
+.timeline-bar.status-confirmed {
+    background: #dcebe2;
+}
+
+.timeline-bar.status-running,
+.timeline-bar.status-withdrawalpending {
+    background: #f4e7bf;
+}
+
+.timeline-bar.status-completed {
+    background: #e3e9e5;
+}
+
+.timeline-bar.status-cancelled,
+.timeline-bar.status-rejected {
+    background: #f2dede;
+    color: #713b3b;
+}
+
+.timeline-detail {
+    margin-top: 18px;
+    padding: 20px;
+    border: 1px solid #dfe8e2;
+    border-radius: 12px;
+    background: #fbfcfb;
+}
+
+.timeline-detail-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.timeline-detail h2 {
+    margin: 0;
+    color: #244e40;
+    font-size: 1.1rem;
+}
+
+.timeline-detail h3 {
+    color: #244e40;
+}
+
+.timeline-detail p {
+    margin: 8px 0;
+    color: #56675e;
+}
+
+.timeline-detail a {
+    display: inline-block;
+    margin-top: 10px;
+    color: #386b57;
+}
+
+@media (max-width: 700px) {
+    .timeline-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .timeline-navigation strong {
+        min-width: auto;
+        flex: 1;
+    }
+}
