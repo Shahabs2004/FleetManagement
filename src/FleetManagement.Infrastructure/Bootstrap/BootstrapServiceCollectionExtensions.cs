@@ -47,6 +47,7 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<NotificationService>();
         services.AddScoped<UserNotificationRecipientResolver>();
         services.AddScoped<MissionReportService>();
+        services.AddScoped<FleetDashboardService>();
         services.AddScoped<MissionReportExportService>();
         services.AddScoped<UserManagementService>();
         services.AddHostedService<SessionExpiryHostedService>();
