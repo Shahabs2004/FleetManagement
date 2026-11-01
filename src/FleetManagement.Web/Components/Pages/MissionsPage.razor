@@ -161,7 +161,10 @@
                                                 <button type="button"
                                                         class="@GetAvailabilitySlotClass(slot)"
                                                         disabled="@(!CanSelectAvailabilitySlot(slot))"
-                                                        @onclick="() => SelectAvailabilitySlot(slot)">
+                                                        @onpointerdown="() => BeginAvailabilityDrag(slot)"
+                                                        @onpointerenter="() => UpdateAvailabilityDrag(slot)"
+                                                        @onpointerup="() => CompleteAvailabilityDrag(slot)"
+                                                        @onclick="() => HandleAvailabilityClick(slot)">
                                                     @(slot.IsAvailable ? "آزاد" : "—")
                                                 </button>
                                             }
@@ -289,6 +292,10 @@
     private IReadOnlyList<AvailabilityDay> _availabilityDays = [];
     private DateTimeOffset? _selectionStart;
     private DateTimeOffset? _selectionEnd;
+    private bool _isAvailabilityDragging;
+    private bool _skipNextAvailabilityClick;
+    private DateTimeOffset? _dragStart;
+    private DateTimeOffset? _dragEnd;
 
     /// <summary>بارگذاری پروفایل، گروه‌های مجاز، مکان‌ها و سوابق شخصی.</summary>
     protected override async Task OnInitializedAsync()
@@ -447,11 +454,77 @@
         _message = "زمان شروع و پایان از جدول ظرفیت عمومی به فرم منتقل شد.";
     }
 
+    /// <summary>آغاز انتخاب با کشیدن ماوس یا لمس‌پذیر.</summary>
+    private void BeginAvailabilityDrag(PublicAvailabilitySlot slot)
+    {
+        if (!_selectionStart.HasValue || _selectionEnd.HasValue)
+        {
+            if (!slot.IsAvailable)
+            {
+                return;
+            }
+
+            _selectionStart = slot.StartAtUtc;
+            _selectionEnd = null;
+            _dragStart = slot.StartAtUtc;
+        }
+        else
+        {
+            _dragStart = _selectionStart;
+        }
+
+        _dragEnd = slot.StartAtUtc;
+        _isAvailabilityDragging = true;
+        _skipNextAvailabilityClick = false;
+    }
+
+    /// <summary>نمایش پیش‌نمایش بازه هنگام حرکت روی خانه‌های جدول.</summary>
+    private void UpdateAvailabilityDrag(PublicAvailabilitySlot slot)
+    {
+        if (_isAvailabilityDragging && _dragStart.HasValue
+            && slot.StartAtUtc > _dragStart.Value)
+        {
+            _dragEnd = slot.StartAtUtc;
+        }
+    }
+
+    /// <summary>تأیید بازه پس از پایان کشیدن.</summary>
+    private void CompleteAvailabilityDrag(PublicAvailabilitySlot slot)
+    {
+        if (!_isAvailabilityDragging)
+        {
+            return;
+        }
+
+        _isAvailabilityDragging = false;
+        _skipNextAvailabilityClick = true;
+
+        if (_dragStart.HasValue && slot.StartAtUtc > _dragStart.Value)
+        {
+            SelectAvailabilitySlot(slot);
+        }
+    }
+
+    /// <summary>پشتیبانی از انتخاب صفحه‌کلید و دو کلیک در کنار کشیدن ماوس.</summary>
+    private void HandleAvailabilityClick(PublicAvailabilitySlot slot)
+    {
+        if (_skipNextAvailabilityClick)
+        {
+            _skipNextAvailabilityClick = false;
+            return;
+        }
+
+        SelectAvailabilitySlot(slot);
+    }
+
     /// <summary>پاک‌کردن بازه انتخاب‌شده.</summary>
     private void ClearAvailabilitySelection()
     {
         _selectionStart = null;
         _selectionEnd = null;
+        _dragStart = null;
+        _dragEnd = null;
+        _isAvailabilityDragging = false;
     }
 
     /// <summary>تعیین امکان کلیک روی خانه جدول.</summary>
@@ -474,7 +547,13 @@
                 ? slot.StartAtUtc < _selectionEnd.Value
                 : slot.StartAtUtc == _selectionStart.Value);
 
-        return selected
+        var preview = _isAvailabilityDragging
+            && _dragStart.HasValue
+            && _dragEnd.HasValue
+            && slot.StartAtUtc >= _dragStart.Value
+            && slot.StartAtUtc <= _dragEnd.Value;
+
+        return selected || preview
             ? "availability-slot selected"
             : slot.IsAvailable
                 ? "availability-slot free"
