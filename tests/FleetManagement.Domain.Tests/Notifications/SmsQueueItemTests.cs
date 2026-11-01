@@ -72,6 +72,35 @@ public sealed class SmsQueueItemTests
             () => item.CancelScheduledReminder("لغو"));
     }
 
+    [Fact]
+    public void استعلام_ناموفق_تا_سقف_تلاش_بعدی_زمان‌بندی_می‌شود()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var item = CreateItem(SmsEventType.MissionApproved);
+        item.MarkSending(now);
+        item.MarkAccepted("12345", now, 30);
+
+        item.DeferStatusPoll(now.AddSeconds(30), 60);
+        Assert.Equal(1, item.StatusPollCount);
+        Assert.Equal(now.AddSeconds(90), item.NextStatusPollAtUtc);
+
+        item.DeferStatusPoll(now.AddSeconds(90), 60);
+        item.DeferStatusPoll(now.AddSeconds(150), 60);
+
+        Assert.Equal(3, item.StatusPollCount);
+        Assert.Null(item.NextStatusPollAtUtc);
+        Assert.Equal(SmsQueueStatus.Accepted, item.Status);
+    }
+
+    [Fact]
+    public void استعلام_مجدد_برای_پیام_پذیرفته_نشده_مجاز_نیست()
+    {
+        var item = CreateItem(SmsEventType.MissionApproved);
+
+        Assert.Throws<InvalidOperationException>(
+            () => item.DeferStatusPoll(DateTimeOffset.UtcNow, 30));
+    }
+
     private static SmsQueueItem CreateItem(
         SmsEventType eventType,
         int maximumRetryCount = 3)
