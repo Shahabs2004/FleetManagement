@@ -1639,3 +1639,182 @@ h1 {
     color: #6c7d73;
     font-size: .86rem;
 }
+
+
+.theme-toggle {
+    margin-inline-start: auto;
+    padding: 8px 12px;
+    border: 1px solid #d6e0d9;
+    border-radius: 8px;
+    background: #f8faf8;
+    color: #315c49;
+    font: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.theme-dark {
+    color: #e5eee8;
+    background: #111c17;
+}
+
+.theme-dark .app-header,
+.theme-dark .admin-navigation,
+.theme-dark .app-footer {
+    color: #e5eee8;
+    background: #1b2b23;
+    border-color: #30483b;
+}
+
+.theme-dark .app-header strong,
+.theme-dark .dashboard-heading h1,
+.theme-dark .dashboard-shortcuts h2,
+.theme-dark .timeline-detail h2,
+.theme-dark .timeline-detail h3 {
+    color: #e7f0e9;
+}
+
+.theme-dark .subtitle,
+.theme-dark .dashboard-heading p,
+.theme-dark .dashboard-card > span,
+.theme-dark .dashboard-card > small,
+.theme-dark .session-count,
+.theme-dark .timeline-driver span,
+.theme-dark .timeline-driver small {
+    color: #a9bbb0;
+}
+
+.theme-dark .admin-panel,
+.theme-dark .driver-editor,
+.theme-dark .dashboard-card,
+.theme-dark .dashboard-shortcuts,
+.theme-dark .dashboard-hidden-cards,
+.theme-dark .timeline-detail,
+.theme-dark .public-availability,
+.theme-dark .audit-detail,
+.theme-dark .mission-review-card {
+    color: #e5eee8;
+    background: #1b2b23;
+    border-color: #30483b;
+}
+
+.theme-dark input,
+.theme-dark select,
+.theme-dark textarea,
+.theme-dark .session-filters input,
+.theme-dark .session-filters select,
+.theme-dark .timeline-toolbar select {
+    color: #e5eee8;
+    background: #122019;
+    border-color: #405a4a;
+}
+
+.theme-dark input::placeholder,
+.theme-dark textarea::placeholder {
+    color: #879b8e;
+}
+
+.theme-dark .session-table-wrap,
+.theme-dark .availability-grid-wrap,
+.theme-dark .timeline-scroll {
+    border-color: #30483b;
+    background: #17251d;
+}
+
+.theme-dark .session-table th,
+.theme-dark .timeline-header,
+.theme-dark .timeline-driver,
+.theme-dark .availability-grid-header > * {
+    color: #dbe9df;
+    background: #24392d;
+    border-color: #344d3d;
+}
+
+.theme-dark .session-table td,
+.theme-dark .timeline-row,
+.theme-dark .timeline-driver-heading {
+    color: #d3e0d7;
+    border-color: #30483b;
+}
+
+.theme-dark .timeline-track {
+    background-color: #1b2b23;
+    background-image: repeating-linear-gradient(
+        to right,
+        transparent 0,
+        transparent calc(100% / var(--tick-count) - 1px),
+        #30483b calc(100% / var(--tick-count) - 1px),
+        #30483b calc(100% / var(--tick-count))
+    );
+}
+
+.theme-dark .timeline-bar.status-confirmed {
+    color: #dcefe2;
+    background: #315b45;
+}
+
+.theme-dark .timeline-bar.status-running,
+.theme-dark .timeline-bar.status-withdrawalpending {
+    color: #f7e9c5;
+    background: #66562f;
+}
+
+.theme-dark .timeline-bar.status-completed {
+    color: #dce5df;
+    background: #46534b;
+}
+
+.theme-dark .timeline-bar.status-cancelled,
+.theme-dark .timeline-bar.status-rejected {
+    color: #f1dada;
+    background: #673f3f;
+}
+
+.theme-dark .availability-grid-header > *,
+.theme-dark .availability-grid-row > * {
+    background: #1b2b23;
+    border-color: #30483b;
+}
+
+.theme-dark .availability-grid-header > * {
+    color: #dbe9df;
+    background: #24392d;
+}
+
+.theme-dark .availability-slot.free {
+    color: #d9f0df;
+    background: #315b45;
+}
+
+.theme-dark .availability-slot.busy {
+    color: #9ba99f;
+    background: #29352d;
+}
+
+.theme-dark .availability-slot.selected {
+    color: #f7edcf;
+    background: #6d5a31;
+}
+
+.theme-dark .theme-toggle,
+.theme-dark .secondary-button {
+    color: #e1ede5;
+    background: #293d31;
+    border-color: #496451;
+}
+
+.theme-dark a {
+    color: #a8d0b5;
+}
+
+.theme-dark .setup-info {
+    color: #d9e8dc;
+    background: #263d30;
+    border-color: #405d49;
+}
+
+.theme-dark .setup-error {
+    color: #f0dada;
+    background: #482c2c;
+    border-color: #754343;
+}
