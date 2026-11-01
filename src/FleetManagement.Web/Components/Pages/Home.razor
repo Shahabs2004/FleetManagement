@@ -1,8 +1,9 @@
 @page "/"
-@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@attribute [FleetPermission("dashboard.view")]
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Components.Authorization
 @using FleetManagement.Infrastructure.Reporting
+@using FleetManagement.Web.Security
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject FleetDashboardService DashboardService
 @inject DashboardLayoutSettingsService DashboardLayoutSettings
