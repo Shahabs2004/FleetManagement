@@ -1,5 +1,6 @@
 using System.Text.Json;
 using FleetManagement.Domain.Drivers;
+using FleetManagement.Domain.Missions;
 using FleetManagement.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -99,6 +100,19 @@ public sealed class DriverManagementService(
         var driver = await db.Drivers.SingleOrDefaultAsync(item => item.Id == driverId, cancellationToken)
             ?? throw new KeyNotFoundException("راننده موردنظر پیدا نشد.");
 
+        if (status != DriverEmploymentStatus.Active)
+        {
+            var hasActiveMission = await db.Missions.AnyAsync(mission =>
+                mission.DriverId == driverId
+                && mission.Status is MissionStatus.Confirmed or MissionStatus.Running,
+                cancellationToken);
+
+            if (hasActiveMission)
+            {
+                throw new InvalidOperationException("وضعیت استخدامی راننده دارای مأموریت فعال قابل تغییر نیست.");
+            }
+        }
+
         var before = driver.EmploymentStatus.ToString();
         driver.ChangeEmploymentStatus(status);
         await db.SaveChangesAsync(cancellationToken);
@@ -121,6 +135,16 @@ public sealed class DriverManagementService(
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var driver = await db.Drivers.SingleOrDefaultAsync(item => item.Id == driverId, cancellationToken)
             ?? throw new KeyNotFoundException("راننده موردنظر پیدا نشد.");
+
+        var hasActiveMission = await db.Missions.AnyAsync(mission =>
+            mission.DriverId == driverId
+            && mission.Status is MissionStatus.Confirmed or MissionStatus.Running,
+            cancellationToken);
+
+        if (hasActiveMission)
+        {
+            throw new InvalidOperationException("راننده دارای مأموریت فعال قابل بایگانی نیست.");
+        }
 
         driver.Archive();
         await db.SaveChangesAsync(cancellationToken);
