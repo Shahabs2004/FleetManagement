@@ -47,6 +47,7 @@ public sealed class AuthorizationConfiguration
                         new() { Permission = "missions.*" },
                         new() { Permission = "reports.view" },
                         new() { Permission = "reports.export" },
+                        new() { Permission = "missions.timeline.view" },
                         new() { Permission = "notifications.view" },
                         new() { Permission = "dashboard.view" }
                     ]
@@ -72,6 +73,7 @@ public sealed class AuthorizationConfiguration
                         new() { Permission = "missions.cancel" },
                         new() { Permission = "missions.extend" },
                         new() { Permission = "missions.split" },
+                        new() { Permission = "missions.timeline.view" },
                         new() { Permission = "notifications.view" },
                         new() { Permission = "dashboard.view" }
                     ]
