@@ -1592,3 +1592,50 @@ h1 {
     outline: 2px solid #b18d3c;
     font-weight: 700;
 }
+
+
+.dashboard-card-toolbar {
+    display: flex;
+    align-self: stretch;
+    justify-content: flex-start;
+    gap: 5px;
+    direction: ltr;
+}
+
+.dashboard-card-toolbar button {
+    min-width: 26px;
+    height: 25px;
+    padding: 0 5px;
+    border: 1px solid #e2eae5;
+    border-radius: 5px;
+    background: #f8faf8;
+    color: #63766b;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.dashboard-card-toolbar button:disabled {
+    opacity: .35;
+    cursor: default;
+}
+
+.dashboard-hidden-cards {
+    padding: 16px 20px;
+    border: 1px dashed #d6e0d9;
+    border-radius: 10px;
+    background: #fafcfb;
+}
+
+.dashboard-hidden-cards h2 {
+    margin: 0 0 12px;
+    color: #5e7167;
+    font-size: .95rem;
+}
+
+.dashboard-hidden-cards .dashboard-links span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #6c7d73;
+    font-size: .86rem;
+}
