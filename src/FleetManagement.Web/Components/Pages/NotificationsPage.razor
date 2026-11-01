@@ -243,11 +243,14 @@
 
     /// <summary>تبدیل عدد به رقم‌های فارسی.</summary>
     private static string ToPersian(int value)
+        => ToPersian(value.ToString(CultureInfo.InvariantCulture));
+
+    /// <summary>تبدیل رقم‌های لاتین در متن به رقم‌های فارسی.</summary>
+    private static string ToPersian(string value)
     {
         const string latin = "0123456789";
         const string persian = "۰۱۲۳۴۵۶۷۸۹";
-        var text = value.ToString(CultureInfo.InvariantCulture);
-        return string.Create(text.Length, text, (destination, source) =>
+        return string.Create(value.Length, value, (destination, source) =>
         {
             for (var index = 0; index < source.Length; index++)
             {
