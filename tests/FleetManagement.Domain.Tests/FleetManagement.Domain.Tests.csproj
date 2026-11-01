@@ -17,5 +17,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\FleetManagement.Domain\FleetManagement.Domain.csproj" />
+    <ProjectReference Include="..\..\src\FleetManagement.Infrastructure\FleetManagement.Infrastructure.csproj" />
   </ItemGroup>
 </Project>
