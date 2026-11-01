@@ -349,8 +349,12 @@
             _changeRequests = (await MissionService.GetChangeRequestsAsync(take: 500))
                 .Where(item => item.Status is MissionChangeRequestStatus.Pending or MissionChangeRequestStatus.UnderReview)
                 .ToList();
-            _drivers = await DriverService.SearchAsync();
-            _vehicles = await VehicleService.SearchAsync();
+            _drivers = (await DriverService.SearchAsync())
+                .Where(driver => driver.CanBeAssignedToMission())
+                .ToList();
+            _vehicles = (await VehicleService.SearchAsync())
+                .Where(vehicle => vehicle.ManualStatus == ManualVehicleStatus.Ready)
+                .ToList();
 
             foreach (var mission in _missions)
             {
