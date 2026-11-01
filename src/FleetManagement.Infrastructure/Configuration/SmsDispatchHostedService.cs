@@ -156,7 +156,12 @@ public sealed class SmsDispatchHostedService(
             {
                 var statuses = await client.GetStatusesOriginalIdAsync(configuration, [providerId], cancellationToken);
                 var result = statuses.FirstOrDefault(status => status.Id == item.ProviderMessageId);
-                if (result is null || string.IsNullOrWhiteSpace(result.Status)) continue;
+                if (result is null || string.IsNullOrWhiteSpace(result.Status))
+                {
+                    item.DeferStatusPoll(DateTimeOffset.UtcNow, configuration.StatusPollingIntervalSeconds);
+                    await db.SaveChangesAsync(cancellationToken);
+                    continue;
+                }
 
                 item.RecordDeliveryStatus(result.Status, IsDeliveredStatus(result.Status), DateTimeOffset.UtcNow,
                     configuration.StatusPollingIntervalSeconds);
@@ -167,6 +172,8 @@ public sealed class SmsDispatchHostedService(
             }
             catch (Exception exception)
             {
+                item.DeferStatusPoll(DateTimeOffset.UtcNow, configuration.StatusPollingIntervalSeconds);
+                await db.SaveChangesAsync(cancellationToken);
                 logger.LogWarning("استعلام وضعیت پیامک {QueueItemId} ناموفق بود ({ErrorType}).",
                     item.Id, exception.GetType().Name);
                 continue;
