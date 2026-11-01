@@ -207,27 +207,35 @@ public sealed class BootstrapSetupService(
     }
 
     /// <summary>
-    /// تأیید کد مستقل مدیر فنی پیش از نمایش تنظیمات پیامک.
+    /// تأیید کد مدیر فنی؛ پس از پنج خطا برای پانزده دقیقه قفل می‌شود.
     /// </summary>
     public async Task<bool> VerifyTechnicalAdministratorAccessAsync(
         string suppliedCode,
+        string attemptKey,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(suppliedCode);
+        ArgumentException.ThrowIfNullOrWhiteSpace(attemptKey);
 
-        var state = await stateStore.ReadAsync(cancellationToken);
-
-        if (state.SetupCompleted
-            || string.IsNullOrWhiteSpace(state.TechnicalAdministratorCodeHash)
-            || state.TechnicalAdministratorCodeExpiresAtUtc is null
-            || state.TechnicalAdministratorCodeExpiresAtUtc <= DateTimeOffset.UtcNow)
+        if (IsLockedOut(attemptKey))
         {
             return false;
         }
 
-        return FixedTimeSetupCodeEquals(
-            state.TechnicalAdministratorCodeHash,
-            suppliedCode.Trim());
+        var state = await stateStore.ReadAsync(cancellationToken);
+        var verified = !state.SetupCompleted
+            && !string.IsNullOrWhiteSpace(state.TechnicalAdministratorCodeHash)
+            && state.TechnicalAdministratorCodeExpiresAtUtc > DateTimeOffset.UtcNow
+            && FixedTimeSetupCodeEquals(state.TechnicalAdministratorCodeHash, suppliedCode.Trim());
+
+        if (verified)
+        {
+            LoginAttempts.TryRemove(attemptKey, out _);
+            return true;
+        }
+
+        RegisterFailedAttempt(attemptKey);
+        return false;
     }
 
     /// <summary>
