@@ -101,6 +101,10 @@
                                 {
                                     <AuthorizeView Policy="Permission:notifications.sms.retry">
                                         <Authorized Context="retryPermissionContext">
+                                            <input class="sms-retry-reason"
+                                                   value="@GetRetryReason(item.Id)"
+                                                   @onchange="args => SetRetryReason(item.Id, args)"
+                                                   placeholder="علت رفع خطا را ثبت کنید" />
                                             <button type="button" class="secondary-button" @onclick="() => RetryAsync(item.Id)" disabled="@_isBusy">
                                                 تلاش مجدد
                                             </button>
@@ -127,6 +131,7 @@
     private string _missionId = string.Empty;
     private string? _error;
     private IReadOnlyList<SmsQueueItem> _items = [];
+    private readonly Dictionary<Guid, string> _retryReasons = [];
 
     /// <summary>بارگذاری اولیه گزارش پیامک‌ها.</summary>
     protected override Task OnInitializedAsync() => LoadAsync();
@@ -173,6 +178,15 @@
     }
 
     /// <summary>ثبت تلاش مجدد دستی با هویت کاربر جاری.</summary>
+    private string GetRetryReason(Guid itemId) =>
+        _retryReasons.TryGetValue(itemId, out var reason) ? reason : string.Empty;
+
+    /// <summary>ثبت علت اصلاح خطا برای تلاش مجدد.</summary>
+    private void SetRetryReason(Guid itemId, ChangeEventArgs args)
+    {
+        _retryReasons[itemId] = args.Value?.ToString() ?? string.Empty;
+    }
+
     private async Task RetryAsync(Guid itemId)
     {
         _isBusy = true;
@@ -184,7 +198,15 @@
                 ?? state.User.Identity?.Name
                 ?? "Unknown";
 
-            await SmsQueue.RetryManuallyAsync(itemId, actor);
+            var correctionReason = GetRetryReason(itemId);
+            if (string.IsNullOrWhiteSpace(correctionReason))
+            {
+                _error = "پیش از تلاش مجدد، علت رفع خطا را ثبت کنید.";
+                return;
+            }
+
+            await SmsQueue.RetryManuallyAsync(itemId, actor, correctionReason);
+            _retryReasons.Remove(itemId);
             await LoadAsync();
         }
         catch (Exception exception)
