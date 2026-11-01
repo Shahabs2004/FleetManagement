@@ -468,6 +468,11 @@
             _selectionEnd = null;
             _dragStart = slot.StartAtUtc;
         }
+        else if (slot.StartAtUtc <= _selectionStart.Value && slot.IsAvailable)
+        {
+            _selectionStart = slot.StartAtUtc;
+            _dragStart = slot.StartAtUtc;
+        }
         else
         {
             _dragStart = _selectionStart;
@@ -497,11 +502,12 @@
         }
 
         _isAvailabilityDragging = false;
-        _skipNextAvailabilityClick = true;
+        _skipNextAvailabilityClick = false;
 
         if (_dragStart.HasValue && slot.StartAtUtc > _dragStart.Value)
         {
             SelectAvailabilitySlot(slot);
+            _skipNextAvailabilityClick = true;
         }
     }
 
