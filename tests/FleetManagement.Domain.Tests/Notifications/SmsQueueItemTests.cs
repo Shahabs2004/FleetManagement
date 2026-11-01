@@ -73,6 +73,30 @@ public sealed class SmsQueueItemTests
     }
 
     [Fact]
+    public void ارسال_نیمه_تمام_پس_از_توقف_پردازش_به_خطای_دائمی_منتقل_می‌شود()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var item = CreateItem(SmsEventType.MissionApproved);
+        item.MarkSending(now);
+
+        item.MarkInterruptedSendingAsPermanentFailure(now.AddMinutes(5));
+
+        Assert.Equal(SmsQueueStatus.PermanentFailure, item.Status);
+        Assert.Null(item.NextAttemptAtUtc);
+        Assert.Contains("نتیجه نزد ارائه‌دهنده نامشخص است", item.ErrorReason);
+        Assert.Equal(now, item.LastAttemptAtUtc);
+    }
+
+    [Fact]
+    public void پیام_غیر_در_حال_ارسال_نمی‌تواند_به‌عنوان_ارسال_نیمه_تمام_ثبت_شود()
+    {
+        var item = CreateItem(SmsEventType.MissionApproved);
+
+        Assert.Throws<InvalidOperationException>(
+            () => item.MarkInterruptedSendingAsPermanentFailure(DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
     public void استعلام_ناموفق_تا_سقف_تلاش_بعدی_زمان‌بندی_می‌شود()
     {
         var now = DateTimeOffset.UtcNow;
