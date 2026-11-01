@@ -15,6 +15,7 @@
 @using Microsoft.AspNetCore.Authorization
 @inject MissionManagementService MissionService
 @inject MissionChangeRequestService ChangeRequestService
+@inject MissionChangeApprovalService ApprovalService
 @inject DriverManagementService DriverService
 @inject VehicleManagementService VehicleService
 @inject DriverVehiclePreferenceService DriverVehiclePreferences
@@ -685,7 +686,7 @@
     /// <summary>تأیید و اعمال یکپارچه مقادیر پیشنهادی.</summary>
     private Task ApproveChangeAsync(Guid id) => ExecuteAsync(async actor =>
     {
-        await MissionService.ApproveChangeAsync(id, actor);
+        await ApprovalService.ApproveChangeAsync(id, actor);
         _message = "تغییرات مأموریت به‌صورت یکپارچه اعمال شد.";
     }, "تأیید تغییر مأموریت", "Permission:missions.edit");
 
