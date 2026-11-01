@@ -37,6 +37,9 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+// Endpoint routing باید پیش از middleware محدودسازی نرخ اجرا شود.
+app.UseRouting();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<DirectorySessionValidationMiddleware>();
 app.UseMiddleware<FleetSessionTrackingMiddleware>();
