@@ -316,16 +316,18 @@ public sealed class SmsQueueService(
     public async Task RetryManuallyAsync(
         Guid queueItemId,
         string actorUsername,
+        string correctionReason,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(correctionReason);
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var item = await db.SmsQueueItems.SingleOrDefaultAsync(
             queueItem => queueItem.Id == queueItemId,
             cancellationToken)
             ?? throw new KeyNotFoundException("رکورد پیامک پیدا نشد.");
 
-        var before = item.Status.ToString();
-        item.RetryManually(DateTimeOffset.UtcNow);
+        var before = new { Status = item.Status.ToString(), item.ErrorReason };
+        item.RetryManually(DateTimeOffset.UtcNow, correctionReason);
         await db.SaveChangesAsync(cancellationToken);
 
         await auditLog.RecordAsync(
@@ -334,8 +336,13 @@ public sealed class SmsQueueService(
             "SmsQueueItem",
             item.Id.ToString(),
             "Success",
-            beforeJson: System.Text.Json.JsonSerializer.Serialize(new { Status = before }),
-            afterJson: System.Text.Json.JsonSerializer.Serialize(new { Status = item.Status.ToString() }),
+            correctionReason,
+            beforeJson: System.Text.Json.JsonSerializer.Serialize(before),
+            afterJson: System.Text.Json.JsonSerializer.Serialize(new
+            {
+                Status = item.Status.ToString(),
+                CorrectionReason = correctionReason
+            }),
             cancellationToken: cancellationToken);
     }
 }
