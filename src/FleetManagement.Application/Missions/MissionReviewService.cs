@@ -129,7 +129,8 @@ public sealed class MissionReviewService(
             return new RejectedMission(
                 mission.Id,
                 mission.MissionNumber,
-                mission.RequesterUsername);
+                mission.RequesterUsername,
+                mission);
         }, cancellationToken);
 
         await auditLog.RecordAsync(
