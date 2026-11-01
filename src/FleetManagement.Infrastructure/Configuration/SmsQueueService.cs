@@ -244,7 +244,22 @@ public sealed class SmsQueueService(
 
         var local = TimeZoneInfo.ConvertTime(utc, zone);
         var calendar = new PersianCalendar();
-        return $"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} {local.Hour:00}:00";
+        return ToPersianDigits($"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} {local.Hour:00}:00");
+    }
+
+    /// <summary>تبدیل ارقام لاتین به فارسی در متن پیامک.</summary>
+    private static string ToPersianDigits(string value)
+    {
+        const string latin = "0123456789";
+        const string persian = "۰۱۲۳۴۵۶۷۸۹";
+        return string.Create(value.Length, value, (destination, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                var digit = latin.IndexOf(source[index]);
+                destination[index] = digit >= 0 ? persian[digit] : source[index];
+            }
+        });
     }
 
     /// <summary>لغو یادآوری‌های هنوز ارسال‌نشده مأموریت.</summary>
