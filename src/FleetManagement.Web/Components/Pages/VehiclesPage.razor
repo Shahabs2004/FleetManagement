@@ -103,6 +103,7 @@
                         <th>برند</th>
                         <th>مدل</th>
                         <th>پلاک</th>
+                        <th>وضعیت جاری</th>
                         <th>وضعیت دستی</th>
                         <th>بایگانی</th>
                         <th>عملیات</th>
@@ -115,6 +116,7 @@
                             <td>@vehicle.Brand</td>
                             <td>@vehicle.Model</td>
                             <td dir="ltr">@vehicle.LicensePlate</td>
+                            <td>@GetEffectiveStatusName(vehicle)</td>
                             <td>@GetStatusName(vehicle.ManualStatus)</td>
                             <td>@(vehicle.IsArchived ? "بایگانی‌شده" : "فعال")</td>
                             <td>
@@ -153,6 +155,7 @@
     private Guid? _editingId;
     private ManualVehicleStatus _manualStatus = ManualVehicleStatus.Ready;
     private IReadOnlyList<Vehicle> _vehicles = [];
+    private HashSet<Guid> _activeMissionVehicleIds = [];
 
     /// <summary>بارگذاری اولیه خودروها.</summary>
     protected override Task OnInitializedAsync() => LoadAsync();
@@ -164,6 +167,7 @@
         try
         {
             _vehicles = await VehicleService.SearchAsync(_search, _includeArchived);
+            _activeMissionVehicleIds = (await VehicleService.GetActiveMissionVehicleIdsAsync()).ToHashSet();
         }
         catch (Exception exception)
         {
@@ -330,6 +334,18 @@
     }
 
     /// <summary>عنوان فارسی وضعیت دستی خودرو.</summary>
+    private string GetEffectiveStatusName(Vehicle vehicle)
+    {
+        return vehicle.GetEffectiveStatus(_activeMissionVehicleIds.Contains(vehicle.Id)) switch
+        {
+            VehicleEffectiveStatus.InMission => "در مأموریت",
+            VehicleEffectiveStatus.Ready => "آماده به کار",
+            VehicleEffectiveStatus.RepairShop => "تعمیرگاه",
+            VehicleEffectiveStatus.OutOfService => "خارج از سرویس",
+            _ => "نامشخص"
+        };
+    }
+
     private static string GetStatusName(ManualVehicleStatus status) => status switch
     {
         ManualVehicleStatus.Ready => "آماده به کار",
