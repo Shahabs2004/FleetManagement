@@ -9,7 +9,7 @@
 4. بررسی RowVersion و Constraint در Migrationها.
 
 ## P1 — معماری
-5. انتقال منطق از `MissionManagementService` (≈۱۵۸۰ خط) به Application و شکستن آن به سرویس‌های کوچک (ثبت، تأیید، تغییر، تقسیم، کیلومتر، انصراف). **در حال انجام؛ قواعد برنامه‌ریزی و قرارداد MissionChangeProposal به Application منتقل شده‌اند. سناریوهای ثبت، فهرست، شروع بررسی و رد درخواست تغییر نیز در PR شماره ۳ به Application منتقل شده‌اند؛ تأیید و اعمال پیشنهاد همچنان در Infrastructure باقی است.**
+5. انتقال منطق از `MissionManagementService` (≈۱۵۸۰ خط) به Application و شکستن آن به سرویس‌های کوچک (ثبت، تأیید، تغییر، تقسیم، کیلومتر، انصراف). **در حال انجام؛ قواعد برنامه‌ریزی و قرارداد MissionChangeProposal به Application منتقل شده‌اند. سناریوهای ثبت، فهرست، شروع بررسی، رد و تأیید/اعمال پیشنهاد تغییر در PRهای شماره ۳ و ۴ به Application منتقل شده‌اند.**
 6. شکستن `FleetAuthenticationEndpoints` و فایل‌های بزرگ.
 7. تغییر نام پروژه آزمون یا جداسازی آن به Domain/Application/Infrastructure/Integration.
 8. کاتالوگ مرکزی مجوزها (ثابت‌ها) + ثبت مجوزهای مستقل مذکور در پیوست ب.
