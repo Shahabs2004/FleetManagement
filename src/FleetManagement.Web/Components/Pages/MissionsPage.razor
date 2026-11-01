@@ -293,7 +293,6 @@
     private DateTimeOffset? _selectionStart;
     private DateTimeOffset? _selectionEnd;
     private bool _isAvailabilityDragging;
-    private bool _skipNextAvailabilityClick;
     private DateTimeOffset? _dragStart;
     private DateTimeOffset? _dragEnd;
 
@@ -480,7 +479,6 @@
 
         _dragEnd = slot.StartAtUtc;
         _isAvailabilityDragging = true;
-        _skipNextAvailabilityClick = false;
     }
 
     /// <summary>نمایش پیش‌نمایش بازه هنگام حرکت روی خانه‌های جدول.</summary>
@@ -502,21 +500,18 @@
         }
 
         _isAvailabilityDragging = false;
-        _skipNextAvailabilityClick = false;
 
         if (_dragStart.HasValue && slot.StartAtUtc > _dragStart.Value)
         {
             SelectAvailabilitySlot(slot);
-            _skipNextAvailabilityClick = true;
         }
     }
 
     /// <summary>پشتیبانی از انتخاب صفحه‌کلید و دو کلیک در کنار کشیدن ماوس.</summary>
     private void HandleAvailabilityClick(PublicAvailabilitySlot slot)
     {
-        if (_skipNextAvailabilityClick)
+        if (_selectionEnd.HasValue && slot.StartAtUtc == _selectionEnd.Value)
         {
-            _skipNextAvailabilityClick = false;
             return;
         }
 
