@@ -1233,6 +1233,61 @@ public sealed class MissionManagementService(
             ?? throw new KeyNotFoundException("مأموریت موردنظر پیدا نشد.");
     }
 
+    /// <summary>
+    /// صف‌بندی پیامک پس از ثبت موفق عملیات؛ خطای پیامک هرگز عملیات مأموریت را برنمی‌گرداند.
+    /// </summary>
+    private async Task QueueSmsSafelyAsync(
+        Mission mission,
+        SmsEventType eventType,
+        string? reason,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await smsQueueService.EnqueueForMissionAsync(
+                mission,
+                eventType,
+                reason,
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            var trackingId = Guid.NewGuid().ToString("N");
+            logger.LogWarning(
+                exception,
+                "صف‌بندی پیامک رویداد {EventType} برای مأموریت {MissionId} ناموفق بود. شناسه پیگیری: {TrackingId}",
+                eventType,
+                mission.Id,
+                trackingId);
+        }
+    }
+
+    /// <summary>لغو یادآوری‌های قدیمی بدون متوقف‌کردن تغییر مأموریت.</summary>
+    private async Task CancelUnsentRemindersSafelyAsync(
+        Guid missionId,
+        string reason,
+        string actor,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await smsQueueService.CancelUnsentRemindersAsync(
+                missionId,
+                reason,
+                actor,
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            var trackingId = Guid.NewGuid().ToString("N");
+            logger.LogWarning(
+                exception,
+                "لغو یادآوری‌های پیامکی مأموریت {MissionId} ناموفق بود. شناسه پیگیری: {TrackingId}",
+                missionId,
+                trackingId);
+        }
+    }
+
     private Task RecordMissionAuditAsync(
         string actor,
         string action,
