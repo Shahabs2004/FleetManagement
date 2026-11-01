@@ -78,6 +78,11 @@
                         <a href="/admin/sessions">سوابق ورود</a>
                     </Authorized>
                 </AuthorizeView>
+                <AuthorizeView Policy="Permission:settings.sessions">
+                    <Authorized Context="sessionSettingsPermissionContext">
+                        <a href="/admin/session-settings">تنظیمات نشست</a>
+                    </Authorized>
+                </AuthorizeView>
                 <a href="/logout">خروج</a>
             </nav>
         </Authorized>
