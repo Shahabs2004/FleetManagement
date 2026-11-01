@@ -16,10 +16,10 @@ public sealed class SystemSetting : Entity
     }
 
     /// <summary>کلید یکتای تنظیم.</summary>
-    public string Key { get; private set; }
+    public string Key { get; private set; } = string.Empty;
 
     /// <summary>مقدار تنظیم؛ قالب JSON نیز برای تنظیمات چندفیلدی پشتیبانی می‌شود.</summary>
-    public string Value { get; private set; }
+    public string Value { get; private set; } = string.Empty;
 
     /// <summary>زمان آخرین تغییر مقدار تنظیم بر اساس UTC.</summary>
     public DateTimeOffset UpdatedAtUtc { get; private set; }
