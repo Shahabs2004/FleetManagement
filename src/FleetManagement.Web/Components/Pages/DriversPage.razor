@@ -291,8 +291,13 @@
             var actor = await GetActorAsync();
             if (_editingId.HasValue)
             {
-                await DriverService.UpdateAsync(_editingId.Value, _firstName, _lastName, _mobile, actor);
-                await DriverService.ChangeEmploymentStatusAsync(_editingId.Value, _status, actor);
+                await DriverService.UpdateAsync(
+                    _editingId.Value,
+                    _firstName,
+                    _lastName,
+                    _mobile,
+                    _status,
+                    actor);
                 _message = "تغییرات راننده ذخیره شد.";
             }
             else
