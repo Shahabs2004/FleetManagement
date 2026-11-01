@@ -25,4 +25,22 @@ public sealed class MissionChangeNotificationSender(NotificationService notifica
             referenceType,
             referenceId,
             cancellationToken);
+
+    /// <inheritdoc />
+    public Task<int> CreateForRolesAsync(
+        IEnumerable<string> roleKeys,
+        string title,
+        string message,
+        string eventKey,
+        string? referenceType = null,
+        string? referenceId = null,
+        CancellationToken cancellationToken = default) =>
+        notificationService.CreateForRolesAsync(
+            roleKeys,
+            title,
+            message,
+            eventKey,
+            referenceType,
+            referenceId,
+            cancellationToken);
 }
