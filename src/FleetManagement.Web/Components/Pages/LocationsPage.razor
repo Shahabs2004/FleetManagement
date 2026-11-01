@@ -194,6 +194,7 @@
         _busy = true;
         try
         {
+            await EnsureAdministratorAsync();
             await LocationService.ApproveAsync(id, await GetActorAsync());
             _message = "مکان تأیید شد.";
             await LoadAsync();
@@ -214,6 +215,7 @@
         _busy = true;
         try
         {
+            await EnsureAdministratorAsync();
             await LocationService.RejectAsync(id, "پیشنهاد توسط مدیر سامانه رد شد.", await GetActorAsync());
             _message = "پیشنهاد رد شد.";
             await LoadAsync();
@@ -242,6 +244,7 @@
         _busy = true;
         try
         {
+            await EnsureAdministratorAsync();
             await LocationService.RenameAsync(_renaming.Id, _renameValue, await GetActorAsync());
             _renaming = null;
             _message = "نام مکان اصلاح شد.";
@@ -263,6 +266,7 @@
         _busy = true;
         try
         {
+            await EnsureAdministratorAsync();
             await LocationService.DeactivateAsync(id, await GetActorAsync());
             _message = "مکان غیرفعال شد و از فهرست انتخاب حذف گردید.";
             await LoadAsync();
@@ -274,6 +278,16 @@
         finally
         {
             _busy = false;
+        }
+    }
+
+    /// <summary>کنترل مجدد مجوز مدیریتی در سمت سرور، مستقل از مخفی‌بودن دکمه‌ها.</summary>
+    private async Task EnsureAdministratorAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (!state.User.IsInRole("SystemAdministrator"))
+        {
+            throw new UnauthorizedAccessException("فقط مدیر سامانه مجاز به این عملیات است.");
         }
     }
 
