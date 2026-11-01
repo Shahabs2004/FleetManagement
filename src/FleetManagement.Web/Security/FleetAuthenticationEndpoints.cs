@@ -201,8 +201,7 @@ public static class FleetAuthenticationEndpoints
                 {
                     IsPersistent = false,
                     AllowRefresh = true,
-                    IssuedUtc = DateTimeOffset.UtcNow,
-                    ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(30)
+                    IssuedUtc = DateTimeOffset.UtcNow
                 });
 
             return Results.Redirect("/");
@@ -368,8 +367,7 @@ public static class FleetAuthenticationEndpoints
         {
             IsPersistent = false,
             AllowRefresh = true,
-            IssuedUtc = DateTimeOffset.UtcNow,
-            ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(30)
+            IssuedUtc = DateTimeOffset.UtcNow
         };
 
         await context.SignInAsync(
