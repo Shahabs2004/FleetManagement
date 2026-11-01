@@ -33,15 +33,18 @@
                     </button>
                 }
             </div>
-            <div class="jalali-picker-hour">
-                <label for="@($"{Id}-hour")">ساعت</label>
-                <select id="@($"{Id}-hour")" @bind="_hour">
-                    @for (var hour = 0; hour < 24; hour++)
-                    {
-                        <option value="@hour" disabled="@IsHourDisabled(hour)">@ToPersianDigits($"{hour:00}:00")</option>
-                    }
-                </select>
-            </div>
+            @if (IncludeTime)
+            {
+                <div class="jalali-picker-hour">
+                    <label for="@($"{Id}-hour")">ساعت</label>
+                    <select id="@($"{Id}-hour")" @bind="_hour">
+                        @for (var hour = 0; hour < 24; hour++)
+                        {
+                            <option value="@hour" disabled="@IsHourDisabled(hour)">@ToPersianDigits($"{hour:00}:00")</option>
+                        }
+                    </select>
+                </div>
+            }
             <div class="jalali-picker-actions">
                 <button type="button" class="secondary-button" @onclick="CloseCalendar">انصراف</button>
                 <button type="button" class="primary-button" @onclick="ConfirmSelection" disabled="@(!CanConfirm)">تأیید زمان</button>
@@ -105,10 +108,16 @@
     [Parameter]
     public string? MinValue { get; set; }
 
+    /// <summary>در صورت false فقط تاریخ انتخاب می‌شود.</summary>
+    [Parameter]
+    public bool IncludeTime { get; set; } = true;
+
     /// <summary>متن قابل مشاهده با تقویم جلالی و رقم فارسی.</summary>
     private string DisplayValue => _selectedDate.HasValue
-        ? $"{FormatPersianDate(_selectedDate.Value)} {_hour:00}:00"
-        : "انتخاب تاریخ و ساعت";
+        ? IncludeTime
+            ? $"{FormatPersianDate(_selectedDate.Value)} {_hour:00}:00"
+            : FormatPersianDate(_selectedDate.Value)
+        : IncludeTime ? "انتخاب تاریخ و ساعت" : "انتخاب تاریخ";
 
     /// <summary>عنوان ماه و سال جاری در تقویم جلالی.</summary>
     private string MonthTitle =>
@@ -117,15 +126,16 @@
     /// <summary>امکان تأیید تاریخ و ساعت انتخاب‌شده.</summary>
     private bool CanConfirm =>
         _selectedDate.HasValue
-        && !IsDateTimeBeforeMinimum(_selectedDate.Value.AddHours(_hour));
+        && !IsDateTimeBeforeMinimum(_selectedDate.Value.AddHours(IncludeTime ? _hour : 0));
 
     /// <summary>همگام‌سازی انتخاب داخلی با مقدار فرم.</summary>
     protected override void OnParametersSet()
     {
+        var format = IncludeTime ? "yyyy-MM-dd'T'HH:mm" : "yyyy-MM-dd";
         if (!string.IsNullOrWhiteSpace(Value)
             && DateTime.TryParseExact(
                 Value,
-                "yyyy-MM-dd'T'HH:mm",
+                format,
                 CultureInfo.InvariantCulture,
                 DateTimeStyles.None,
                 out var parsed))
@@ -193,8 +203,10 @@
             return;
         }
 
-        var localValue = _selectedDate.Value.Date.AddHours(_hour);
-        Value = localValue.ToString("yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture);
+        var localValue = _selectedDate.Value.Date.AddHours(IncludeTime ? _hour : 0);
+        Value = IncludeTime
+            ? localValue.ToString("yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture)
+            : localValue.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         await ValueChanged.InvokeAsync(Value);
         _isOpen = false;
     }
@@ -258,9 +270,10 @@
     /// <summary>خواندن حداقل مقدار محلی فرم.</summary>
     private bool TryGetMinimum(out DateTime minimum)
     {
+        var format = IncludeTime ? "yyyy-MM-dd'T'HH:mm" : "yyyy-MM-dd";
         return DateTime.TryParseExact(
             MinValue,
-            "yyyy-MM-dd'T'HH:mm",
+            format,
             CultureInfo.InvariantCulture,
             DateTimeStyles.None,
             out minimum);
