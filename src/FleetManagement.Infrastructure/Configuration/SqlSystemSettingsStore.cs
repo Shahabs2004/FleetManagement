@@ -1,3 +1,4 @@
+using System.Data;
 using System.Text.Json;
 using FleetManagement.Application.Configuration;
 using FleetManagement.Domain.Configuration;
@@ -51,6 +52,11 @@ public sealed class SqlSystemSettingsStore(
         await using var dbContext =
             await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
+        // جلوگیری از رقابت دو درخواست برای درج یا به‌روزرسانی یک کلید تنظیم.
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable,
+            cancellationToken);
+
         var setting = await dbContext.SystemSettings
             .SingleOrDefaultAsync(item => item.Key == key, cancellationToken);
 
@@ -64,5 +70,6 @@ public sealed class SqlSystemSettingsStore(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 }
