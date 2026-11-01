@@ -39,10 +39,11 @@ public sealed class SmsQueueService(
             throw new KeyNotFoundException("مأموریت مرتبط با پیامک پیدا نشد.");
         }
 
+        var normalizedPhone = NormalizeIranianMobile(recipientPhone);
         var item = new SmsQueueItem(
             eventType,
             recipientName,
-            recipientPhone,
+            normalizedPhone,
             body,
             missionId,
             scheduledAtUtc,
@@ -138,8 +139,14 @@ public sealed class SmsQueueService(
         }
 
         var distinctRecipients = recipients
-            .GroupBy(item => item.Phone.Trim(), StringComparer.Ordinal)
-            .Select(group => group.First())
+            .Select(item => new
+            {
+                item.Name,
+                Phone = TryNormalizeIranianMobile(item.Phone)
+            })
+            .Where(item => item.Phone is not null)
+            .GroupBy(item => item.Phone!, StringComparer.Ordinal)
+            .Select(group => (group.First().Name, Phone: group.Key))
             .ToArray();
 
         var sendAt = scheduledAtUtc ?? DateTimeOffset.UtcNow;
@@ -171,6 +178,49 @@ public sealed class SmsQueueService(
         }
 
         return created;
+    }
+
+    /// <summary>تبدیل شماره همراه ایران به قالب ۱۲ رقمی دارای پیش‌شماره کشور.</summary>
+    private static string NormalizeIranianMobile(string phone)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(phone);
+        var digits = new string(phone
+            .Where(char.IsDigit)
+            .Select(character =>
+            {
+                var numericValue = (int)char.GetNumericValue(character);
+                return numericValue is >= 0 and <= 9 ? (char)('0' + numericValue) : '\\0';
+            })
+            .Where(character => character != '\\0')
+            .ToArray());
+
+        if (digits.StartsWith("0098", StringComparison.Ordinal))
+        {
+            digits = digits[2..];
+        }
+        else if (digits.StartsWith("0", StringComparison.Ordinal))
+        {
+            digits = digits[1..];
+        }
+
+        if (digits.Length == 10 && digits.StartsWith("9", StringComparison.Ordinal))
+        {
+            digits = "98" + digits;
+        }
+
+        if (digits.Length != 12 || !digits.StartsWith("98", StringComparison.Ordinal))
+        {
+            throw new ArgumentException("شماره همراه برای ارسال پیامک باید با پیش‌شماره ۹۸ و ۱۲ رقم ثبت شود.", nameof(phone));
+        }
+
+        return digits;
+    }
+
+    /// <summary>تبدیل امن شماره؛ شماره نامعتبر وارد صف پیامک نمی‌شود.</summary>
+    private static string? TryNormalizeIranianMobile(string phone)
+    {
+        try { return NormalizeIranianMobile(phone); }
+        catch (ArgumentException) { return null; }
     }
 
     /// <summary>قالب‌سازی زمان پیامک بر اساس منطقه زمانی تهران.</summary>
