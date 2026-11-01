@@ -106,6 +106,10 @@ public sealed class SmsDispatchHostedService(
             {
                 throw;
             }
+            catch (AdpSmsProviderException exception)
+            {
+                item.MarkPermanentFailure($"خطای ارائه‌دهنده پیامک: {exception.Code}", DateTimeOffset.UtcNow);
+            }
             catch (Exception exception)
             {
                 // پاسخ گمشده مبهم است؛ ارسال مجدد خودکار ممکن است پیامک تکراری بسازد.
