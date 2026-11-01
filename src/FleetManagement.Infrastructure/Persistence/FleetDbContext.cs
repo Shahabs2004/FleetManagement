@@ -41,6 +41,9 @@ public sealed class FleetDbContext(DbContextOptions<FleetDbContext> options)
     /// <summary>اعلان‌های داخلی کاربران.</summary>
     public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
 
+    /// <summary>صف و سابقه دائمی پیامک‌های ارسال‌شده یا در انتظار ارسال.</summary>
+    public DbSet<SmsQueueItem> SmsQueueItems => Set<SmsQueueItem>();
+
     /// <summary>رویدادهای دائمی ممیزی عملیات مهم سامانه.</summary>
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
