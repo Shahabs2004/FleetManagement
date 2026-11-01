@@ -199,6 +199,23 @@ public sealed class SmsQueueItem : Entity
             : null;
     }
 
+    /// <summary>
+    /// ثبت شکست یا پاسخ نامشخص استعلام وضعیت و زمان‌بندی استعلام بعدی.
+    /// تلاش ناموفق نیز از سقف استعلام‌ها محسوب می‌شود تا رکورد برای همیشه در صف نماند.
+    /// </summary>
+    public void DeferStatusPoll(DateTimeOffset nowUtc, int pollingIntervalSeconds)
+    {
+        if (Status != SmsQueueStatus.Accepted)
+        {
+            throw new InvalidOperationException("استعلام مجدد فقط برای پیام پذیرفته‌شده امکان‌پذیر است.");
+        }
+
+        StatusPollCount++;
+        NextStatusPollAtUtc = StatusPollCount < MaximumStatusPollingAttempts
+            ? nowUtc.AddSeconds(Math.Clamp(pollingIntervalSeconds, 5, 86400))
+            : null;
+    }
+
     /// <summary>تلاش مجدد دستی پس از اصلاح علت خطا.</summary>
     public void RetryManually(DateTimeOffset nowUtc, string correctionReason)
     {
