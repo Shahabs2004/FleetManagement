@@ -20,6 +20,14 @@
 
     <div class="session-filters">
         <div>
+            <label>از تاریخ جلالی</label>
+            <input @bind="_fromDate" placeholder="۱۴۰۵/۰۱/۰۱" />
+        </div>
+        <div>
+            <label>تا تاریخ جلالی</label>
+            <input @bind="_toDate" placeholder="۱۴۰۵/۱۲/۲۹" />
+        </div>
+        <div>
             <label for="mileage-vehicle">خودرو</label>
             <select id="mileage-vehicle" @bind="_vehicleId">
                 <option value="">همه خودروها</option>
@@ -106,6 +114,8 @@
     private bool _loading = true;
     private bool _busy;
     private string _vehicleId = string.Empty;
+    private string _fromDate = string.Empty;
+    private string _toDate = string.Empty;
     private string _error = string.Empty;
     private IReadOnlyList<Vehicle> _vehicles = [];
     private IReadOnlyList<MileageHistoryRow> _rows = [];
@@ -137,7 +147,11 @@
         try
         {
             var vehicleId = Guid.TryParse(_vehicleId, out var parsed) ? parsed : (Guid?)null;
-            _rows = await ReportService.GetMileageHistoryAsync(vehicleId, take: 1000);
+            _rows = await ReportService.GetMileageHistoryAsync(
+                vehicleId,
+                take: 1000,
+                fromUtc: ParseJalaliDate(_fromDate, endOfDay: false),
+                toUtc: ParseJalaliDate(_toDate, endOfDay: true));
         }
         catch (Exception exception)
         {
@@ -149,6 +163,53 @@
             _loading = false;
             _busy = false;
         }
+    }
+
+    /// <summary>تبدیل تاریخ جلالی با ارقام فارسی/عربی به ابتدای یا انتهای روز در UTC.</summary>
+    private static DateTimeOffset? ParseJalaliDate(string value, bool endOfDay)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var normalized = NormalizeDigits(value.Trim()).Replace('-', '/');
+        var parts = normalized.Split('/');
+        if (parts.Length != 3
+            || !int.TryParse(parts[0], out var year)
+            || !int.TryParse(parts[1], out var month)
+            || !int.TryParse(parts[2], out var day))
+        {
+            throw new InvalidOperationException("تاریخ را به شکل سال/ماه/روز جلالی وارد کنید.");
+        }
+
+        var calendar = new PersianCalendar();
+        var local = calendar.ToDateTime(year, month, day,
+            endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0,
+            endOfDay ? 999 : 0);
+        if (endOfDay) local = local.AddTicks(9999);
+
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+
+        var utc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), zone);
+        return new DateTimeOffset(utc, TimeSpan.Zero);
+    }
+
+    /// <summary>تبدیل ارقام فارسی و عربی به لاتین برای پردازش تاریخ.</summary>
+    private static string NormalizeDigits(string value)
+    {
+        const string persian = "۰۱۲۳۴۵۶۷۸۹";
+        const string arabic = "٠١٢٣٤٥٦٧٨٩";
+        var result = value.ToCharArray();
+        for (var index = 0; index < result.Length; index++)
+        {
+            var position = persian.IndexOf(result[index]);
+            if (position >= 0) result[index] = (char)('0' + position);
+            else
+            {
+                position = arabic.IndexOf(result[index]);
+                if (position >= 0) result[index] = (char)('0' + position);
+            }
+        }
+        return new string(result);
     }
 
     /// <summary>نمایش زمان برنامه‌ریزی در منطقه تهران و تقویم جلالی.</summary>
