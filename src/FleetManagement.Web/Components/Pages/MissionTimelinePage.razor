@@ -107,7 +107,7 @@
                 <p><strong>مسیر:</strong> @_selectedMission.Origin ← @_selectedMission.Destination</p>
                 <p><strong>شروع:</strong> @FormatTehranTime(_selectedMission.PlannedStartAtUtc)</p>
                 <p><strong>پایان:</strong> @FormatTehranTime(_selectedMission.PlannedEndAtUtc)</p>
-                <a href="@($"/missions?missionId={_selectedMission.Id}")">باز کردن درخواست مأموریت</a>
+                <a href="/admin/missions">رفتن به صفحه بررسی مأموریت‌ها</a>
             </aside>
         }
     }
