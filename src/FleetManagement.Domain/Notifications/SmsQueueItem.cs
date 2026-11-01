@@ -207,6 +207,20 @@ public sealed class SmsQueueItem : Entity
         ErrorReason = null;
     }
 
+    /// <summary>لغو یادآوری ارسال‌نشده پس از تغییر یا لغو زمان مأموریت.</summary>
+    public void CancelScheduledReminder(string reason)
+    {
+        if (EventType != SmsEventType.MissionStartReminder
+            || Status is not (SmsQueueStatus.Queued or SmsQueueStatus.RetryScheduled))
+        {
+            throw new InvalidOperationException("فقط یادآوری زمان‌بندی‌شده و ارسال‌نشده قابل لغو است.");
+        }
+
+        Status = SmsQueueStatus.Cancelled;
+        NextAttemptAtUtc = null;
+        ErrorReason = Required(reason, 1000, nameof(reason));
+    }
+
     private static string Required(string value, int maxLength, string parameterName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
