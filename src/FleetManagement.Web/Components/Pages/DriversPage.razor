@@ -2,10 +2,13 @@
 @rendermode InteractiveServer
 @attribute [FleetPermission("drivers.view")]
 @using FleetManagement.Domain.Drivers
+@using FleetManagement.Domain.Vehicles
 @using FleetManagement.Infrastructure.Configuration
 @using FleetManagement.Web.Security
 @using Microsoft.AspNetCore.Components.Authorization
 @inject DriverManagementService DriverService
+@inject VehicleManagementService VehicleService
+@inject DriverVehiclePreferenceService DriverVehiclePreferences
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ILogger<DriversPage> Logger
 
@@ -97,6 +100,7 @@
                         <th>تلفن همراه</th>
                         <th>وضعیت استخدامی</th>
                         <th>وضعیت بایگانی</th>
+                        <th>خودروی پیش‌فرض</th>
                         <th>عملیات</th>
                     </tr>
                 </thead>
@@ -108,6 +112,24 @@
                             <td dir="ltr">@driver.MobilePhone</td>
                             <td>@GetStatusName(driver.EmploymentStatus)</td>
                             <td>@(driver.IsArchived ? "بایگانی‌شده" : "فعال")</td>
+                            <td>
+                                <AuthorizeView Policy="Permission:drivers.default-vehicle.manage">
+                                    <Authorized Context="defaultVehiclePermissionContext">
+                                        <select value="@GetDefaultVehicleSelection(driver.Id)"
+                                                @onchange="args => SetDefaultVehicleAsync(driver.Id, args)"
+                                                disabled="@_busy">
+                                            <option value="">بدون خودروی پیش‌فرض</option>
+                                            @foreach (var vehicle in _vehicles.Where(item => !item.IsArchived && item.ManualStatus == ManualVehicleStatus.Ready))
+                                            {
+                                                <option value="@vehicle.Id">@vehicle.Brand @vehicle.Model — @vehicle.LicensePlate</option>
+                                            }
+                                        </select>
+                                    </Authorized>
+                                    <NotAuthorized>
+                                        @GetDefaultVehicleName(driver.Id)
+                                    </NotAuthorized>
+                                </AuthorizeView>
+                            </td>
                             <td>
                                 <button type="button" class="secondary-button" @onclick="() => Edit(driver)">ویرایش</button>
                                 @if (!driver.IsArchived)
@@ -140,6 +162,8 @@
     private Guid? _editingId;
     private DriverEmploymentStatus _status = DriverEmploymentStatus.Active;
     private IReadOnlyList<Driver> _drivers = [];
+    private IReadOnlyList<Vehicle> _vehicles = [];
+    private IReadOnlyDictionary<Guid, Guid> _defaultVehicleIds = new Dictionary<Guid, Guid>();
 
     /// <summary>بارگذاری اولیه فهرست رانندگان.</summary>
     protected override Task OnInitializedAsync() => LoadAsync();
@@ -150,7 +174,14 @@
         _loading = true;
         try
         {
-            _drivers = await DriverService.SearchAsync(_search, _includeArchived);
+            var driversTask = DriverService.SearchAsync(_search, _includeArchived);
+            var vehiclesTask = VehicleService.SearchAsync(includeArchived: true);
+            var defaultsTask = DriverVehiclePreferences.GetAllAsync();
+
+            await Task.WhenAll(driversTask, vehiclesTask, defaultsTask);
+            _drivers = await driversTask;
+            _vehicles = await vehiclesTask;
+            _defaultVehicleIds = await defaultsTask;
         }
         catch (Exception exception)
         {
@@ -159,6 +190,55 @@
         finally
         {
             _loading = false;
+        }
+    }
+
+    /// <summary>خواندن شناسه خودروی پیش‌فرض برای کنترل انتخاب.</summary>
+    private string GetDefaultVehicleSelection(Guid driverId) =>
+        _defaultVehicleIds.TryGetValue(driverId, out var vehicleId)
+            ? vehicleId.ToString()
+            : string.Empty;
+
+    /// <summary>نمایش نام خودروی پیش‌فرض ثبت‌شده.</summary>
+    private string GetDefaultVehicleName(Guid driverId)
+    {
+        if (!_defaultVehicleIds.TryGetValue(driverId, out var vehicleId))
+        {
+            return "—";
+        }
+
+        var vehicle = _vehicles.FirstOrDefault(item => item.Id == vehicleId);
+        return vehicle is null
+            ? "خودروی پیش‌فرض ناموجود"
+            : $"{vehicle.Brand} {vehicle.Model} — {vehicle.LicensePlate}";
+    }
+
+    /// <summary>ثبت یا حذف خودروی پیش‌فرض راننده.</summary>
+    private async Task SetDefaultVehicleAsync(Guid driverId, ChangeEventArgs args)
+    {
+        _busy = true;
+        _error = string.Empty;
+        try
+        {
+            Guid? vehicleId = Guid.TryParse(args.Value?.ToString(), out var parsed)
+                ? parsed
+                : null;
+
+            await DriverVehiclePreferences.SetDefaultVehicleAsync(
+                driverId,
+                vehicleId,
+                await GetActorAsync());
+
+            _defaultVehicleIds = await DriverVehiclePreferences.GetAllAsync();
+            _message = "خودروی پیش‌فرض راننده به‌روزرسانی شد.";
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "تغییر خودروی پیش‌فرض راننده");
+        }
+        finally
+        {
+            _busy = false;
         }
     }
 
