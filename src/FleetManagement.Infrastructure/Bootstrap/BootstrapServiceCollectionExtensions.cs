@@ -36,6 +36,7 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<AuthorizationSettingsService>();
         services.AddScoped<AuthorizationResolutionService>();
         services.AddScoped<UserSessionService>();
+        services.AddScoped<SessionPolicySettingsService>();
         services.AddScoped<AuditLogService>();
         services.AddScoped<DriverManagementService>();
         services.AddScoped<VehicleManagementService>();
