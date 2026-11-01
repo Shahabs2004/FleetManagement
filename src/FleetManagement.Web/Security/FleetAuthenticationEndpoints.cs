@@ -330,6 +330,7 @@ public static class FleetAuthenticationEndpoints
             new(ClaimTypes.GivenName, user.FirstName),
             new(ClaimTypes.Surname, user.LastName),
             new("fleet:username", user.Username),
+            new("fleet:auth-source", "directory"),
             new("fleet:organizational-unit", user.OrganizationalUnit),
             new("fleet:directory-dn", user.DistinguishedName),
             new("fleet:session-start", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()),
