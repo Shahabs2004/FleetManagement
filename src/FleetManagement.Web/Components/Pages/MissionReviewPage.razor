@@ -14,6 +14,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Authorization
 @inject MissionManagementService MissionService
+@inject MissionReviewService MissionReviewService
 @inject MissionChangeRequestService ChangeRequestService
 @inject MissionChangeApprovalService ApprovalService
 @inject DriverManagementService DriverService
@@ -712,7 +713,7 @@
     /// <summary>شروع بررسی درخواست.</summary>
     private Task StartReviewAsync(Guid id) => ExecuteAsync(async actor =>
     {
-        await MissionService.StartReviewAsync(id, actor);
+        await MissionReviewService.StartReviewAsync(id, actor);
         _message = "بررسی درخواست آغاز شد.";
     }, "شروع بررسی مأموریت", "Permission:missions.review");
 
@@ -725,7 +726,7 @@
             throw new InvalidOperationException("راننده و خودرو را انتخاب کنید.");
         }
 
-        await MissionService.ApproveAsync(id, driverId, vehicleId, actor);
+        await MissionReviewService.ApproveAsync(id, driverId, vehicleId, actor);
         _message = "مأموریت تأیید و منابع تخصیص داده شد.";
     }, "تأیید مأموریت", "Permission:missions.approve");
 
@@ -733,7 +734,7 @@
     private Task RejectAsync(Guid id) => ExecuteAsync(async actor =>
     {
         EnsureReason();
-        await MissionService.RejectAsync(id, _reason, actor);
+        await MissionReviewService.RejectAsync(id, _reason, actor);
         _message = "درخواست رد شد.";
     }, "رد درخواست مأموریت", "Permission:missions.reject");
 
