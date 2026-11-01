@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FleetManagement.Application.Configuration;
 
 namespace FleetManagement.Infrastructure.Configuration;
@@ -5,7 +6,9 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// <summary>
 /// مدیریت نام و نشان سازمان در تنظیمات SQL.
 /// </summary>
-public sealed class OrganizationSettingsService(ISystemSettingsStore settingsStore)
+public sealed class OrganizationSettingsService(
+    ISystemSettingsStore settingsStore,
+    AuditLogService auditLog)
 {
     private const string SettingKey = "Organization.Profile";
 
@@ -19,7 +22,7 @@ public sealed class OrganizationSettingsService(ISystemSettingsStore settingsSto
     }
 
     /// <summary>اعتبارسنجی و ذخیره نام و نشان سازمان.</summary>
-    public Task SaveAsync(
+    public async Task SaveAsync(
         OrganizationProfileConfiguration configuration,
         CancellationToken cancellationToken = default)
     {
@@ -50,9 +53,28 @@ public sealed class OrganizationSettingsService(ISystemSettingsStore settingsSto
 
         configuration.OrganizationName = configuration.OrganizationName.Trim();
 
-        return settingsStore.SetAsync(
+        var previous = await GetAsync(cancellationToken);
+
+        await settingsStore.SetAsync(
             SettingKey,
             configuration,
             cancellationToken);
+
+        await auditLog.RecordAsync(
+            "TechnicalAdministrator",
+            "UpdateOrganizationProfile",
+            "OrganizationProfile",
+            null,
+            "Success",
+            beforeJson: JsonSerializer.Serialize(previous is null
+                ? null
+                : new { previous.OrganizationName, previous.LogoContentType, HasLogo = !string.IsNullOrWhiteSpace(previous.LogoBase64) }),
+            afterJson: JsonSerializer.Serialize(new
+            {
+                configuration.OrganizationName,
+                configuration.LogoContentType,
+                HasLogo = !string.IsNullOrWhiteSpace(configuration.LogoBase64)
+            }),
+            cancellationToken: cancellationToken);
     }
 }
