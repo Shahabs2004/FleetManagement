@@ -30,6 +30,7 @@
 - [معماری فنی](docs/architecture/ARCHITECTURE.md)
 - [ساختار مخزن](docs/development/REPOSITORY-STRUCTURE.md)
 - [تصمیم‌های امنیتی و استقرار](docs/operations/SECURITY-AND-DEPLOYMENT.md)
+- [راهنمای API پیامک ADP](docs/operations/ADP-SMS-API.md)
 - [چک‌لیست انتشار و پذیرش عملیاتی](docs/deployment/RELEASE-AND-ACCEPTANCE-CHECKLIST.md)
 - [راهنمای IIS و Active Directory](docs/deployment/iis-active-directory.md)
 
