@@ -23,11 +23,12 @@ dotnet publish src/FleetManagement.Web/FleetManagement.Web.csproj -c Release -o 
 ```
 
 4. پوشه انتشار را در مسیر ثابت و محدودشده روی سرور کپی کنید.
-5. در IIS یک Application Pool مستقل ایجاد کنید؛ مقدار .NET CLR Version روی No Managed Code و حالت ۶۴ بیتی فعال باشد.
-6. هویت Application Pool را به یک هویت اختصاصی با حداقل مجوز لازم تنظیم کنید.
-7. وب‌سایت را به پوشه انتشار متصل و HTTPS را فعال کنید.
-8. در Authentication، Anonymous Authentication برای صفحه ورود فعال بماند و Windows Authentication نیز فعال شود. Providerهای Negotiate و NTLM مطابق سیاست دامنه سازمان تنظیم شوند.
-9. مطمئن شوید فایل web.config خروجی publish بدون تغییر در ریشه برنامه قرار دارد.
+5. پیش از اولین اجرای برنامه، اسکریپت `scripts/windows/Prepare-Server.ps1` را با دسترسی Administrator و نام واقعی Application Pool اجرا کنید تا پوشه محرمانه bootstrap و ACL محدود آن ایجاد شود؛ برنامه را پیش از این مرحله اجرا نکنید.
+6. در IIS یک Application Pool مستقل ایجاد کنید؛ مقدار .NET CLR Version روی No Managed Code و حالت ۶۴ بیتی فعال باشد.
+7. هویت Application Pool را به یک هویت اختصاصی با حداقل مجوز لازم تنظیم کنید.
+8. وب‌سایت را به پوشه انتشار متصل و HTTPS را فعال کنید.
+9. در Authentication، Anonymous Authentication برای صفحه ورود فعال بماند و Windows Authentication نیز فعال شود. Providerهای Negotiate و NTLM مطابق سیاست دامنه سازمان تنظیم شوند.
+10. مطمئن شوید فایل web.config خروجی publish بدون تغییر در ریشه برنامه قرار دارد.
 
 ## پایگاه داده
 
