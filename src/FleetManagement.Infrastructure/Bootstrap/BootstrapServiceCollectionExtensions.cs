@@ -53,6 +53,7 @@ public static class BootstrapServiceCollectionExtensions
         services.AddHostedService<SessionExpiryHostedService>();
         services.AddScoped<OrganizationSettingsService>();
         services.AddScoped<SmsSettingsService>();
+        services.AddScoped<SmsQueueService>();
         services.AddSingleton<ActiveDirectoryConnectionTester>();
 
         return services;
