@@ -1,3 +1,4 @@
+using FleetManagement.Application.Auditing;
 using FleetManagement.Domain.Auditing;
 using FleetManagement.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +8,7 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// <summary>
 /// ثبت و جست‌وجوی رویدادهای ممیزی؛ این سرویس هیچ API ویرایش یا حذف ارائه نمی‌کند.
 /// </summary>
-public sealed class AuditLogService(IDbContextFactory<FleetDbContext> dbContextFactory)
+public sealed class AuditLogService(IDbContextFactory<FleetDbContext> dbContextFactory) : IAuditLogWriter
 {
     /// <summary>
     /// ثبت یک رویداد ممیزی؛ فراخواننده باید داده‌های محرمانه را از تصویرها حذف کند.
