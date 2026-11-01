@@ -112,17 +112,24 @@ public sealed class DirectorySessionValidationMiddleware(RequestDelegate next)
                 new("fleet:username", result.User.Username),
                 new("fleet:display-name", result.User.DisplayName),
                 new("fleet:organizational-unit", result.User.OrganizationalUnit),
+                new("fleet:directory-dn", result.User.DistinguishedName),
                 new("fleet:auth-source", "directory"),
                 new("fleet:session-start", principal.FindFirstValue("fleet:session-start") ?? string.Empty),
                 new("fleet:session-id", sessionId.ToString())
             };
+
+            foreach (var group in result.User.AllowedGroups)
+            {
+                claims.Add(new Claim("fleet:ad-group", group.DistinguishedName));
+                claims.Add(new Claim("fleet:ad-group-name", group.Name));
+            }
 
             claims.AddRange(authorization.Roles.Select(role =>
                 new Claim(ClaimTypes.Role, role)));
             claims.AddRange(authorization.GrantedPermissions.Select(permission =>
                 new Claim("fleet:permission", permission)));
             claims.AddRange(authorization.DeniedPermissions.Select(permission =>
-                new Claim("fleet:denied-permission", permission)));
+                new Claim("fleet:permission-deny", permission)));
 
             var refreshedPrincipal = new ClaimsPrincipal(
                 new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
