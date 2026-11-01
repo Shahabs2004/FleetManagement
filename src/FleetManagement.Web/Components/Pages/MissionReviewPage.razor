@@ -11,11 +11,13 @@
 @using FleetManagement.Web.Notifications
 @using FleetManagement.Web.Components.Shared
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Authorization
 @inject MissionManagementService MissionService
 @inject DriverManagementService DriverService
 @inject VehicleManagementService VehicleService
 @inject DriverVehiclePreferenceService DriverVehiclePreferences
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IAuthorizationService AuthorizationService
 @inject NotificationEventBus NotificationEvents
 @inject ILogger<MissionReviewPage> Logger
 
@@ -75,7 +77,7 @@
                     <span>@GetStatusName(mission.Status)</span>
                     @if (mission.Status is MissionStatus.Confirmed or MissionStatus.Running or MissionStatus.Completed or MissionStatus.Cancelled)
                     {
-                        <a class="secondary-button" href="@("/missions/" + mission.Id + "/print")">چاپ دستور</a>
+                        <AuthorizeView Policy="Permission:missions.print"><Authorized Context="printContext"><a class="secondary-button" href="@("/missions/" + mission.Id + "/print")">چاپ دستور</a></Authorized></AuthorizeView>
                     }
                 </div>
                 <div class="mission-review-grid">
@@ -116,27 +118,27 @@
                     <div class="driver-actions">
                         @if (mission.Status == MissionStatus.Pending)
                         {
-                            <button type="button" class="secondary-button" @onclick="() => StartReviewAsync(mission.Id)" disabled="@_busy">شروع بررسی</button>
+                            <AuthorizeView Policy="Permission:missions.review"><Authorized Context="startReviewContext"><button type="button" class="secondary-button" @onclick="() => StartReviewAsync(mission.Id)" disabled="@_busy">شروع بررسی</button></Authorized></AuthorizeView>
                         }
-                        <button type="button" class="primary-button" @onclick="() => ApproveAsync(mission.Id)" disabled="@_busy">تأیید و تخصیص</button>
-                        <button type="button" class="secondary-button" @onclick="() => RejectAsync(mission.Id)" disabled="@_busy">رد درخواست</button>
+                        <AuthorizeView Policy="Permission:missions.approve"><Authorized Context="approveContext"><button type="button" class="primary-button" @onclick="() => ApproveAsync(mission.Id)" disabled="@_busy">تأیید و تخصیص</button></Authorized></AuthorizeView>
+                        <AuthorizeView Policy="Permission:missions.reject"><Authorized Context="rejectContext"><button type="button" class="secondary-button" @onclick="() => RejectAsync(mission.Id)" disabled="@_busy">رد درخواست</button></Authorized></AuthorizeView>
                     </div>
                 }
                 else if (mission.Status == MissionStatus.WithdrawalPending)
                 {
                     <div class="driver-actions">
-                        <button type="button" class="primary-button" @onclick="() => ApproveWithdrawalAsync(mission.Id)" disabled="@_busy">تأیید انصراف</button>
-                        <button type="button" class="secondary-button" @onclick="() => RejectWithdrawalAsync(mission.Id)" disabled="@_busy">رد انصراف</button>
+                        <AuthorizeView Policy="Permission:missions.cancel"><Authorized Context="approveWithdrawalContext"><button type="button" class="primary-button" @onclick="() => ApproveWithdrawalAsync(mission.Id)" disabled="@_busy">تأیید انصراف</button></Authorized></AuthorizeView>
+                        <AuthorizeView Policy="Permission:missions.cancel"><Authorized Context="rejectWithdrawalContext"><button type="button" class="secondary-button" @onclick="() => RejectWithdrawalAsync(mission.Id)" disabled="@_busy">رد انصراف</button></Authorized></AuthorizeView>
                     </div>
                 }
                 else if (mission.Status is MissionStatus.Confirmed or MissionStatus.Running)
                 {
                     <div class="driver-actions">
-                        <button type="button" class="secondary-button" @onclick="() => CancelAsync(mission.Id)" disabled="@_busy">لغو مأموریت</button>
+                        <AuthorizeView Policy="Permission:missions.cancel"><Authorized Context="cancelContext"><button type="button" class="secondary-button" @onclick="() => CancelAsync(mission.Id)" disabled="@_busy">لغو مأموریت</button></Authorized></AuthorizeView>
                         @if (mission.Status == MissionStatus.Running)
                         {
-                            <button type="button" class="secondary-button" @onclick='() => OpenTimeAction(mission.Id, "extend", mission.PlannedEndAtUtc)'>تمدید زمان</button>
-                            <button type="button" class="secondary-button" @onclick='() => OpenTimeAction(mission.Id, "early", mission.PlannedEndAtUtc)'>خاتمه زودهنگام</button>
+                            <AuthorizeView Policy="Permission:missions.extend"><Authorized Context="extendContext"><button type="button" class="secondary-button" @onclick='() => OpenTimeAction(mission.Id, "extend", mission.PlannedEndAtUtc)'>تمدید زمان</button>
+                            <button type="button" class="secondary-button" @onclick='() => OpenTimeAction(mission.Id, "early", mission.PlannedEndAtUtc)'>خاتمه زودهنگام</button></Authorized></AuthorizeView>
                         }
                     </div>
                 }
@@ -144,7 +146,7 @@
                 @if (mission.Status == MissionStatus.Running)
                 {
                     <div class="driver-actions">
-                        <button type="button" class="secondary-button" @onclick="() => OpenSplit(mission)">تقسیم مأموریت</button>
+                        <AuthorizeView Policy="Permission:missions.split"><Authorized Context="splitContext"><button type="button" class="secondary-button" @onclick="() => OpenSplit(mission)">تقسیم مأموریت</button></Authorized></AuthorizeView>
                     </div>
                 }
 
@@ -260,14 +262,14 @@
                 </details>
                 @if (change.Status == MissionChangeRequestStatus.Pending)
                 {
-                    <button type="button" class="primary-button" @onclick="() => StartChangeReviewAsync(change.Id)" disabled="@_busy">شروع بررسی و قفل درخواست</button>
+                    <AuthorizeView Policy="Permission:missions.review"><Authorized Context="startChangeContext"><button type="button" class="primary-button" @onclick="() => StartChangeReviewAsync(change.Id)" disabled="@_busy">شروع بررسی و قفل درخواست</button></Authorized></AuthorizeView>
                 }
                 else if (change.Status == MissionChangeRequestStatus.UnderReview
                     && string.Equals(change.ReviewerUsername, _actor, StringComparison.OrdinalIgnoreCase))
                 {
                     <div class="driver-actions">
-                        <button type="button" class="primary-button" @onclick="() => ApproveChangeAsync(change.Id)" disabled="@_busy">تأیید و اعمال یکپارچه</button>
-                        <button type="button" class="secondary-button" @onclick="() => RejectChangeAsync(change.Id)" disabled="@_busy">رد درخواست تغییر</button>
+                        <AuthorizeView Policy="Permission:missions.edit"><Authorized Context="approveChangeContext"><button type="button" class="primary-button" @onclick="() => ApproveChangeAsync(change.Id)" disabled="@_busy">تأیید و اعمال یکپارچه</button></Authorized></AuthorizeView>
+                        <AuthorizeView Policy="Permission:missions.reject"><Authorized Context="rejectChangeContext"><button type="button" class="secondary-button" @onclick="() => RejectChangeAsync(change.Id)" disabled="@_busy">رد درخواست تغییر</button></Authorized></AuthorizeView>
                     </div>
                 }
                 else if (change.Status == MissionChangeRequestStatus.UnderReview)
@@ -417,6 +419,7 @@
     /// <summary>ذخیره تمدید یا خاتمه زودهنگام.</summary>
     private async Task SaveTimeActionAsync()
     {
+        if (!await HasPermissionAsync("Permission:missions.extend")) return;
         if (!_timeActionMissionId.HasValue || string.IsNullOrWhiteSpace(_reason))
         {
             _error = "علت تصمیم و زمان جدید را وارد کنید.";
@@ -476,6 +479,7 @@
     /// <summary>اعتبارسنجی و ثبت تقسیم مأموریت.</summary>
     private async Task SplitAsync()
     {
+        if (!await HasPermissionAsync("Permission:missions.split")) return;
         if (!_splitMissionId.HasValue
             || !Guid.TryParse(_splitDriver, out var driverId)
             || !Guid.TryParse(_splitVehicle, out var vehicleId)
@@ -548,14 +552,14 @@
     {
         await MissionService.StartChangeReviewAsync(id, actor);
         _message = "بررسی درخواست تغییر آغاز شد و برای بازبین جاری قفل شد.";
-    }, "شروع بررسی تغییر مأموریت");
+    }, "شروع بررسی تغییر مأموریت", "Permission:missions.review");
 
     /// <summary>تأیید و اعمال یکپارچه مقادیر پیشنهادی.</summary>
     private Task ApproveChangeAsync(Guid id) => ExecuteAsync(async actor =>
     {
         await MissionService.ApproveChangeAsync(id, actor);
         _message = "تغییرات مأموریت به‌صورت یکپارچه اعمال شد.";
-    }, "تأیید تغییر مأموریت");
+    }, "تأیید تغییر مأموریت", "Permission:missions.edit");
 
     /// <summary>رد درخواست تغییر با علت اجباری.</summary>
     private Task RejectChangeAsync(Guid id) => ExecuteAsync(async actor =>
@@ -564,7 +568,7 @@
         await MissionService.RejectChangeAsync(id, actor, _reason);
         _reason = string.Empty;
         _message = "درخواست تغییر رد شد و اطلاعات قبلی مأموریت حفظ شد.";
-    }, "رد تغییر مأموریت");
+    }, "رد تغییر مأموریت", "Permission:missions.reject");
 
     /// <summary>عنوان فارسی وضعیت درخواست تغییر.</summary>
     private static string GetChangeStatus(MissionChangeRequestStatus status) => status switch
@@ -581,7 +585,7 @@
     {
         await MissionService.StartReviewAsync(id, actor);
         _message = "بررسی درخواست آغاز شد.";
-    }, "شروع بررسی مأموریت");
+    }, "شروع بررسی مأموریت", "Permission:missions.review");
 
     /// <summary>تأیید درخواست و تخصیص راننده و خودرو.</summary>
     private Task ApproveAsync(Guid id) => ExecuteAsync(async actor =>
@@ -594,7 +598,7 @@
 
         await MissionService.ApproveAsync(id, driverId, vehicleId, actor);
         _message = "مأموریت تأیید و منابع تخصیص داده شد.";
-    }, "تأیید مأموریت");
+    }, "تأیید مأموریت", "Permission:missions.approve");
 
     /// <summary>رد درخواست با علت اجباری.</summary>
     private Task RejectAsync(Guid id) => ExecuteAsync(async actor =>
@@ -602,7 +606,7 @@
         EnsureReason();
         await MissionService.RejectAsync(id, _reason, actor);
         _message = "درخواست رد شد.";
-    }, "رد درخواست مأموریت");
+    }, "رد درخواست مأموریت", "Permission:missions.reject");
 
     /// <summary>لغو مأموریت تأییدشده یا در حال اجرا.</summary>
     private Task CancelAsync(Guid id) => ExecuteAsync(async actor =>
@@ -610,14 +614,14 @@
         EnsureReason();
         await MissionService.CancelAsync(id, _reason, actor);
         _message = "مأموریت لغو شد و منابع آزاد شدند.";
-    }, "لغو مأموریت");
+    }, "لغو مأموریت", "Permission:missions.cancel");
 
     /// <summary>تأیید درخواست انصراف.</summary>
     private Task ApproveWithdrawalAsync(Guid id) => ExecuteAsync(async actor =>
     {
         await MissionService.ApproveWithdrawalAsync(id, actor);
         _message = "درخواست انصراف تأیید شد.";
-    }, "تأیید انصراف");
+    }, "تأیید انصراف", "Permission:missions.cancel");
 
     /// <summary>رد درخواست انصراف با علت.</summary>
     private Task RejectWithdrawalAsync(Guid id) => ExecuteAsync(async actor =>
@@ -625,11 +629,22 @@
         EnsureReason();
         await MissionService.RejectWithdrawalAsync(id, _reason, actor);
         _message = "درخواست انصراف رد شد.";
-    }, "رد انصراف");
+    }, "رد انصراف", "Permission:missions.cancel");
+
+    /// <summary>بررسی مجوز عملیاتی در سمت سرور.</summary>
+    private async Task<bool> HasPermissionAsync(string policy)
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var authorization = await AuthorizationService.AuthorizeAsync(state.User, policy);
+        if (authorization.Succeeded) return true;
+        _error = "شما مجوز لازم برای انجام این عملیات را ندارید.";
+        return false;
+    }
 
     /// <summary>اجرای امن عملیات و بارگذاری مجدد فهرست.</summary>
-    private async Task ExecuteAsync(Func<string, Task> action, string operation)
+    private async Task ExecuteAsync(Func<string, Task> action, string operation, string requiredPermission)
     {
+        if (!await HasPermissionAsync(requiredPermission)) return;
         _busy = true;
         _error = string.Empty;
         try
