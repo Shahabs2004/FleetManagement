@@ -4,6 +4,7 @@
 @attribute [FleetPermission("missions.review")]
 @using System.Globalization
 @using FleetManagement.Domain.Missions
+@using FleetManagement.Application.Missions
 @using FleetManagement.Domain.Drivers
 @using FleetManagement.Domain.Vehicles
 @using FleetManagement.Infrastructure.Configuration
@@ -13,6 +14,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Authorization
 @inject MissionManagementService MissionService
+@inject MissionChangeRequestService ChangeRequestService
 @inject DriverManagementService DriverService
 @inject VehicleManagementService VehicleService
 @inject DriverVehiclePreferenceService DriverVehiclePreferences
@@ -378,7 +380,7 @@
 
             _actor = await GetActorAsync();
             _missions = await MissionService.SearchAsync(status: status, take: 500);
-            _changeRequests = (await MissionService.GetChangeRequestsAsync(take: 500))
+            _changeRequests = (await ChangeRequestService.GetChangeRequestsAsync(take: 500))
                 .Where(item => item.Status is MissionChangeRequestStatus.Pending or MissionChangeRequestStatus.UnderReview)
                 .ToList();
             _drivers = (await DriverService.SearchAsync())
@@ -676,7 +678,7 @@
     /// <summary>شروع بررسی درخواست تغییر و قفل‌کردن آن برای بازبین جاری.</summary>
     private Task StartChangeReviewAsync(Guid id) => ExecuteAsync(async actor =>
     {
-        await MissionService.StartChangeReviewAsync(id, actor);
+        await ChangeRequestService.StartChangeReviewAsync(id, actor);
         _message = "بررسی درخواست تغییر آغاز شد و برای بازبین جاری قفل شد.";
     }, "شروع بررسی تغییر مأموریت", "Permission:missions.review");
 
@@ -691,7 +693,7 @@
     private Task RejectChangeAsync(Guid id) => ExecuteAsync(async actor =>
     {
         EnsureReason();
-        await MissionService.RejectChangeAsync(id, actor, _reason);
+        await ChangeRequestService.RejectChangeAsync(id, actor, _reason);
         _reason = string.Empty;
         _message = "درخواست تغییر رد شد و اطلاعات قبلی مأموریت حفظ شد.";
     }, "رد تغییر مأموریت", "Permission:missions.reject");
