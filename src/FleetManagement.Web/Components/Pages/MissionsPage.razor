@@ -111,10 +111,10 @@
                             <label for="mission-order">شماره دستور مأموریت (اختیاری)</label>
                             <input id="mission-order" @bind="_missionOrderNumber" maxlength="50" />
                         </div>
-                        <div>
-                            <label for="mission-order-date">تاریخ دستور مأموریت (اختیاری)</label>
-                            <input id="mission-order-date" type="date" value="@_missionOrderDate" @onchange="OnOrderDateChanged" />
-                        </div>
+                        <JalaliDateTimeInput Id="mission-order-date"
+                                              Label="تاریخ دستور مأموریت (اختیاری)"
+                                              IncludeTime="false"
+                                              @bind-Value="_missionOrderDate" />
                     </div>
                     <section class="public-availability">
                         <button type="button" class="secondary-button" @onclick="ToggleAvailabilityAsync" disabled="@_availabilityLoading">
