@@ -45,6 +45,9 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<IMissionChangeRequestStore, EfMissionChangeRequestStore>();
         services.AddScoped<IMissionChangeNotificationSender, MissionChangeNotificationSender>();
         services.AddScoped<MissionChangeRequestService>();
+        services.AddScoped<MissionChangeApprovalService>();
+        services.AddScoped<IMissionChangeApprovalRulesProvider, MissionChangeApprovalRulesProvider>();
+        services.AddScoped<IMissionChangeSmsScheduler, MissionChangeSmsScheduler>();
         services.AddScoped<DriverManagementService>();
         services.AddScoped<DriverVehiclePreferenceService>();
         services.AddScoped<VehicleManagementService>();
