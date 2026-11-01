@@ -153,8 +153,7 @@
                         <h3>@(_timeActionKind == "extend" ? "تمدید مأموریت" : "خاتمه زودهنگام")</h3>
                         <JalaliDateTimeInput Id="mission-time-action"
                                               Label="زمان جدید (به وقت تهران)"
-                                              @bind-Value="_timeActionLocal"
-                                              MinValue="@GetMinimumDateTimeInput()" />
+                                              @bind-Value="_timeActionLocal" />
                         <div class="driver-actions">
                             <button type="button" class="primary-button" @onclick="SaveTimeActionAsync" disabled="@_busy">ثبت</button>
                             <button type="button" class="secondary-button" @onclick="() => _timeActionMissionId = null">انصراف</button>
@@ -193,8 +192,7 @@
                             <div>
                                 <JalaliDateTimeInput Id="mission-split-time"
                                                       Label="زمان تقسیم (به وقت تهران)"
-                                                      @bind-Value="_splitAtLocal"
-                                                      MinValue="@GetMinimumDateTimeInput()" />
+                                                      @bind-Value="_splitAtLocal" />
                             </div>
                             <div>
                                 <label>کیلومترشمار پایان بخش اول</label>
