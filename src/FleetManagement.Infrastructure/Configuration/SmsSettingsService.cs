@@ -214,7 +214,7 @@ public sealed class SmsSettingsService(
     /// شکل محدودشده برای خواندن بخش غیرمحرمانه تنظیمات پیامک.
     /// سایر فیلدهای JSON، از جمله اعتبارنامه‌ها، deserialize نمی‌شوند.
     /// </summary>
-    private sealed class SmsTemplateSettingsSnapshot
+    public sealed class SmsTemplateSettingsSnapshot
     {
         public List<SmsEventTemplateConfiguration>? EventTemplates { get; set; }
     }
