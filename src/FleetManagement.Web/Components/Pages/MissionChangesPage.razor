@@ -13,6 +13,7 @@
 @using FleetManagement.Web.Security
 @using Microsoft.AspNetCore.Components.Authorization
 @inject MissionManagementService MissionService
+@inject MissionChangeRequestService ChangeRequestService
 @inject LocationManagementService LocationService
 @inject DriverManagementService DriverService
 @inject VehicleManagementService VehicleService
@@ -241,7 +242,7 @@
             _locations = await LocationService.GetApprovedAsync();
             _drivers = await DriverService.SearchAsync();
             _vehicles = await VehicleService.SearchAsync();
-            _changeRequests = await MissionService.GetChangeRequestsAsync(requesterUsername: _username);
+            _changeRequests = await ChangeRequestService.GetChangeRequestsAsync(requesterUsername: _username);
         }
         catch (Exception exception)
         {
@@ -357,7 +358,7 @@
                 orderDate,
                 odometer);
 
-            await MissionService.RequestChangeAsync(
+            await ChangeRequestService.RequestChangeAsync(
                 _selectedMission.Value,
                 _username,
                 _reason,
