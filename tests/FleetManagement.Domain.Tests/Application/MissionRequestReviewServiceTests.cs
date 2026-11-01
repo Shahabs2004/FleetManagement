@@ -52,7 +52,7 @@ public sealed class MissionRequestReviewServiceTests
         Assert.Equal("CreateRequest", audit.LastAction);
         Assert.Equal(1, notifications.CallCount);
         Assert.Equal("MissionRequestCreated", notifications.LastEventKey);
-        Assert.Equal(["FleetManager", "Operator"], notifications.LastRoleKeys);
+        Assert.Equal(new[] { "FleetManager", "Operator" }, notifications.LastRoleKeys);
     }
 
     [Fact]
