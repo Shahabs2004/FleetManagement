@@ -11,7 +11,7 @@ namespace FleetManagement.Web.Security;
 public static class FleetAuthenticationExtensions
 {
     /// <summary>
-    /// احراز هویت کوکی با زمان بیکاری ۳۰ دقیقه و حداکثر عمر مطلق ۸ ساعت را ثبت می‌کند.
+    /// احراز هویت کوکی را ثبت می‌کند؛ کنترل مهلت نشست به سیاست ذخیره‌شده در SQL واگذار می‌شود.
     /// </summary>
     public static IServiceCollection AddFleetAuthentication(this IServiceCollection services)
     {
@@ -25,25 +25,15 @@ public static class FleetAuthenticationExtensions
                 options.Cookie.SameSite = SameSiteMode.Lax;
                 options.LoginPath = "/login";
                 options.AccessDeniedPath = "/login?error=denied";
-                options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+                // بیشترین مهلت بیکاری قابل تنظیم دو ساعت است؛ middleware مهلت دقیق را از SQL کنترل می‌کند.
+                options.ExpireTimeSpan = TimeSpan.FromHours(2);
                 options.SlidingExpiration = true;
 
-                // نشست با تمدید فعالیت، از سقف عمر مطلق هشت ساعت عبور نمی‌کند.
+                // اعتبار واقعی نشست با شناسه ثبت‌شده در SQL و سیاست جاری بررسی می‌شود.
                 options.Events.OnValidatePrincipal = async context =>
                 {
-                    var sessionStart = context.Principal?.FindFirstValue("fleet:session-start");
-
-                    if (!long.TryParse(sessionStart, out var startedAtUnix))
-                    {
-                        context.RejectPrincipal();
-                        await context.HttpContext.SignOutAsync(
-                            CookieAuthenticationDefaults.AuthenticationScheme);
-                        return;
-                    }
-
-                    var startedAt = DateTimeOffset.FromUnixTimeSeconds(startedAtUnix);
-
-                    if (DateTimeOffset.UtcNow - startedAt > TimeSpan.FromHours(8))
+                    var rawSessionId = context.Principal?.FindFirstValue("fleet:session-id");
+                    if (!Guid.TryParse(rawSessionId, out _))
                     {
                         context.RejectPrincipal();
                         await context.HttpContext.SignOutAsync(
