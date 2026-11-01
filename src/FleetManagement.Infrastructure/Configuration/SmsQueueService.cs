@@ -69,7 +69,8 @@ public sealed class SmsQueueService(
         ArgumentNullException.ThrowIfNull(mission);
 
         var configuration = await smsSettingsService.GetAsync(cancellationToken);
-        if (configuration is null)
+        if (configuration is null
+            || await smsSettingsService.IsSkippedAsync(cancellationToken))
         {
             return 0;
         }
@@ -123,13 +124,13 @@ public sealed class SmsQueueService(
         }
 
         var recipients = new List<(string Name, string Phone)>();
-        if (template.RecipientRule is SmsRecipientRule.Requester or SmsRecipientRule.RequesterAndDriver
+        if ((template.RecipientRule is SmsRecipientRule.Requester or SmsRecipientRule.RequesterAndDriver)
             && !string.IsNullOrWhiteSpace(mission.RequesterPhoneSnapshot))
         {
             recipients.Add((mission.RequesterName, mission.RequesterPhoneSnapshot));
         }
 
-        if (template.RecipientRule is SmsRecipientRule.Driver or SmsRecipientRule.RequesterAndDriver
+        if ((template.RecipientRule is SmsRecipientRule.Driver or SmsRecipientRule.RequesterAndDriver)
             && driver is not null
             && !string.IsNullOrWhiteSpace(driver.MobilePhone))
         {
@@ -182,6 +183,45 @@ public sealed class SmsQueueService(
         var local = TimeZoneInfo.ConvertTime(utc, zone);
         var calendar = new PersianCalendar();
         return $"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} {local.Hour:00}:00";
+    }
+
+    /// <summary>لغو یادآوری‌های هنوز ارسال‌نشده مأموریت.</summary>
+    public async Task<int> CancelUnsentRemindersAsync(
+        Guid missionId,
+        string reason,
+        string actorUsername,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var reminders = await db.SmsQueueItems
+            .Where(item => item.MissionId == missionId
+                && item.EventType == SmsEventType.MissionStartReminder
+                && (item.Status == SmsQueueStatus.Queued
+                    || item.Status == SmsQueueStatus.RetryScheduled))
+            .ToListAsync(cancellationToken);
+
+        foreach (var reminder in reminders)
+        {
+            reminder.CancelScheduledReminder(reason);
+        }
+
+        if (reminders.Count == 0)
+        {
+            return 0;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await auditLog.RecordAsync(
+            actorUsername,
+            "CancelUnsentSmsReminders",
+            "Mission",
+            missionId.ToString(),
+            "Success",
+            reason,
+            afterJson: System.Text.Json.JsonSerializer.Serialize(new { CancelledCount = reminders.Count }),
+            cancellationToken: cancellationToken);
+
+        return reminders.Count;
     }
 
     /// <summary>جست‌وجوی سوابق پیامک با فیلترهای مستقل و حداکثر ۵۰۰ رکورد.</summary>
