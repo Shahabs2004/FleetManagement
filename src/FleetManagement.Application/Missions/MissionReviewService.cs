@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FleetManagement.Application.Auditing;
 using FleetManagement.Application.Notifications;
 using FleetManagement.Domain.Missions;
@@ -21,11 +22,11 @@ public sealed class MissionReviewService(
         string actor,
         CancellationToken cancellationToken = default)
     {
-        await store.ExecuteSerializableAsync(async (unitOfWork, token) =>
+        var mission = await store.ExecuteSerializableAsync(async (unitOfWork, token) =>
         {
-            var mission = await GetMissionAsync(unitOfWork, missionId, token);
-            mission.StartReview(DateTimeOffset.UtcNow);
-            return true;
+            var item = await GetMissionAsync(unitOfWork, missionId, token);
+            item.StartReview(DateTimeOffset.UtcNow);
+            return item;
         }, cancellationToken);
 
         await auditLog.RecordAsync(
@@ -34,6 +35,7 @@ public sealed class MissionReviewService(
             "Mission",
             missionId.ToString(),
             "Success",
+            afterJson: SerializeMissionState(mission),
             cancellationToken: cancellationToken);
     }
 
@@ -90,6 +92,7 @@ public sealed class MissionReviewService(
             "Mission",
             approved.Id.ToString(),
             "Success",
+            afterJson: SerializeMissionState(approved.Mission),
             cancellationToken: cancellationToken);
 
         await notificationSender.CreateAsync(
@@ -140,6 +143,7 @@ public sealed class MissionReviewService(
             rejected.Id.ToString(),
             "Rejected",
             reason,
+            afterJson: SerializeMissionState(rejected.Mission),
             cancellationToken: cancellationToken);
 
         await notificationSender.CreateAsync(
@@ -167,6 +171,19 @@ public sealed class MissionReviewService(
             reason,
             cancellationToken);
     }
+
+    private static string SerializeMissionState(Mission mission) =>
+        JsonSerializer.Serialize(new
+        {
+            mission.MissionNumber,
+            mission.Status,
+            mission.DriverId,
+            mission.VehicleId,
+            mission.PlannedStartAtUtc,
+            mission.PlannedEndAtUtc,
+            mission.ActualStartAtUtc,
+            mission.ActualEndAtUtc
+        });
 
     private static async Task<Mission> GetMissionAsync(
         IMissionReviewUnitOfWork unitOfWork,
