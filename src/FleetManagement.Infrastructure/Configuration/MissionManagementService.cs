@@ -1013,8 +1013,10 @@ public sealed class MissionManagementService(
         }
 
         var effectiveEndAtUtc = mission.ActualEndAtUtc ?? mission.PlannedEndAtUtc;
+        var resultingStartKm = startKm ?? mission.OdometerStartKm;
+        var resultingEndKm = endKm ?? mission.OdometerEndKm;
 
-        if (mission.VehicleId.HasValue && startKm.HasValue)
+        if (mission.VehicleId.HasValue && resultingStartKm.HasValue)
         {
             var previousEnd = await db.Missions
                 .Where(item => item.Id != mission.Id
@@ -1025,14 +1027,14 @@ public sealed class MissionManagementService(
                 .Select(item => item.OdometerEndKm)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            if (previousEnd.HasValue && startKm.Value < previousEnd.Value)
+            if (previousEnd.HasValue && resultingStartKm.Value < previousEnd.Value)
             {
                 throw new InvalidOperationException("کیلومترشمار شروع از آخرین مقدار ثبت‌شده برای این خودرو کمتر است.");
             }
-
         }
 
-        if (mission.VehicleId.HasValue && endKm.HasValue)
+        var lastCurrentMissionOdometer = resultingEndKm ?? resultingStartKm;
+        if (mission.VehicleId.HasValue && lastCurrentMissionOdometer.HasValue)
         {
             var nextStart = await db.Missions
                 .Where(item => item.Id != mission.Id
@@ -1043,9 +1045,9 @@ public sealed class MissionManagementService(
                 .Select(item => item.OdometerStartKm)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            if (nextStart.HasValue && endKm.Value > nextStart.Value)
+            if (nextStart.HasValue && lastCurrentMissionOdometer.Value > nextStart.Value)
             {
-                throw new InvalidOperationException("کیلومترشمار پایان از مقدار شروع مأموریت بعدی بیشتر است.");
+                throw new InvalidOperationException("مقدار کیلومترشمار این مأموریت از شروع مأموریت بعدی بیشتر است.");
             }
         }
 
