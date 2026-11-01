@@ -1,3 +1,5 @@
+using FleetManagement.Domain.Notifications;
+
 namespace FleetManagement.Infrastructure.Configuration;
 
 /// <summary>
