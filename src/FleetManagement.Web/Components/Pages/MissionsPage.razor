@@ -5,6 +5,7 @@
 @using System.Globalization
 @using System.Security.Claims
 @using FleetManagement.Domain.Missions
+@using FleetManagement.Application.Missions
 @using FleetManagement.Domain.Locations
 @using FleetManagement.Infrastructure.Configuration
 @using FleetManagement.Infrastructure.Reporting
@@ -13,6 +14,7 @@
 @using FleetManagement.Web.Components.Shared
 @using Microsoft.AspNetCore.Components.Authorization
 @inject MissionManagementService MissionService
+@inject MissionRequestService MissionRequestService
 @inject MissionAvailabilityService AvailabilityService
 @inject LocationManagementService LocationService
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -716,7 +718,7 @@
             }
             else
             {
-                await MissionService.CreateRequestAsync(
+                await MissionRequestService.CreateRequestAsync(
                     _title,
                     _username,
                     _requesterName,
