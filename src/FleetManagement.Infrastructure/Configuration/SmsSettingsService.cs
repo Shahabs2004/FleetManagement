@@ -42,6 +42,54 @@ public sealed class SmsSettingsService(
             cancellationToken: cancellationToken);
     }
 
+    /// <summary>
+    /// به‌روزرسانی قالب‌ها و گیرندگان توسط مدیر سامانه، بدون نمایش یا تغییر اطلاعات اتصال.
+    /// </summary>
+    public async Task UpdateTemplatesAsync(
+        IReadOnlyCollection<SmsEventTemplateConfiguration> templates,
+        string actorUsername,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(templates);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actorUsername);
+
+        var configuration = await GetAsync(cancellationToken)
+            ?? throw new InvalidOperationException("تنظیمات اتصال پیامک هنوز توسط مدیر فنی ثبت نشده است.");
+
+        if (templates.Count != Enum.GetValues<SmsEventType>().Length
+            || templates.GroupBy(template => template.EventType).Any(group => group.Count() != 1)
+            || templates.Any(template =>
+                !Enum.IsDefined(template.EventType)
+                || !Enum.IsDefined(template.RecipientRule)
+                || template.Template.Length > 2000
+                || (template.IsEnabled && string.IsNullOrWhiteSpace(template.Template))))
+        {
+            throw new ArgumentException("قالب‌ها باید برای هر رویداد دقیقاً یک‌بار و با متن معتبر تعریف شوند.", nameof(templates));
+        }
+
+        var before = JsonSerializer.Serialize(configuration.EventTemplates);
+        configuration.EventTemplates = templates
+            .Select(template => new SmsEventTemplateConfiguration
+            {
+                EventType = template.EventType,
+                IsEnabled = template.IsEnabled,
+                RecipientRule = template.RecipientRule,
+                Template = template.Template.Trim()
+            })
+            .ToList();
+
+        await settingsStore.SetAsync(SettingKey, configuration, cancellationToken);
+        await auditLog.RecordAsync(
+            actorUsername,
+            "UpdateSmsTemplates",
+            "SmsConfiguration",
+            null,
+            "Success",
+            beforeJson: before,
+            afterJson: JsonSerializer.Serialize(configuration.EventTemplates),
+            cancellationToken: cancellationToken);
+    }
+
     /// <summary>اعتبارسنجی و ذخیره تنظیمات سرویس پیامک.</summary>
     public async Task SaveAsync(
         SmsProviderConfiguration configuration,
