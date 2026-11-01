@@ -16,6 +16,7 @@ public sealed class SmsDispatchHostedService(
     ILogger<SmsDispatchHostedService> logger) : BackgroundService
 {
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan InterruptedSendTimeout = TimeSpan.FromMinutes(5);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -33,6 +34,7 @@ public sealed class SmsDispatchHostedService(
                     var configuration = await settings.GetAsync(stoppingToken);
                     if (configuration is not null && !await settings.IsSkippedAsync(stoppingToken))
                     {
+                        await RecoverInterruptedSendingAsync(stoppingToken);
                         await SendDueAsync(configuration, stoppingToken);
                         await PollDueAsync(configuration, stoppingToken);
                     }
@@ -56,6 +58,36 @@ public sealed class SmsDispatchHostedService(
                 break;
             }
         }
+    }
+
+    /// <summary>
+    /// بازیابی رکوردهایی که پردازش هنگام ارسال آن‌ها متوقف شده است.
+    /// به‌دلیل نامشخص بودن نتیجه شبکه، پیام به خطای دائمی می‌رود و خودکار تکرار نمی‌شود.
+    /// </summary>
+    private async Task RecoverInterruptedSendingAsync(CancellationToken cancellationToken)
+    {
+        var staleBefore = DateTimeOffset.UtcNow.Subtract(InterruptedSendTimeout);
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var interruptedItems = await db.SmsQueueItems
+            .Where(item => item.Status == SmsQueueStatus.Sending
+                && (!item.LastAttemptAtUtc.HasValue || item.LastAttemptAtUtc <= staleBefore))
+            .ToListAsync(cancellationToken);
+
+        if (interruptedItems.Count == 0)
+        {
+            return;
+        }
+
+        var detectedAt = DateTimeOffset.UtcNow;
+        foreach (var item in interruptedItems)
+        {
+            item.MarkInterruptedSendingAsPermanentFailure(detectedAt);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        logger.LogWarning(
+            "{Count} پیامک نیمه‌تمام پس از توقف پردازش به خطای دائمی منتقل شد؛ پیش از تلاش مجدد باید پنل ارائه‌دهنده بررسی شود.",
+            interruptedItems.Count);
     }
 
     private async Task SendDueAsync(SmsProviderConfiguration configuration, CancellationToken cancellationToken)
