@@ -1039,6 +1039,32 @@ public sealed class MissionManagementService(
         return dueMissions.Count;
     }
 
+    /// <summary>
+    /// دریافت مأموریت‌های دارای راننده که با بازه قابل مشاهده جدول زمانی هم‌پوشانی دارند.
+    /// </summary>
+    public async Task<IReadOnlyList<Mission>> GetTimelineAsync(
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        int take = 1000,
+        CancellationToken cancellationToken = default)
+    {
+        if (toUtc <= fromUtc)
+        {
+            throw new ArgumentException("پایان بازه باید بعد از شروع آن باشد.");
+        }
+
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await db.Missions
+            .AsNoTracking()
+            .Where(mission => mission.DriverId.HasValue
+                && mission.PlannedStartAtUtc < toUtc
+                && mission.PlannedEndAtUtc > fromUtc)
+            .OrderBy(mission => mission.PlannedStartAtUtc)
+            .Take(Math.Clamp(take, 1, 2000))
+            .ToListAsync(cancellationToken);
+    }
+
     /// <summary>دریافت یک مأموریت با شناسه برای نمایش جزئیات و چاپ دستور.</summary>
     public async Task<Mission> GetByIdAsync(Guid missionId, CancellationToken cancellationToken = default)
     {
