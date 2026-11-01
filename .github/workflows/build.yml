@@ -29,3 +29,16 @@ jobs:
 
       - name: اجرای آزمون‌ها
         run: dotnet test FleetManagement.sln --configuration Release --no-build --verbosity normal
+
+      - name: انتشار خروجی وب
+        if: matrix.os == 'windows-latest'
+        run: dotnet publish src/FleetManagement.Web/FleetManagement.Web.csproj --configuration Release --no-build --output publish
+
+      - name: نگهداری خروجی قابل‌دانلود
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: FleetManagement-web
+          path: publish/
+          if-no-files-found: error
+          retention-days: 14
