@@ -6,9 +6,11 @@
 @using FleetManagement.Domain.Missions
 @using FleetManagement.Domain.Locations
 @using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Infrastructure.Reporting
 @using FleetManagement.Web.Security
 @using Microsoft.AspNetCore.Components.Authorization
 @inject MissionManagementService MissionService
+@inject MissionAvailabilityService AvailabilityService
 @inject LocationManagementService LocationService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ILogger<MissionsPage> Logger
@@ -110,6 +112,61 @@
                             <input id="mission-order-date" type="date" value="@_missionOrderDate" @onchange="OnOrderDateChanged" />
                         </div>
                     </div>
+                    <section class="public-availability">
+                        <button type="button" class="secondary-button" @onclick="ToggleAvailabilityAsync" disabled="@_availabilityLoading">
+                            @(_showAvailability ? "بستن جدول ظرفیت عمومی" : "انتخاب زمان از جدول ظرفیت عمومی")
+                        </button>
+                        <p>این جدول فقط ظرفیت کلی را نشان می‌دهد و نام راننده یا خودرو را افشا نمی‌کند. ثبت درخواست، منابع را رزرو نمی‌کند؛ تخصیص نهایی پس از بررسی انجام می‌شود.</p>
+                        @if (_availabilityLoading)
+                        {
+                            <p>در حال محاسبه ظرفیت هفتگی...</p>
+                        }
+                        @if (_showAvailability && _availabilityDays.Count > 0)
+                        {
+                            <div class="availability-selection">
+                                @if (_selectionStart.HasValue && !_selectionEnd.HasValue)
+                                {
+                                    <span>شروع انتخاب شد: @FormatAvailabilityTime(_selectionStart.Value)؛ اکنون زمان پایان را انتخاب کنید.</span>
+                                }
+                                else if (_selectionStart.HasValue && _selectionEnd.HasValue)
+                                {
+                                    <span>بازه انتخاب‌شده: @FormatAvailabilityTime(_selectionStart.Value) تا @FormatAvailabilityTime(_selectionEnd.Value)</span>
+                                    <button type="button" class="secondary-button" @onclick="ClearAvailabilitySelection">پاک‌کردن انتخاب</button>
+                                }
+                                else
+                                {
+                                    <span>برای شروع، یک ساعت آزاد را انتخاب کنید؛ سپس ساعت پایان را با کلیک دوم مشخص کنید.</span>
+                                }
+                            </div>
+                            <div class="availability-grid-wrap">
+                                <div class="availability-grid">
+                                    <div class="availability-grid-header">
+                                        <span>ساعت</span>
+                                        @foreach (var day in _availabilityDays)
+                                        {
+                                            <strong>@day.Label</strong>
+                                        }
+                                    </div>
+                                    @for (var hour = 0; hour < 24; hour++)
+                                    {
+                                        <div class="availability-grid-row">
+                                            <span class="availability-hour">@ToPersianDigits($"{hour:00}:00")</span>
+                                            @foreach (var day in _availabilityDays)
+                                            {
+                                                var slot = day.Slots[hour];
+                                                <button type="button"
+                                                        class="@GetAvailabilitySlotClass(slot)"
+                                                        disabled="@(!CanSelectAvailabilitySlot(slot))"
+                                                        @onclick="() => SelectAvailabilitySlot(slot)">
+                                                    @(slot.IsAvailable ? "آزاد" : "—")
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </section>
                     <div class="mission-route-editor">
                         <label for="mission-stops">توقف‌های میانی (هر مکان در یک خط و از فهرست تأییدشده)</label>
                         <textarea id="mission-stops" @bind="_intermediateStops" rows="3" placeholder="نام مکان اول&#10;نام مکان دوم"></textarea>
@@ -214,6 +271,12 @@
     private IReadOnlyList<string> _groups = [];
     private IReadOnlyList<Location> _locations = [];
     private IReadOnlyList<Mission> _missions = [];
+    private bool _showAvailability;
+    private bool _availabilityLoading;
+    private IReadOnlyList<PublicAvailabilitySlot> _availabilitySlots = [];
+    private IReadOnlyList<AvailabilityDay> _availabilityDays = [];
+    private DateTimeOffset? _selectionStart;
+    private DateTimeOffset? _selectionEnd;
 
     /// <summary>بارگذاری پروفایل، گروه‌های مجاز، مکان‌ها و سوابق شخصی.</summary>
     protected override async Task OnInitializedAsync()
@@ -241,6 +304,180 @@
             _loading = false;
         }
     }
+
+    /// <summary>نمایش یا بستن جدول ظرفیت عمومی هفته جاری.</summary>
+    private async Task ToggleAvailabilityAsync()
+    {
+        _showAvailability = !_showAvailability;
+        if (!_showAvailability || _availabilitySlots.Count > 0)
+        {
+            return;
+        }
+
+        _availabilityLoading = true;
+        try
+        {
+            _availabilitySlots = await AvailabilityService.GetCurrentWeekAsync();
+            var zone = GetTehranTimeZone();
+            _availabilityDays = _availabilitySlots
+                .GroupBy(slot => TimeZoneInfo.ConvertTime(slot.StartAtUtc, zone).Date)
+                .OrderBy(group => group.Key)
+                .Select(group =>
+                {
+                    var localDate = group.Key;
+                    var calendar = new PersianCalendar();
+                    var dayName = localDate.DayOfWeek switch
+                    {
+                        DayOfWeek.Saturday => "شنبه",
+                        DayOfWeek.Sunday => "یکشنبه",
+                        DayOfWeek.Monday => "دوشنبه",
+                        DayOfWeek.Tuesday => "سه‌شنبه",
+                        DayOfWeek.Wednesday => "چهارشنبه",
+                        DayOfWeek.Thursday => "پنجشنبه",
+                        DayOfWeek.Friday => "جمعه",
+                        _ => string.Empty
+                    };
+                    var date = $"{calendar.GetYear(localDate):0000}/{calendar.GetMonth(localDate):00}/{calendar.GetDayOfMonth(localDate):00}";
+                    return new AvailabilityDay(
+                        localDate,
+                        group.OrderBy(slot => slot.StartAtUtc).ToArray(),
+                        $"{dayName} {ToPersianDigits(date)}");
+                })
+                .ToArray();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "محاسبه ظرفیت عمومی");
+            _showAvailability = false;
+        }
+        finally
+        {
+            _availabilityLoading = false;
+        }
+    }
+
+    /// <summary>کنترل انتخاب بازه با دو کلیک روی ساعت شروع و پایان.</summary>
+    private void SelectAvailabilitySlot(PublicAvailabilitySlot slot)
+    {
+        _error = string.Empty;
+        _message = string.Empty;
+
+        if (!_selectionStart.HasValue || _selectionEnd.HasValue)
+        {
+            if (!slot.IsAvailable)
+            {
+                return;
+            }
+
+            _selectionStart = slot.StartAtUtc;
+            _selectionEnd = null;
+            return;
+        }
+
+        if (slot.StartAtUtc <= _selectionStart.Value)
+        {
+            if (slot.IsAvailable)
+            {
+                _selectionStart = slot.StartAtUtc;
+            }
+            return;
+        }
+
+        var intervalSlots = _availabilitySlots
+            .Where(item => item.StartAtUtc >= _selectionStart.Value
+                && item.StartAtUtc < slot.StartAtUtc)
+            .ToArray();
+
+        if (intervalSlots.Length == 0 || intervalSlots.Any(item => !item.IsAvailable))
+        {
+            _error = "بازه انتخاب‌شده در تمام ساعات ظرفیت عمومی ندارد؛ لطفاً زمان دیگری انتخاب کنید.";
+            _selectionStart = null;
+            _selectionEnd = null;
+            return;
+        }
+
+        _selectionEnd = slot.StartAtUtc;
+        _startLocal = ToTehranInputValue(_selectionStart.Value);
+        _endLocal = ToTehranInputValue(_selectionEnd.Value);
+        _message = "زمان شروع و پایان از جدول ظرفیت عمومی به فرم منتقل شد.";
+    }
+
+    /// <summary>پاک‌کردن بازه انتخاب‌شده.</summary>
+    private void ClearAvailabilitySelection()
+    {
+        _selectionStart = null;
+        _selectionEnd = null;
+    }
+
+    /// <summary>تعیین امکان کلیک روی خانه جدول.</summary>
+    private bool CanSelectAvailabilitySlot(PublicAvailabilitySlot slot)
+    {
+        if (!_selectionStart.HasValue || _selectionEnd.HasValue)
+        {
+            return slot.IsAvailable;
+        }
+
+        return slot.StartAtUtc > _selectionStart.Value;
+    }
+
+    /// <summary>کلاس نمایشی خانه آزاد، مشغول یا انتخاب‌شده.</summary>
+    private string GetAvailabilitySlotClass(PublicAvailabilitySlot slot)
+    {
+        var selected = _selectionStart.HasValue
+            && slot.StartAtUtc >= _selectionStart.Value
+            && (_selectionEnd.HasValue
+                ? slot.StartAtUtc < _selectionEnd.Value
+                : slot.StartAtUtc == _selectionStart.Value);
+
+        return selected
+            ? "availability-slot selected"
+            : slot.IsAvailable
+                ? "availability-slot free"
+                : "availability-slot busy";
+    }
+
+    /// <summary>تبدیل ساعت UTC به مقدار ورودی تاریخ و ساعت محلی تهران.</summary>
+    private static string ToTehranInputValue(DateTimeOffset utc)
+    {
+        var local = TimeZoneInfo.ConvertTime(utc, GetTehranTimeZone());
+        return local.ToString("yyyy-MM-dd'T'HH:00", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>نمایش تاریخ و ساعت انتخاب‌شده در تقویم جلالی.</summary>
+    private static string FormatAvailabilityTime(DateTimeOffset utc)
+    {
+        var local = TimeZoneInfo.ConvertTime(utc, GetTehranTimeZone());
+        var calendar = new PersianCalendar();
+        var text = $"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} {local.Hour:00}:00";
+        return ToPersianDigits(text);
+    }
+
+    /// <summary>یافتن منطقه زمانی تهران در Windows یا Linux.</summary>
+    private static TimeZoneInfo GetTehranTimeZone()
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+    }
+
+    /// <summary>تبدیل ارقام لاتین به فارسی.</summary>
+    private static string ToPersianDigits(string value)
+    {
+        const string latin = "0123456789";
+        const string persian = "۰۱۲۳۴۵۶۷۸۹";
+        return string.Create(value.Length, value, (destination, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                var digit = latin.IndexOf(source[index]);
+                destination[index] = digit >= 0 ? persian[digit] : source[index];
+            }
+        });
+    }
+
+    private sealed record AvailabilityDay(
+        DateTime Date,
+        IReadOnlyList<PublicAvailabilitySlot> Slots,
+        string Label);
 
     /// <summary>دریافت زمان شروع از ورودی تاریخ و ساعت مرورگر.</summary>
     private void OnStartChanged(ChangeEventArgs args) => _startLocal = args.Value?.ToString() ?? string.Empty;
