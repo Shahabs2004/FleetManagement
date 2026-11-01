@@ -23,6 +23,29 @@ public sealed class SmsSettingsService(
             cancellationToken);
     }
 
+    /// <summary>
+    /// بررسی وجود تنظیمات بدون خواندن یا deserialize کردن اطلاعات محرمانه اتصال.
+    /// </summary>
+    public async Task<bool> HasConfigurationAsync(CancellationToken cancellationToken = default)
+    {
+        var snapshot = await settingsStore.GetAsync<SmsTemplateSettingsSnapshot>(
+            SettingKey,
+            cancellationToken);
+        return snapshot is not null;
+    }
+
+    /// <summary>
+    /// دریافت قالب‌ها بدون بارگذاری نام کاربری، رمز یا شماره فرستنده سرویس.
+    /// </summary>
+    public async Task<IReadOnlyList<SmsEventTemplateConfiguration>?> GetTemplatesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var snapshot = await settingsStore.GetAsync<SmsTemplateSettingsSnapshot>(
+            SettingKey,
+            cancellationToken);
+        return snapshot?.EventTemplates;
+    }
+
     /// <summary>بررسی عبور مدیر فنی از مرحله پیامک در ویزارد.</summary>
     public async Task<bool> IsSkippedAsync(CancellationToken cancellationToken = default)
     {
@@ -186,4 +209,14 @@ public sealed class SmsSettingsService(
             afterJson: JsonSerializer.Serialize(SafeSummary(configuration)),
             cancellationToken: cancellationToken);
     }
+    
+    /// <summary>
+    /// شکل محدودشده برای خواندن بخش غیرمحرمانه تنظیمات پیامک.
+    /// سایر فیلدهای JSON، از جمله اعتبارنامه‌ها، deserialize نمی‌شوند.
+    /// </summary>
+    private sealed class SmsTemplateSettingsSnapshot
+    {
+        public List<SmsEventTemplateConfiguration>? EventTemplates { get; set; }
+    }
+
 }
