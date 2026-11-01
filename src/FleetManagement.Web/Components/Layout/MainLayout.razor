@@ -2,13 +2,24 @@
 @using FleetManagement.Web.Components.Shared
 @inject FleetManagement.Infrastructure.Bootstrap.IBootstrapStateStore BootstrapStateStore
 @inject FleetManagement.Infrastructure.Bootstrap.SqlAvailabilityService SqlAvailability
+@inject FleetManagement.Infrastructure.Configuration.OrganizationSettingsService OrganizationSettings
 @inject NavigationManager Navigation
+@inject ILogger<MainLayout> Logger
 
 <div class="app-shell">
     <header class="app-header">
-        <div class="brand-mark" aria-hidden="true">ن</div>
+        @if (_organizationProfile is not null
+            && !string.IsNullOrWhiteSpace(_organizationProfile.LogoBase64)
+            && !string.IsNullOrWhiteSpace(_organizationProfile.LogoContentType))
+        {
+            <img class="organization-logo" src="@GetLogoDataUri()" alt="نشان سازمان" />
+        }
+        else
+        {
+            <div class="brand-mark" aria-hidden="true">ن</div>
+        }
         <div>
-            <strong>سامانه مدیریت ناوگان</strong>
+            <strong>@(_organizationProfile?.OrganizationName ?? "سامانه مدیریت ناوگان")</strong>
             <div class="subtitle">مدیریت یکپارچه مأموریت‌ها و ناوگان سازمان</div>
         </div>
     </header>
@@ -108,6 +119,21 @@
 </div>
 
 @code {
+    private FleetManagement.Infrastructure.Configuration.OrganizationProfileConfiguration? _organizationProfile;
+    private bool _organizationLoaded;
+
+    /// <summary>ساخت نشانی داده‌ای نشان سازمان برای نمایش در سربرگ.</summary>
+    private string? GetLogoDataUri()
+    {
+        if (string.IsNullOrWhiteSpace(_organizationProfile?.LogoBase64)
+            || string.IsNullOrWhiteSpace(_organizationProfile.LogoContentType))
+        {
+            return null;
+        }
+
+        return $"data:{_organizationProfile.LogoContentType};base64,{_organizationProfile.LogoBase64}";
+    }
+
     /// <summary>
     /// در صورت ناتمام بودن راه‌اندازی یا قطعی SQL، فقط صفحه مجاز نمایش داده می‌شود.
     /// </summary>
@@ -131,6 +157,22 @@
         }
 
         var sqlIsAvailable = await SqlAvailability.IsAvailableAsync();
+
+        if (sqlIsAvailable && !_organizationLoaded)
+        {
+            try
+            {
+                _organizationProfile = await OrganizationSettings.GetAsync();
+            }
+            catch (Exception exception)
+            {
+                Logger.LogWarning(exception, "خواندن نام و نشان سازمان انجام نشد.");
+            }
+            finally
+            {
+                _organizationLoaded = true;
+            }
+        }
 
         if (!sqlIsAvailable && currentPath != "recovery")
         {
