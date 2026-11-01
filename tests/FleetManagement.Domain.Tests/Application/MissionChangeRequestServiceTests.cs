@@ -199,6 +199,36 @@ public sealed class MissionChangeRequestServiceTests
                     && ChangeRequest.MissionId == missionId
                     && ChangeRequest.Status is MissionChangeRequestStatus.Pending or MissionChangeRequestStatus.UnderReview));
 
+        public Task<IReadOnlyList<string>> GetApprovedLocationNamesAsync(
+            IReadOnlyCollection<string> locationNames,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>([]);
+
+        public Task<FleetManagement.Domain.Drivers.Driver?> GetDriverAsync(
+            Guid driverId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<FleetManagement.Domain.Drivers.Driver?>(null);
+
+        public Task<FleetManagement.Domain.Vehicles.Vehicle?> GetVehicleAsync(
+            Guid vehicleId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<FleetManagement.Domain.Vehicles.Vehicle?>(null);
+
+        public Task<bool> HasResourceConflictAsync(
+            Mission current,
+            Guid driverId,
+            Guid vehicleId,
+            TimeSpan gap,
+            DateTimeOffset proposedEnd,
+            DateTimeOffset proposedStart,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
+
+        public Task<long?> GetLastOdometerAsync(
+            Guid vehicleId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<long?>(null);
+
         public void Add(MissionChangeRequest request) => AddedRequest = request;
     }
 
