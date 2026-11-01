@@ -338,15 +338,24 @@
 
     protected override void OnAfterRender(bool firstRender)
     {
-        if (_technicalAdministratorVerified
-            && (_technicalAdministratorVerifiedUntilUtc is null
-                || _technicalAdministratorVerifiedUntilUtc <= DateTimeOffset.UtcNow))
+        if (ExpireTechnicalAdministratorAccess())
         {
-            _technicalAdministratorVerified = false;
-            _technicalAdministratorVerifiedUntilUtc = null;
-            _smsModel.Password = string.Empty;
             StateHasChanged();
         }
+    }
+
+    private bool ExpireTechnicalAdministratorAccess()
+    {
+        if (!_technicalAdministratorVerified
+            || _technicalAdministratorVerifiedUntilUtc > DateTimeOffset.UtcNow)
+        {
+            return false;
+        }
+
+        _technicalAdministratorVerified = false;
+        _technicalAdministratorVerifiedUntilUtc = null;
+        _smsModel.Password = string.Empty;
+        return true;
     }
 
     /// <summary>
@@ -787,16 +796,8 @@
 
     private bool HasCurrentTechnicalAdministratorAccess()
     {
-        if (_technicalAdministratorVerified
-            && _technicalAdministratorVerifiedUntilUtc > DateTimeOffset.UtcNow)
-        {
-            return true;
-        }
-
-        _technicalAdministratorVerified = false;
-        _technicalAdministratorVerifiedUntilUtc = null;
-        _smsModel.Password = string.Empty;
-        return false;
+        ExpireTechnicalAdministratorAccess();
+        return _technicalAdministratorVerified;
     }
 
     /// <summary>
