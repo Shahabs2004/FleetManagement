@@ -4,6 +4,7 @@ using System.Text.Json;
 using FleetManagement.Application.Configuration;
 using FleetManagement.Domain.Drivers;
 using FleetManagement.Domain.Missions;
+using FleetManagement.Domain.Notifications;
 using FleetManagement.Domain.Vehicles;
 using FleetManagement.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +18,9 @@ public sealed class MissionManagementService(
     IDbContextFactory<FleetDbContext> dbContextFactory,
     ISystemSettingsStore settingsStore,
     AuditLogService auditLog,
-    NotificationService notificationService)
+    NotificationService notificationService,
+    SmsQueueService smsQueueService,
+    ILogger<MissionManagementService> logger)
 {
     private const string RulesKey = "Missions.Rules";
 
