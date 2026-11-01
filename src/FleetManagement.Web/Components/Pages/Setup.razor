@@ -397,23 +397,10 @@
             _organizationReady = true;
         }
 
-        var savedSms = await SmsSettings.GetAsync();
-        if (savedSms is not null)
-        {
-            _smsModel.Organization = savedSms.Organization;
-            _smsModel.Username = savedSms.Username;
-            _smsModel.SourceNumber = savedSms.SourceNumber;
-            _smsModel.MaximumRetryCount = savedSms.MaximumRetryCount;
-            _smsModel.RetryIntervalSeconds = savedSms.RetryIntervalSeconds;
-            _smsModel.StatusPollingIntervalSeconds = savedSms.StatusPollingIntervalSeconds;
-            _smsModel.MaximumStatusPollingAttempts = savedSms.MaximumStatusPollingAttempts;
-            _smsModel.ReminderLeadMinutes = savedSms.ReminderLeadMinutes;
-            _smsReady = true;
-        }
-        else
-        {
-            _smsReady = await SmsSettings.IsSkippedAsync();
-        }
+        // فقط وجود تنظیمات بررسی می‌شود؛ اطلاعات حساب سرویس پیامک تا تأیید مدیر فنی
+        // وارد مدل صفحه یا Circuit مدیر محلی نمی‌شود.
+        _smsReady = await SmsSettings.HasConfigurationAsync()
+            || await SmsSettings.IsSkippedAsync();
     }
 
     /// <summary>
