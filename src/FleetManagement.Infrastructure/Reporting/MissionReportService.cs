@@ -139,6 +139,70 @@ public sealed class MissionReportService(IDbContextFactory<FleetDbContext> dbCon
     /// <summary>
     /// محاسبه ساعت مأموریت بر اساس قواعد پایان عادی، خاتمه زودهنگام و لغو.
     /// </summary>
+
+    /// <summary>
+    /// دریافت دفتر سوابق کیلومترشمار مأموریت‌ها به تفکیک خودرو؛ فقط مأموریت‌هایی که
+    /// حداقل یکی از مقادیر کیلومترشمار آن‌ها ثبت شده است نمایش داده می‌شوند.
+    /// </summary>
+    public async Task<IReadOnlyList<MileageHistoryRow>> GetMileageHistoryAsync(
+        Guid? vehicleId = null,
+        int take = 500,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var query = db.Missions.AsNoTracking()
+            .Where(mission => mission.VehicleId.HasValue
+                && (mission.OdometerStartKm.HasValue || mission.OdometerEndKm.HasValue));
+
+        if (vehicleId.HasValue)
+        {
+            query = query.Where(mission => mission.VehicleId == vehicleId.Value);
+        }
+
+        var missions = await query
+            .OrderByDescending(mission => mission.PlannedStartAtUtc)
+            .ThenByDescending(mission => mission.CreatedAtUtc)
+            .Take(Math.Clamp(take, 1, 1000))
+            .ToListAsync(cancellationToken);
+
+        var driverIds = missions
+            .Where(mission => mission.DriverId.HasValue)
+            .Select(mission => mission.DriverId!.Value)
+            .Distinct()
+            .ToList();
+        var vehicleIds = missions
+            .Where(mission => mission.VehicleId.HasValue)
+            .Select(mission => mission.VehicleId!.Value)
+            .Distinct()
+            .ToList();
+
+        var drivers = await db.Drivers.AsNoTracking()
+            .Where(driver => driverIds.Contains(driver.Id))
+            .ToDictionaryAsync(driver => driver.Id, cancellationToken);
+        var vehicles = await db.Vehicles.AsNoTracking()
+            .Where(vehicle => vehicleIds.Contains(vehicle.Id))
+            .ToDictionaryAsync(vehicle => vehicle.Id, cancellationToken);
+
+        return missions.Select(mission =>
+        {
+            var vehicle = vehicles[mission.VehicleId!.Value];
+            var driverName = mission.DriverId.HasValue && drivers.TryGetValue(mission.DriverId.Value, out var driver)
+                ? $"{driver.FirstName} {driver.LastName}".Trim()
+                : "تعیین نشده";
+
+            return new MileageHistoryRow(
+                mission.MissionNumber,
+                mission.Title,
+                $"{vehicle.Brand} {vehicle.Model} - {vehicle.LicensePlate}",
+                driverName,
+                mission.PlannedStartAtUtc,
+                mission.OdometerStartKm,
+                mission.OdometerEndKm,
+                mission.DistanceKm,
+                mission.Status);
+        }).ToList();
+    }
+
     private static decimal GetMissionHours(Mission mission)
     {
         if (mission.Status == MissionStatus.Cancelled && !mission.ActualStartAtUtc.HasValue)
