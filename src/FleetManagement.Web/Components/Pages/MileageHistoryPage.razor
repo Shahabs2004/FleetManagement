@@ -1,0 +1,205 @@
+@page "/reports/mileage"
+@rendermode InteractiveServer
+@attribute [FleetPermission("reports.view")]
+@using System.Globalization
+@using FleetManagement.Domain.Missions
+@using FleetManagement.Domain.Vehicles
+@using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Infrastructure.Reporting
+@using FleetManagement.Web.Security
+@inject MissionReportService ReportService
+@inject VehicleManagementService VehicleService
+@inject ILogger<MileageHistoryPage> Logger
+
+<PageTitle>سوابق کیلومترشمار</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">گزارش‌های ناوگان</div>
+    <h1>دفتر سوابق کیلومترشمار</h1>
+    <p>سوابق کیلومترشمار مأموریت‌ها به‌صورت فقط‌خواندنی نمایش داده می‌شود. ثبت و اصلاح مقادیر از مسیر بررسی مأموریت انجام می‌شود.</p>
+
+    <div class="session-filters">
+        <div>
+            <label for="mileage-vehicle">خودرو</label>
+            <select id="mileage-vehicle" @bind="_vehicleId">
+                <option value="">همه خودروها</option>
+                @foreach (var vehicle in _vehicles)
+                {
+                    <option value="@vehicle.Id">@vehicle.Brand @vehicle.Model — @vehicle.LicensePlate</option>
+                }
+            </select>
+        </div>
+        <button type="button" class="primary-button" @onclick="LoadAsync" disabled="@_busy">نمایش سوابق</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="setup-error">@_error</div>
+    }
+
+    @if (_loading)
+    {
+        <p>در حال دریافت سوابق کیلومترشمار...</p>
+    }
+    else
+    {
+        <div class="report-summary">
+            <div class="report-summary-item">
+                <strong>@ToPersian(_rows.Count.ToString(CultureInfo.InvariantCulture))</strong>
+                <span>رکورد کیلومترشمار</span>
+            </div>
+            <div class="report-summary-item">
+                <strong>@ToPersian(_rows.Count(row => row.DistanceKm.HasValue).ToString(CultureInfo.InvariantCulture))</strong>
+                <span>رکورد دارای مسافت کامل</span>
+            </div>
+            <div class="report-summary-item">
+                <strong>@ToPersian(_rows.Where(row => row.DistanceKm.HasValue).Sum(row => row.DistanceKm!.Value).ToString("N0", CultureInfo.InvariantCulture))</strong>
+                <span>مجموع مسافت ثبت‌شده (کیلومتر)</span>
+            </div>
+        </div>
+
+        @if (_rows.Count == 0)
+        {
+            <div class="setup-info">برای خودرو یا فیلتر انتخاب‌شده سابقه کیلومترشمار ثبت نشده است.</div>
+        }
+        else
+        {
+            <p>حداکثر ۱۰۰۰ رکورد اخیر نمایش داده می‌شود. رکوردهای ناقص نیز برای پیگیری تکمیل کیلومترشمار در فهرست باقی می‌مانند.</p>
+            <div class="session-table-wrap">
+                <table class="session-table">
+                    <thead>
+                        <tr>
+                            <th>شماره مأموریت</th>
+                            <th>عنوان مأموریت</th>
+                            <th>خودرو</th>
+                            <th>راننده</th>
+                            <th>تاریخ برنامه‌ریزی</th>
+                            <th>کیلومتر شروع</th>
+                            <th>کیلومتر پایان</th>
+                            <th>مسافت (کیلومتر)</th>
+                            <th>وضعیت</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in _rows)
+                        {
+                            <tr @key="row.MissionNumber">
+                                <td>@row.MissionNumber</td>
+                                <td>@row.MissionTitle</td>
+                                <td>@row.VehicleName</td>
+                                <td>@row.DriverName</td>
+                                <td>@FormatTehranTime(row.PlannedStartAtUtc)</td>
+                                <td>@FormatNumber(row.OdometerStartKm)</td>
+                                <td>@FormatNumber(row.OdometerEndKm)</td>
+                                <td>@FormatNumber(row.DistanceKm)</td>
+                                <td>@GetStatusName(row.Status)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+</section>
+
+@code {
+    private bool _loading = true;
+    private bool _busy;
+    private string _vehicleId = string.Empty;
+    private string _error = string.Empty;
+    private IReadOnlyList<Vehicle> _vehicles = [];
+    private IReadOnlyList<MileageHistoryRow> _rows = [];
+
+    /// <summary>بارگذاری فهرست خودروها و سوابق اولیه کیلومترشمار.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _vehicles = await VehicleService.SearchAsync(includeArchived: true);
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>دریافت سوابق کیلومترشمار برای خودرو انتخاب‌شده.</summary>
+    private async Task LoadAsync()
+    {
+        _busy = true;
+        _loading = true;
+        _error = string.Empty;
+        try
+        {
+            var vehicleId = Guid.TryParse(_vehicleId, out var parsed) ? parsed : (Guid?)null;
+            _rows = await ReportService.GetMileageHistoryAsync(vehicleId, take: 1000);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception);
+            _rows = [];
+        }
+        finally
+        {
+            _loading = false;
+            _busy = false;
+        }
+    }
+
+    /// <summary>نمایش زمان برنامه‌ریزی در منطقه تهران و تقویم جلالی.</summary>
+    private static string FormatTehranTime(DateTimeOffset value)
+    {
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+        var local = TimeZoneInfo.ConvertTime(value, zone);
+        var calendar = new PersianCalendar();
+        return ToPersian($"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} {local.Hour:00}:00");
+    }
+
+    /// <summary>نمایش مقدار عددی یا خط تیره برای داده ثبت‌نشده.</summary>
+    private static string FormatNumber(long? value)
+        => value.HasValue ? ToPersian(value.Value.ToString("N0", CultureInfo.InvariantCulture)) : "—";
+
+    /// <summary>عنوان فارسی وضعیت مأموریت.</summary>
+    private static string GetStatusName(MissionStatus status) => status switch
+    {
+        MissionStatus.Pending => "در انتظار بررسی",
+        MissionStatus.UnderReview => "در حال بررسی",
+        MissionStatus.Confirmed => "تأیید شده",
+        MissionStatus.Running => "در حال اجرا",
+        MissionStatus.Completed => "پایان‌یافته",
+        MissionStatus.Cancelled => "لغوشده",
+        MissionStatus.Rejected => "ردشده",
+        MissionStatus.WithdrawalPending => "در انتظار انصراف",
+        _ => "نامشخص"
+    };
+
+    /// <summary>تبدیل رقم‌های لاتین به رقم‌های فارسی.</summary>
+    private static string ToPersian(string value)
+    {
+        const string latin = "0123456789";
+        const string persian = "۰۱۲۳۴۵۶۷۸۹";
+        return string.Create(value.Length, value, (destination, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                var digit = latin.IndexOf(source[index]);
+                destination[index] = digit >= 0 ? persian[digit] : source[index];
+            }
+        });
+    }
+
+    /// <summary>ثبت جزئیات خطا در گزارش سرور و نمایش شناسه پیگیری.</summary>
+    private void ReportError(Exception exception)
+    {
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "دریافت سوابق کیلومترشمار ناموفق بود. شناسه پیگیری: {TrackingId}", trackingId);
+        _error = $"دریافت سوابق انجام نشد. شناسه پیگیری: {trackingId}";
+    }
+}
