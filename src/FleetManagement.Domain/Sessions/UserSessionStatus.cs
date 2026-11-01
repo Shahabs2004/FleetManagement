@@ -18,5 +18,8 @@ public enum UserSessionStatus
     AbsoluteExpired = 4,
 
     /// <summary>تلاش ورود ناموفق.</summary>
-    Failed = 5
+    Failed = 5,
+
+    /// <summary>پایان نشست به علت غیرفعال‌شدن حساب یا حذف عضویت مجاز در AD.</summary>
+    DirectoryRevoked = 6
 }
