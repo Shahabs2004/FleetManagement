@@ -32,7 +32,8 @@
     {
         <div class="setup-success">
             <strong>راه‌اندازی اولیه با موفقیت تکمیل شد.</strong>
-            <p>کد اولیه باطل شده و مسیر راه‌اندازی قفل شده است. ورود عادی سامانه در مرحله بعدی توسعه فعال می‌شود.</p>
+            <p>کدهای راه‌اندازی باطل شده‌اند و مسیر ویزارد قفل است. برای ورود به سامانه از صفحه ورود استفاده کنید.</p>
+            <a class="primary-button" href="/login">ورود به سامانه</a>
         </div>
     }
     else if (!_hasLocalAdministrator)
@@ -84,7 +85,7 @@
     else if (!_sqlReady)
     {
         <div class="setup-step">
-            <div class="step-caption">گام ۲ از ۳ · اتصال و ایجاد پایگاه داده SQL Server</div>
+            <div class="step-caption">گام ۳ از ۵ · اتصال و ایجاد پایگاه داده SQL Server</div>
             <p>حساب SQL باید مجوز اتصال به master و ایجاد پایگاه داده را داشته باشد.</p>
 
             <EditForm Model="_sqlModel" OnValidSubmit="ConfigureSqlAsync">
