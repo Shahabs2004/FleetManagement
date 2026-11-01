@@ -81,15 +81,16 @@
     {
         try
         {
-            var configuration = await SmsSettings.GetAsync();
-            _isConfigured = configuration is not null;
+            // این صفحه فقط قالب‌ها را می‌خواند؛ رمز و سایر اطلاعات اتصال اصلاً deserialize نمی‌شوند.
+            var savedTemplates = await SmsSettings.GetTemplatesAsync();
+            _isConfigured = savedTemplates is not null;
             var templatesByEvent = SmsProviderConfiguration.CreateDefault()
                 .EventTemplates
                 .ToDictionary(template => template.EventType);
 
-            if (configuration is not null)
+            if (savedTemplates is not null)
             {
-                foreach (var template in configuration.EventTemplates)
+                foreach (var template in savedTemplates)
                 {
                     templatesByEvent[template.EventType] = template;
                 }
