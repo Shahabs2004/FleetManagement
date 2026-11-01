@@ -3,15 +3,15 @@ using FleetManagement.Application.Missions;
 namespace FleetManagement.Infrastructure.Configuration;
 
 /// <summary>
-/// ارائه قواعد برنامه‌ریزی به سناریوی تأیید تغییر با استفاده از تنظیمات فعلی مأموریت.
+/// سازگارکننده قواعد مشترک برنامه‌ریزی با سناریوی تأیید تغییر مأموریت.
 /// </summary>
-public sealed class MissionChangeApprovalRulesProvider(MissionManagementService missionManagementService)
+public sealed class MissionChangeApprovalRulesProvider(IMissionPlanningRulesProvider rulesProvider)
     : IMissionChangeApprovalRulesProvider
 {
     /// <inheritdoc />
     public async Task<MissionChangeApprovalRules> GetAsync(CancellationToken cancellationToken = default)
     {
-        var rules = await missionManagementService.GetRulesAsync(cancellationToken);
+        var rules = await rulesProvider.GetAsync(cancellationToken);
         return new MissionChangeApprovalRules(rules.MinimumGapHours);
     }
 }
