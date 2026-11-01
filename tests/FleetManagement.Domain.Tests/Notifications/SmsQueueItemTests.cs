@@ -38,6 +38,20 @@ public sealed class SmsQueueItemTests
     }
 
     [Fact]
+    public void پیام_تحویل_شده_نمی_تواند_به_خطای_دائمی_تبدیل_شود()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var item = CreateItem(SmsEventType.MissionApproved);
+        item.MarkSending(now);
+        item.MarkAccepted("12345", now, 30);
+        item.RecordDeliveryStatus("Delivered", true, now.AddSeconds(30), 30);
+
+        Assert.Throws<InvalidOperationException>(
+            () => item.MarkPermanentFailure("خطای دیرهنگام", now.AddMinutes(1)));
+        Assert.Equal(SmsQueueStatus.Delivered, item.Status);
+    }
+
+    [Fact]
     public void یادآوری_ارسال_نشده_قابل_لغو_است()
     {
         var item = CreateItem(SmsEventType.MissionStartReminder);
