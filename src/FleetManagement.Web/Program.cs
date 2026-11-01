@@ -4,6 +4,9 @@ using FleetManagement.Web.Components;
 using FleetManagement.Web.Security;
 using FleetManagement.Web.Notifications;
 using FleetManagement.Application.Notifications;
+using FleetManagement.Application.Auditing;
+using FleetManagement.Application.Configuration;
+using FleetManagement.Infrastructure.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +17,9 @@ builder.Services
 
 // ثبت سرویس‌های زیرساختی؛ اتصال SQL پس از تکمیل ویزارد از فایل محافظت‌شده خوانده می‌شود.
 builder.Services.AddFleetInfrastructure(builder.Configuration);
+builder.Services.AddScoped<IMissionRulesService, MissionRulesService>();
+builder.Services.AddScoped<IAuditLogWriter>(serviceProvider =>
+    serviceProvider.GetRequiredService<AuditLogService>());
 builder.Services.AddFleetAuthentication();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<NotificationEventBus>();
