@@ -522,6 +522,7 @@ public sealed class MissionManagementService(
         }
 
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var mission = await GetMissionAsync(db, missionId, cancellationToken);
         if (!string.Equals(
             mission.RequesterUsername,
@@ -587,6 +588,7 @@ public sealed class MissionManagementService(
             missionOrderDate);
 
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         await auditLog.RecordAsync(
             requesterUsername,
