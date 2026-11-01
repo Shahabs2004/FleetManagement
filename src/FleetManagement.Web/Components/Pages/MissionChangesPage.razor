@@ -366,7 +366,7 @@
 
             _message = "درخواست تغییر ثبت شد؛ اطلاعات اصلی تا زمان تأیید بدون تغییر باقی می‌ماند.";
             _reason = string.Empty;
-            _changeRequests = await MissionService.GetChangeRequestsAsync(requesterUsername: _username);
+            _changeRequests = await ChangeRequestService.GetChangeRequestsAsync(requesterUsername: _username);
         }
         catch (Exception exception)
         {
