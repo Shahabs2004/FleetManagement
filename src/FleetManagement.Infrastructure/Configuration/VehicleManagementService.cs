@@ -39,6 +39,26 @@ public sealed class VehicleManagementService(
         return await query.OrderBy(vehicle => vehicle.Brand).ThenBy(vehicle => vehicle.Model).ToListAsync(cancellationToken);
     }
 
+    /// <summary>شناسه خودروهایی که مأموریت تأییدشده، در حال اجرا یا انصراف در انتظار دارند.</summary>
+    public async Task<IReadOnlyList<Guid>> GetActiveMissionVehicleIdsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var blockingStatuses = new[]
+        {
+            MissionStatus.Confirmed,
+            MissionStatus.Running,
+            MissionStatus.WithdrawalPending
+        };
+
+        return await db.Missions
+            .AsNoTracking()
+            .Where(mission => mission.VehicleId.HasValue && blockingStatuses.Contains(mission.Status))
+            .Select(mission => mission.VehicleId!.Value)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+    }
+
     /// <summary>ثبت خودرو و ثبت رویداد ممیزی.</summary>
     public async Task<Guid> CreateAsync(
         string brand,
