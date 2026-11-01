@@ -806,6 +806,7 @@ public sealed class MissionManagementService(
         CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var mission = await GetMissionAsync(db, missionId, cancellationToken);
         if (!string.Equals(mission.RequesterUsername, requesterUsername, StringComparison.OrdinalIgnoreCase))
         {
@@ -831,6 +832,7 @@ public sealed class MissionManagementService(
         CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var mission = await GetMissionAsync(db, missionId, cancellationToken);
         if (!string.Equals(mission.RequesterUsername, requesterUsername, StringComparison.OrdinalIgnoreCase))
         {
@@ -1299,7 +1301,7 @@ public sealed class MissionManagementService(
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        foreach (var item of auditActions)
+        foreach (var item in auditActions)
         {
             await RecordMissionAuditAsync(
                 "system",
