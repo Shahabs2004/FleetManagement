@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FleetManagement.Application.Configuration;
 
 namespace FleetManagement.Infrastructure.Configuration;
@@ -5,7 +6,9 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// <summary>
 /// مدیریت تنظیمات نقش‌ها و نگاشت‌های مجوز در SQL.
 /// </summary>
-public sealed class AuthorizationSettingsService(ISystemSettingsStore settingsStore)
+public sealed class AuthorizationSettingsService(
+    ISystemSettingsStore settingsStore,
+    AuditLogService auditLog)
 {
     private const string SettingKey = "Security.Authorization";
 
@@ -22,6 +25,7 @@ public sealed class AuthorizationSettingsService(ISystemSettingsStore settingsSt
     /// <summary>اعتبارسنجی و ذخیره تنظیمات نقش و مجوز.</summary>
     public async Task SaveAsync(
         AuthorizationConfiguration configuration,
+        string actorUsername,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(configuration);
@@ -100,9 +104,21 @@ public sealed class AuthorizationSettingsService(ISystemSettingsStore settingsSt
             throw new ArgumentException("مجوز مستقیم یکی از کاربران معتبر نیست.", nameof(configuration));
         }
 
+        var before = await GetAsync(cancellationToken);
+
         await settingsStore.SetAsync(
             SettingKey,
             configuration,
             cancellationToken);
+
+        await auditLog.RecordAsync(
+            actorUsername,
+            "UpdateAuthorizationSettings",
+            "AuthorizationConfiguration",
+            null,
+            "Success",
+            beforeJson: JsonSerializer.Serialize(before),
+            afterJson: JsonSerializer.Serialize(configuration),
+            cancellationToken: cancellationToken);
     }
 }
