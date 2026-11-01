@@ -36,7 +36,7 @@
             <article class="dashboard-card">
                 <span>در انتظار بررسی</span>
                 <strong>@ToPersianDigits(_summary.PendingMissions)</strong>
-                <a href="/admin/missions">مشاهده درخواست‌ها</a>
+                <a href="@(_canReviewMissions ? "/admin/missions" : "/missions")">مشاهده درخواست‌ها</a>
             </article>
             <article class="dashboard-card">
                 <span>تأییدشده و در انتظار شروع</span>
@@ -51,12 +51,12 @@
             <article class="dashboard-card">
                 <span>پایان‌یافته</span>
                 <strong>@ToPersianDigits(_summary.CompletedMissions)</strong>
-                <a href="/reports/missions">گزارش عملکرد</a>
+                <a href="@(_canViewReports ? "/reports/missions" : "/missions")">@(_canViewReports ? "گزارش عملکرد" : "مشاهده مأموریت‌ها")</a>
             </article>
             <article class="dashboard-card">
                 <span>لغوشده</span>
                 <strong>@ToPersianDigits(_summary.CancelledMissions)</strong>
-                <a href="/reports/missions">گزارش لغوها</a>
+                <a href="@(_canViewReports ? "/reports/missions" : "/missions")">@(_canViewReports ? "گزارش لغوها" : "مشاهده مأموریت‌ها")</a>
             </article>
             <article class="dashboard-card">
                 <span>شروع برنامه‌ریزی‌شده امروز</span>
