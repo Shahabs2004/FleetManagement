@@ -160,6 +160,11 @@ public sealed class SmsQueueItem : Entity
     /// <summary>ثبت خطای دائمی بدون تلاش مجدد خودکار.</summary>
     public void MarkPermanentFailure(string error, DateTimeOffset nowUtc)
     {
+        if (Status != SmsQueueStatus.Sending)
+        {
+            throw new InvalidOperationException("فقط پیام در حال ارسال قابل ثبت خطای دائمی است.");
+        }
+
         ErrorReason = Required(error, 1000, nameof(error));
         Status = SmsQueueStatus.PermanentFailure;
         NextAttemptAtUtc = null;
