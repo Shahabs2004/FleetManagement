@@ -73,6 +73,63 @@ public sealed class EfMissionChangeRequestStore(IDbContextFactory<FleetDbContext
                         || item.Status == MissionChangeRequestStatus.UnderReview),
                 cancellationToken);
 
+        public async Task<IReadOnlyList<string>> GetApprovedLocationNamesAsync(
+            IReadOnlyCollection<string> locationNames,
+            CancellationToken cancellationToken = default) =>
+            await db.Locations
+                .Where(location => location.Status == FleetManagement.Domain.Locations.LocationStatus.Approved
+                    && locationNames.Contains(location.Name))
+                .Select(location => location.Name)
+                .ToListAsync(cancellationToken);
+
+        public Task<FleetManagement.Domain.Drivers.Driver?> GetDriverAsync(
+            Guid driverId,
+            CancellationToken cancellationToken = default) =>
+            db.Drivers.SingleOrDefaultAsync(item => item.Id == driverId, cancellationToken);
+
+        public Task<FleetManagement.Domain.Vehicles.Vehicle?> GetVehicleAsync(
+            Guid vehicleId,
+            CancellationToken cancellationToken = default) =>
+            db.Vehicles.SingleOrDefaultAsync(item => item.Id == vehicleId, cancellationToken);
+
+        public async Task<bool> HasResourceConflictAsync(
+            Mission current,
+            Guid driverId,
+            Guid vehicleId,
+            TimeSpan gap,
+            DateTimeOffset proposedEnd,
+            DateTimeOffset proposedStart,
+            CancellationToken cancellationToken = default)
+        {
+            var blockingStatuses = new[]
+            {
+                MissionStatus.Confirmed,
+                MissionStatus.Running,
+                MissionStatus.WithdrawalPending
+            };
+
+            var candidates = await db.Missions
+                .Where(existing =>
+                    existing.Id != current.Id
+                    && blockingStatuses.Contains(existing.Status)
+                    && (existing.DriverId == driverId || existing.VehicleId == vehicleId))
+                .ToListAsync(cancellationToken);
+
+            // محاسبه فاصله در حافظه انجام می‌شود تا ترجمه DateTimeOffset.Add به SQL وابسته نباشد.
+            return candidates.Any(existing =>
+                proposedStart < existing.PlannedEndAtUtc.Add(gap)
+                && proposedEnd.Add(gap) > existing.PlannedStartAtUtc);
+        }
+
+        public Task<long?> GetLastOdometerAsync(
+            Guid vehicleId,
+            CancellationToken cancellationToken = default) =>
+            db.Missions
+                .Where(item => item.VehicleId == vehicleId && item.OdometerEndKm.HasValue)
+                .OrderByDescending(item => item.ActualEndAtUtc ?? item.PlannedEndAtUtc)
+                .Select(item => item.OdometerEndKm)
+                .FirstOrDefaultAsync(cancellationToken);
+
         public void Add(MissionChangeRequest request) => db.MissionChangeRequests.Add(request);
     }
 }
