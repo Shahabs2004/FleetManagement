@@ -1,3 +1,4 @@
+using FleetManagement.Application.Configuration;
 using FleetManagement.Domain.Drivers;
 using FleetManagement.Domain.Missions;
 using FleetManagement.Domain.Vehicles;
