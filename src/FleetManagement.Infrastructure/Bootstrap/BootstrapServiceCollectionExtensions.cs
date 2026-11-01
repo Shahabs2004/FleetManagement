@@ -42,6 +42,14 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<SessionPolicySettingsService>();
         services.AddScoped<AuditLogService>();
         services.AddScoped<IMissionChangeAuditWriter, MissionChangeAuditWriter>();
+        services.AddScoped<IMissionAuditWriter, MissionChangeAuditWriter>();
+        services.AddScoped<IMissionNotificationSender, MissionChangeNotificationSender>();
+        services.AddScoped<IMissionSmsScheduler, MissionChangeSmsScheduler>();
+        services.AddScoped<IMissionPlanningRulesProvider, MissionPlanningRulesProvider>();
+        services.AddScoped<IMissionRequestStore, EfMissionRequestStore>();
+        services.AddScoped<IMissionReviewStore, EfMissionReviewStore>();
+        services.AddScoped<MissionRequestService>();
+        services.AddScoped<MissionReviewService>();
         services.AddScoped<IMissionChangeRequestStore, EfMissionChangeRequestStore>();
         services.AddScoped<IMissionChangeNotificationSender, MissionChangeNotificationSender>();
         services.AddScoped<MissionChangeRequestService>();
