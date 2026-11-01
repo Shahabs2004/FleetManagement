@@ -498,6 +498,9 @@ public sealed class MissionManagementService(
             "Mission",
             mission.Id.ToString(),
             cancellationToken);
+
+        await QueueSmsSafelyAsync(mission, SmsEventType.MissionApproved, null, cancellationToken);
+        await QueueSmsSafelyAsync(mission, SmsEventType.MissionStartReminder, null, cancellationToken);
     }
 
     /// <summary>رد درخواست با علت اجباری.</summary>
@@ -516,6 +519,8 @@ public sealed class MissionManagementService(
             "Mission",
             mission.Id.ToString(),
             cancellationToken);
+
+        await QueueSmsSafelyAsync(mission, SmsEventType.MissionRejected, reason, cancellationToken);
     }
 
     /// <summary>لغو مأموریت با علت و ثبت ممیزی.</summary>
@@ -534,6 +539,8 @@ public sealed class MissionManagementService(
             "Mission",
             mission.Id.ToString(),
             cancellationToken);
+
+        await QueueSmsSafelyAsync(mission, SmsEventType.MissionCancelled, reason, cancellationToken);
     }
 
     /// <summary>خاتمه زودهنگام مأموریت با آزادسازی فوری منابع.</summary>
@@ -563,6 +570,8 @@ public sealed class MissionManagementService(
             "Mission",
             mission.Id.ToString(),
             cancellationToken);
+
+        await QueueSmsSafelyAsync(mission, SmsEventType.MissionCompleted, reason, cancellationToken);
     }
 
     /// <summary>لغو مستقیم درخواست تأییدنشده توسط درخواست‌کننده.</summary>
@@ -640,6 +649,8 @@ public sealed class MissionManagementService(
             "Mission",
             mission.Id.ToString(),
             cancellationToken);
+
+        await QueueSmsSafelyAsync(mission, SmsEventType.WithdrawalApproved, null, cancellationToken);
     }
 
     /// <summary>رد درخواست انصراف و بازگرداندن وضعیت قبلی.</summary>
@@ -662,6 +673,8 @@ public sealed class MissionManagementService(
             "Mission",
             mission.Id.ToString(),
             cancellationToken);
+
+        await QueueSmsSafelyAsync(mission, SmsEventType.WithdrawalRejected, reason, cancellationToken);
     }
 
     /// <summary>تمدید مأموریت با بررسی تعارض جدید برای همان راننده و خودرو.</summary>
@@ -712,6 +725,8 @@ public sealed class MissionManagementService(
             "Mission",
             mission.Id.ToString(),
             cancellationToken);
+
+        await QueueSmsSafelyAsync(mission, SmsEventType.MissionChanged, reason, cancellationToken);
     }
 
     /// <summary>ثبت یا اصلاح کیلومترشمار شروع و پایان توسط کاربر مجاز.</summary>
