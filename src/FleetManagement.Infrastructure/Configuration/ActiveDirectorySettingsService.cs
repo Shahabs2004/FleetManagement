@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FleetManagement.Application.Configuration;
 
 namespace FleetManagement.Infrastructure.Configuration;
@@ -5,7 +6,9 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// <summary>
 /// خواندن و ذخیره تنظیمات Active Directory در مخزن تنظیمات SQL.
 /// </summary>
-public sealed class ActiveDirectorySettingsService(ISystemSettingsStore settingsStore)
+public sealed class ActiveDirectorySettingsService(
+    ISystemSettingsStore settingsStore,
+    AuditLogService auditLog)
 {
     private const string SettingKey = "Directory.ActiveDirectory";
     private const string SkippedSettingKey = "Directory.ActiveDirectory.SetupSkipped";
@@ -61,6 +64,8 @@ public sealed class ActiveDirectorySettingsService(ISystemSettingsStore settings
                 nameof(configuration));
         }
 
+        var previous = await GetAsync(cancellationToken);
+
         await settingsStore.SetAsync(
             SettingKey,
             configuration,
@@ -70,5 +75,42 @@ public sealed class ActiveDirectorySettingsService(ISystemSettingsStore settings
             SkippedSettingKey,
             false,
             cancellationToken);
+
+        // رمز حساب سرویس AD هرگز در رویداد ممیزی قرار نمی‌گیرد.
+        static object? SafeSummary(ActiveDirectoryConfiguration? value)
+        {
+            return value is null
+                ? null
+                : new
+                {
+                    value.DomainDnsName,
+                    value.LdapServer,
+                    value.Port,
+                    value.UseLdaps,
+                    value.BaseDistinguishedName,
+                    value.ServiceAccountUsername,
+                    value.OrganizationalUnitAttribute,
+                    value.UseWindowsIntegratedAuthentication,
+                    value.AllowUsernamePasswordFallback,
+                    value.IsConnectionVerified,
+                    AllowedGroups = value.AllowedGroups.Select(group => new
+                    {
+                        group.Name,
+                        group.DistinguishedName
+                    }).ToArray(),
+                    ServiceAccountPasswordConfigured =
+                        !string.IsNullOrWhiteSpace(value.ServiceAccountPassword)
+                };
+        }
+
+        await auditLog.RecordAsync(
+            "TechnicalAdministrator",
+            "UpdateActiveDirectorySettings",
+            "ActiveDirectoryConfiguration",
+            null,
+            "Success",
+            beforeJson: JsonSerializer.Serialize(SafeSummary(previous)),
+            afterJson: JsonSerializer.Serialize(SafeSummary(configuration)),
+            cancellationToken: cancellationToken);
     }
 }
