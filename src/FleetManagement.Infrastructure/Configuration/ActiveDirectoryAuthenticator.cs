@@ -85,6 +85,34 @@ public sealed class ActiveDirectoryAuthenticator(
     }
 
     /// <summary>
+    /// بازبینی حساب و گروه‌های AD برای نشست فعال، بدون درخواست مجدد رمز عبور.
+    /// </summary>
+    public async Task<DirectoryAuthenticationResult> ValidateExistingUserAsync(
+        string username,
+        CancellationToken cancellationToken = default)
+    {
+        var configuration = await settingsService.GetAsync(cancellationToken);
+        if (configuration is null || !configuration.IsConnectionVerified)
+        {
+            return Result(DirectoryAuthenticationStatus.NotConfigured);
+        }
+
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            return Result(DirectoryAuthenticationStatus.InvalidCredentials);
+        }
+
+        return await Task.Run(
+            () => AuthenticateCore(
+                configuration,
+                username,
+                suppliedPassword: null,
+                verifyUserPassword: false,
+                cancellationToken),
+            cancellationToken);
+    }
+
+    /// <summary>
     /// جست‌وجوی کاربر، بررسی وضعیت حساب، عضویت گروه و در صورت نیاز تأیید رمز.
     /// </summary>
     private static DirectoryAuthenticationResult AuthenticateCore(
