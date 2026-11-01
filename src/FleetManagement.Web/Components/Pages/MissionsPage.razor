@@ -34,7 +34,7 @@
     <AuthorizeView Policy="Permission:missions.create">
         <Authorized>
             <section class="driver-editor">
-                <h2>ثبت درخواست جدید</h2>
+                <h2>@(_editingMissionId.HasValue ? "ویرایش درخواست مأموریت" : "ثبت درخواست جدید")</h2>
                 @if (_locations.Count == 0)
                 {
                     <div class="setup-info">برای ثبت درخواست ابتدا باید حداقل یک مکان توسط مدیر سامانه تأیید شود.</div>
@@ -174,7 +174,13 @@
                         <textarea id="mission-description" @bind="_description" rows="3" maxlength="2000"></textarea>
                     </div>
                     <div class="driver-actions">
-                        <button type="button" class="primary-button" @onclick="CreateAsync" disabled="@_busy">ثبت درخواست مأموریت</button>
+                        <button type="button" class="primary-button" @onclick="CreateAsync" disabled="@_busy">
+                            @(_editingMissionId.HasValue ? "ذخیره تغییرات درخواست" : "ثبت درخواست مأموریت")
+                        </button>
+                        @if (_editingMissionId.HasValue)
+                        {
+                            <button type="button" class="secondary-button" @onclick="ResetForm" disabled="@_busy">انصراف از ویرایش</button>
+                        }
                     </div>
                 }
             </section>
@@ -230,6 +236,7 @@
                                 }
                                 @if (mission.Status == MissionStatus.Pending)
                                 {
+                                    <button type="button" class="secondary-button" @onclick="() => StartEdit(mission)" disabled="@_busy">ویرایش درخواست</button>
                                     <button type="button" class="secondary-button" @onclick="() => CancelPendingAsync(mission.Id)" disabled="@_busy">لغو درخواست</button>
                                 }
                                 else if (mission.Status is MissionStatus.UnderReview or MissionStatus.Confirmed or MissionStatus.Running)
@@ -271,6 +278,7 @@
     private IReadOnlyList<string> _groups = [];
     private IReadOnlyList<Location> _locations = [];
     private IReadOnlyList<Mission> _missions = [];
+    private Guid? _editingMissionId;
     private bool _showAvailability;
     private bool _availabilityLoading;
     private IReadOnlyList<PublicAvailabilitySlot> _availabilitySlots = [];
@@ -488,6 +496,36 @@
     /// <summary>دریافت تاریخ اختیاری دستور مأموریت.</summary>
     private void OnOrderDateChanged(ChangeEventArgs args) => _missionOrderDate = args.Value?.ToString() ?? string.Empty;
 
+    /// <summary>بارگذاری اطلاعات درخواست در انتظار برای ویرایش توسط درخواست‌کننده.</summary>
+    private void StartEdit(Mission mission)
+    {
+        if (mission.Status != MissionStatus.Pending
+            || !string.Equals(mission.RequesterUsername, _username, StringComparison.OrdinalIgnoreCase))
+        {
+            _error = "این درخواست دیگر قابل ویرایش نیست.";
+            return;
+        }
+
+        _editingMissionId = mission.Id;
+        _title = mission.Title;
+        _requesterPhone = mission.RequesterPhoneSnapshot;
+        _requestingGroup = mission.RequestingGroup;
+        _type = mission.Type;
+        _origin = mission.Origin;
+        _destination = mission.Destination;
+        _startLocal = ToTehranInputValue(mission.PlannedStartAtUtc);
+        _endLocal = ToTehranInputValue(mission.PlannedEndAtUtc);
+        _passengerCount = mission.PassengerCount;
+        _purpose = mission.Purpose;
+        _intermediateStops = string.Join(Environment.NewLine, mission.GetIntermediateStops());
+        _description = mission.Description ?? string.Empty;
+        _missionOrderNumber = mission.MissionOrderNumber ?? string.Empty;
+        _missionOrderDate = mission.MissionOrderDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+        _selectionStart = null;
+        _selectionEnd = null;
+        _message = $"درخواست {mission.MissionNumber} برای ویرایش بارگذاری شد.";
+    }
+
     /// <summary>ثبت درخواست پس از کنترل فهرست مکان‌ها و زمان‌های انتخاب‌شده.</summary>
     private async Task CreateAsync()
     {
@@ -523,27 +561,53 @@
                 ? null
                 : DateOnly.ParseExact(_missionOrderDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-            await MissionService.CreateRequestAsync(
-                _title,
-                _username,
-                _requesterName,
-                _requesterPhone,
-                _organizationalUnit,
-                _requestingGroup,
-                _type,
-                _purpose,
-                _origin,
-                _destination,
-                stops,
-                start,
-                end,
-                _description,
-                _passengerCount,
-                _missionOrderNumber,
-                orderDate,
-                _username);
+            if (_editingMissionId.HasValue)
+            {
+                await MissionService.UpdatePendingRequestAsync(
+                    _editingMissionId.Value,
+                    _username,
+                    _title,
+                    _requesterPhone,
+                    _requestingGroup,
+                    _type,
+                    _purpose,
+                    _origin,
+                    _destination,
+                    stops,
+                    start,
+                    end,
+                    _description,
+                    _passengerCount,
+                    _missionOrderNumber,
+                    orderDate);
 
-            _message = "درخواست مأموریت ثبت شد و برای بررسی ارسال گردید.";
+                _message = "تغییرات درخواست ذخیره شد.";
+            }
+            else
+            {
+                await MissionService.CreateRequestAsync(
+                    _title,
+                    _username,
+                    _requesterName,
+                    _requesterPhone,
+                    _organizationalUnit,
+                    _requestingGroup,
+                    _type,
+                    _purpose,
+                    _origin,
+                    _destination,
+                    stops,
+                    start,
+                    end,
+                    _description,
+                    _passengerCount,
+                    _missionOrderNumber,
+                    orderDate,
+                    _username);
+
+                _message = "درخواست مأموریت ثبت شد و برای بررسی ارسال گردید.";
+            }
+
             ResetForm();
             _missions = await MissionService.SearchAsync(requesterUsername: _username);
         }
@@ -639,6 +703,7 @@
     /// <summary>پاک‌سازی فرم پس از ثبت موفق درخواست.</summary>
     private void ResetForm()
     {
+        _editingMissionId = null;
         _title = string.Empty;
         _requesterPhone = string.Empty;
         _requestingGroup = string.Empty;
