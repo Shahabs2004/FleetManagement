@@ -91,6 +91,36 @@
                     <div><b>هدف:</b> @mission.Purpose</div>
                 </div>
 
+                @if (mission.VehicleId.HasValue
+                    && mission.Status != MissionStatus.Pending
+                    && mission.Status != MissionStatus.UnderReview
+                    && mission.Status != MissionStatus.Rejected)
+                {
+                    <AuthorizeView Policy="Permission:missions.edit">
+                        <Authorized Context="odometerEditContext">
+                            <section class="audit-detail">
+                                <h3>ثبت کیلومترشمار</h3>
+                                <div class="mission-assignment-grid">
+                                    <div>
+                                        <label>کیلومترشمار شروع</label>
+                                        <input type="text" inputmode="numeric" dir="ltr" maxlength="15"
+                                               value="@_odometerStart[mission.Id]"
+                                               @onchange="args => _odometerStart[mission.Id] = args.Value?.ToString() ?? string.Empty" />
+                                    </div>
+                                    <div>
+                                        <label>کیلومترشمار پایان</label>
+                                        <input type="text" inputmode="numeric" dir="ltr" maxlength="15"
+                                               value="@_odometerEnd[mission.Id]"
+                                               @onchange="args => _odometerEnd[mission.Id] = args.Value?.ToString() ?? string.Empty" />
+                                    </div>
+                                </div>
+                                <p>@(mission.DistanceKm.HasValue ? $"مسافت ثبت‌شده: {mission.DistanceKm.Value:N0} کیلومتر" : "برای محاسبه مسافت، هر دو مقدار شروع و پایان را ثبت کنید.")</p>
+                                <button type="button" class="primary-button" @onclick="() => SaveOdometerAsync(mission.Id)" disabled="@_busy">ذخیره کیلومترشمار</button>
+                            </section>
+                        </Authorized>
+                    </AuthorizeView>
+                }
+
                 @if (mission.Status is MissionStatus.Pending or MissionStatus.UnderReview)
                 {
                     <div class="mission-assignment-grid">
@@ -295,6 +325,8 @@
     private IReadOnlyList<Vehicle> _vehicles = [];
     private readonly Dictionary<Guid, string> _driverSelection = [];
     private readonly Dictionary<Guid, string> _vehicleSelection = [];
+    private readonly Dictionary<Guid, string> _odometerStart = [];
+    private readonly Dictionary<Guid, string> _odometerEnd = [];
     private Guid? _splitMissionId;
     private string _splitDriver = string.Empty;
     private string _splitVehicle = string.Empty;
@@ -360,6 +392,8 @@
             {
                 _driverSelection.TryAdd(mission.Id, string.Empty);
                 _vehicleSelection.TryAdd(mission.Id, string.Empty);
+                _odometerStart[mission.Id] = mission.OdometerStartKm?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+                _odometerEnd[mission.Id] = mission.OdometerEndKm?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
             }
         }
         catch (Exception exception)
@@ -453,6 +487,70 @@
         catch (Exception exception)
         {
             ReportError(exception, "ثبت تغییر زمان مأموریت");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>ثبت یکپارچه کیلومترشمار شروع و پایان با کنترل پیوستگی خودرو.</summary>
+    private async Task SaveOdometerAsync(Guid missionId)
+    {
+        if (!await HasPermissionAsync("Permission:missions.edit"))
+        {
+            return;
+        }
+
+        var startText = _odometerStart.GetValueOrDefault(missionId, string.Empty);
+        var endText = _odometerEnd.GetValueOrDefault(missionId, string.Empty);
+
+        long? startKm = null;
+        long? endKm = null;
+
+        if (!string.IsNullOrWhiteSpace(startText))
+        {
+            if (!long.TryParse(startText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedStart))
+            {
+                _error = "مقدار کیلومترشمار شروع معتبر نیست.";
+                return;
+            }
+
+            startKm = parsedStart;
+        }
+
+        if (!string.IsNullOrWhiteSpace(endText))
+        {
+            if (!long.TryParse(endText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedEnd))
+            {
+                _error = "مقدار کیلومترشمار پایان معتبر نیست.";
+                return;
+            }
+
+            endKm = parsedEnd;
+        }
+
+        if (!startKm.HasValue && !endKm.HasValue)
+        {
+            _error = "حداقل یکی از مقادیر کیلومترشمار را وارد کنید.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await MissionService.SetOdometerAsync(
+                missionId,
+                startKm,
+                endKm,
+                await GetActorAsync());
+
+            _message = "کیلومترشمار مأموریت ثبت شد.";
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "ثبت کیلومترشمار مأموریت");
         }
         finally
         {
