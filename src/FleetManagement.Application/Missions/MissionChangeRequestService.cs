@@ -10,7 +10,7 @@ namespace FleetManagement.Application.Missions;
 /// </summary>
 public sealed class MissionChangeRequestService(
     IMissionChangeRequestStore store,
-    IAuditLogWriter auditLog,
+    IMissionChangeAuditWriter auditLog,
     IMissionChangeNotificationSender notificationSender)
 {
     /// <summary>ثبت درخواست تغییر با کنترل مالکیت، وضعیت مأموریت و یکتایی درخواست باز.</summary>
