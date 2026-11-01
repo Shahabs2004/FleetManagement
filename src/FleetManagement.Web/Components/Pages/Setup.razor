@@ -297,8 +297,9 @@
     private bool _smsReady;
     private bool _technicalAdministratorVerified;
     private DateTimeOffset? _technicalAdministratorVerifiedUntilUtc;
-    // شناسه مستقل هر نمونه ویزارد؛ HttpContext در رویدادهای تعاملی Blazor تضمین‌شده نیست.
-    private readonly string _technicalAdministratorAttemptKey = $"technical:{Guid.NewGuid():N}";
+    // قفل تلاش مدیر فنی باید با بارگذاری مجدد صفحه یا ایجاد Circuit جدید دور زده نشود.
+    // چون ویزارد فقط یک مدیر فنی دارد، شمارنده در سطح کل فرایند مشترک است.
+    private const string TechnicalAdministratorAttemptKey = "technical:bootstrap";
     private bool _setupCompleted;
     private bool _isError;
     private string? _message;
@@ -706,7 +707,7 @@
         {
             _technicalAdministratorVerified = await BootstrapSetup.VerifyTechnicalAdministratorAccessAsync(
                 _technicalAdministratorModel.Code,
-                _technicalAdministratorAttemptKey);
+                TechnicalAdministratorAttemptKey);
 
             _technicalAdministratorModel.Code = string.Empty;
 
