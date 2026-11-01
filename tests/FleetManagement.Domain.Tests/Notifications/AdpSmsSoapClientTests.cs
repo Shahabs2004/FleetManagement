@@ -64,6 +64,24 @@ public sealed class AdpSmsSoapClientTests
         Assert.Equal(new AdpSmsDeliveryResult("98765", "123", "Delivered"), results[0]);
     }
 
+    [Theory]
+    [InlineData("E5")]
+    [InlineData("E107")]
+    [InlineData("E999")]
+    public async Task کد_خطای_ADP_به_عنوان_شناسه_موفق_برگردانده_نمی_شود(string code)
+    {
+        using var http = new HttpClient(new StubHandler(_ => Task.FromResult(XmlResponse($"""
+            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:enc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:tns="urn:SMSAPIwsdl">
+              <s:Body><tns:SendResponse><return xsi:type="enc:Array" enc:arrayType="tns:SendResult[1]"><item xsi:type="tns:SendResult"><ID>{code}</ID><Mobile>989121234567</Mobile></item></return></tns:SendResponse></s:Body>
+            </s:Envelope>
+            """))));
+
+        var exception = await Assert.ThrowsAsync<AdpSmsProviderException>(() =>
+            new AdpSmsSoapClient(http).SendAsync(Configuration(), "989121234567", "متن"));
+
+        Assert.Equal(code, exception.Code);
+    }
+
     [Fact]
     public async Task SOAP_Fault_به_عنوان_پاسخ_موفق_پذیرفته_نمی_شود()
     {
@@ -98,4 +116,3 @@ public sealed class AdpSmsSoapClientTests
             CancellationToken cancellationToken) => send(request);
     }
 }
-
