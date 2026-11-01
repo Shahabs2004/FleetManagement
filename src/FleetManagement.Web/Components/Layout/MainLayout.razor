@@ -3,10 +3,12 @@
 @inject FleetManagement.Infrastructure.Bootstrap.IBootstrapStateStore BootstrapStateStore
 @inject FleetManagement.Infrastructure.Bootstrap.SqlAvailabilityService SqlAvailability
 @inject FleetManagement.Infrastructure.Configuration.OrganizationSettingsService OrganizationSettings
+@inject FleetManagement.Infrastructure.Configuration.UserAppearanceSettingsService AppearanceSettings
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager Navigation
 @inject ILogger<MainLayout> Logger
 
-<div class="app-shell">
+<div class="app-shell @(_theme == "Dark" ? "theme-dark" : "theme-light")">
     <header class="app-header">
         @if (_organizationProfile is not null
             && !string.IsNullOrWhiteSpace(_organizationProfile.LogoBase64)
@@ -22,6 +24,13 @@
             <strong>@(_organizationProfile?.OrganizationName ?? "سامانه مدیریت ناوگان")</strong>
             <div class="subtitle">مدیریت یکپارچه مأموریت‌ها و ناوگان سازمان</div>
         </div>
+        <AuthorizeView>
+            <Authorized Context="appearanceContext">
+                <button type="button" class="theme-toggle" @onclick="ToggleThemeAsync">
+                    @(_theme == "Dark" ? "حالت روشن" : "حالت تاریک")
+                </button>
+            </Authorized>
+        </AuthorizeView>
     </header>
 
     <AuthorizeView>
@@ -121,6 +130,31 @@
 @code {
     private FleetManagement.Infrastructure.Configuration.OrganizationProfileConfiguration? _organizationProfile;
     private bool _organizationLoaded;
+    private bool _appearanceLoaded;
+    private string _theme = "Light";
+    private string _username = string.Empty;
+
+    /// <summary>تغییر حالت روشن یا تاریک و ذخیره آن برای کاربر جاری.</summary>
+    private async Task ToggleThemeAsync()
+    {
+        var previousTheme = _theme;
+        _theme = _theme == "Dark" ? "Light" : "Dark";
+
+        if (string.IsNullOrWhiteSpace(_username))
+        {
+            return;
+        }
+
+        try
+        {
+            await AppearanceSettings.SaveAsync(_username, _theme);
+        }
+        catch (Exception exception)
+        {
+            _theme = previousTheme;
+            Logger.LogWarning(exception, "ذخیره حالت ظاهری کاربر انجام نشد.");
+        }
+    }
 
     /// <summary>ساخت نشانی داده‌ای نشان سازمان برای نمایش در سربرگ.</summary>
     private string? GetLogoDataUri()
@@ -157,6 +191,35 @@
         }
 
         var sqlIsAvailable = await SqlAvailability.IsAvailableAsync();
+
+        if (sqlIsAvailable)
+        {
+            var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var principal = authenticationState.User;
+            if (principal.Identity?.IsAuthenticated == true)
+            {
+                _username = principal.FindFirst("fleet:username")?.Value
+                    ?? principal.Identity.Name
+                    ?? string.Empty;
+
+                if (!_appearanceLoaded && !string.IsNullOrWhiteSpace(_username))
+                {
+                    try
+                    {
+                        var appearance = await AppearanceSettings.GetAsync(_username);
+                        _theme = appearance.Theme;
+                    }
+                    catch (Exception exception)
+                    {
+                        Logger.LogWarning(exception, "خواندن حالت ظاهری کاربر انجام نشد.");
+                    }
+                    finally
+                    {
+                        _appearanceLoaded = true;
+                    }
+                }
+            }
+        }
 
         if (sqlIsAvailable && !_organizationLoaded)
         {
