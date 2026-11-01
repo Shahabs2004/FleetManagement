@@ -88,6 +88,70 @@ public sealed class DriverManagementService(
             cancellationToken: cancellationToken);
     }
 
+    /// <summary>
+    /// اصلاح یکپارچه مشخصات و وضعیت استخدامی راننده با کنترل مأموریت فعال.
+    /// </summary>
+    public async Task UpdateAsync(
+        Guid driverId,
+        string firstName,
+        string lastName,
+        string mobilePhone,
+        DriverEmploymentStatus employmentStatus,
+        string actor,
+        string? ipAddress = null,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var driver = await db.Drivers.SingleOrDefaultAsync(item => item.Id == driverId, cancellationToken)
+            ?? throw new KeyNotFoundException("راننده موردنظر پیدا نشد.");
+
+        if (employmentStatus != DriverEmploymentStatus.Active)
+        {
+            var hasActiveMission = await db.Missions.AnyAsync(mission =>
+                mission.DriverId == driverId
+                && mission.Status is MissionStatus.Confirmed or MissionStatus.Running,
+                cancellationToken);
+
+            if (hasActiveMission)
+            {
+                throw new InvalidOperationException("وضعیت استخدامی راننده دارای مأموریت فعال قابل تغییر نیست.");
+            }
+        }
+
+        var before = JsonSerializer.Serialize(new
+        {
+            driver.FirstName,
+            driver.LastName,
+            driver.MobilePhone,
+            driver.EmploymentStatus,
+            driver.IsArchived
+        });
+
+        driver.UpdateProfile(firstName, lastName, mobilePhone);
+        driver.ChangeEmploymentStatus(employmentStatus);
+
+        var after = JsonSerializer.Serialize(new
+        {
+            driver.FirstName,
+            driver.LastName,
+            driver.MobilePhone,
+            driver.EmploymentStatus,
+            driver.IsArchived
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+        await auditLog.RecordAsync(
+            actor,
+            "Update",
+            "Driver",
+            driver.Id.ToString(),
+            "Success",
+            beforeJson: before,
+            afterJson: after,
+            clientIpAddress: ipAddress,
+            cancellationToken: cancellationToken);
+    }
+
     /// <summary>تغییر وضعیت استخدامی و ثبت ممیزی.</summary>
     public async Task ChangeEmploymentStatusAsync(
         Guid driverId,
