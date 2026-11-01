@@ -239,12 +239,15 @@
         return ToPersianDigits($"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} {local.Hour:00}:00");
     }
 
-    /// <summary>تبدیل اعداد به رقم فارسی.</summary>
-    private static string ToPersianDigits(int value)
+    /// <summary>تبدیل عدد صحیح به رقم فارسی.</summary>
+    private static string ToPersianDigits(int value) =>
+        ToPersianDigits(value.ToString(CultureInfo.InvariantCulture));
+
+    /// <summary>تبدیل رشته عددی یا تاریخ به رقم فارسی.</summary>
+    private static string ToPersianDigits(string source)
     {
         const string latin = "0123456789";
         const string persian = "۰۱۲۳۴۵۶۷۸۹";
-        var source = value.ToString(CultureInfo.InvariantCulture);
         return string.Create(source.Length, source, (destination, text) =>
         {
             for (var index = 0; index < text.Length; index++)
