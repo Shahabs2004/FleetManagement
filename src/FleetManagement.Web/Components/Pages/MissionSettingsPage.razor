@@ -1,9 +1,9 @@
 @page "/admin/mission-settings"
 @rendermode InteractiveServer
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "SystemAdministrator")]
-@using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Application.Configuration
 @using Microsoft.AspNetCore.Components.Authorization
-@inject MissionManagementService MissionService
+@inject IMissionRulesService MissionRulesService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ILogger<MissionSettingsPage> Logger
 
@@ -57,7 +57,7 @@
         {
             var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
             _actor = auth.User.FindFirst("fleet:username")?.Value ?? auth.User.Identity?.Name ?? "unknown";
-            var rules = await MissionService.GetRulesAsync();
+            var rules = await MissionRulesService.GetRulesAsync();
             _gapHours = rules.MinimumGapHours.ToString();
             _bookingHorizon = rules.BookingHorizonDays.ToString();
         }
@@ -80,7 +80,7 @@
                 throw new InvalidOperationException("مقادیر فاصله و افق رزرو باید عدد صحیح باشند.");
             }
 
-            await MissionService.SaveRulesAsync(
+            await MissionRulesService.SaveRulesAsync(
                 new MissionRulesConfiguration
                 {
                     MinimumGapHours = gap,
