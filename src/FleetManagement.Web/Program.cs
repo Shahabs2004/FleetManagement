@@ -38,6 +38,7 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAuthentication();
+app.UseMiddleware<DirectorySessionValidationMiddleware>();
 app.UseMiddleware<FleetSessionTrackingMiddleware>();
 app.UseAuthorization();
 app.UseAntiforgery();
