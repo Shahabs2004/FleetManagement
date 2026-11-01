@@ -10,7 +10,7 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// </summary>
 public sealed class MissionChangeSmsScheduler(
     SmsQueueService smsQueueService,
-    ILogger<MissionChangeSmsScheduler> logger) : IMissionChangeSmsScheduler
+    ILogger<MissionChangeSmsScheduler> logger) : IMissionChangeSmsScheduler, IMissionSmsScheduler
 {
     /// <inheritdoc />
     public async Task QueueSafelyAsync(
