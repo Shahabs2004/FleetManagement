@@ -143,6 +143,8 @@ public sealed class MissionReportService(IDbContextFactory<FleetDbContext> dbCon
     public async Task<IReadOnlyList<MileageHistoryRow>> GetMileageHistoryAsync(
         Guid? vehicleId = null,
         int take = 500,
+        DateTimeOffset? fromUtc = null,
+        DateTimeOffset? toUtc = null,
         CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -153,6 +155,12 @@ public sealed class MissionReportService(IDbContextFactory<FleetDbContext> dbCon
         if (vehicleId.HasValue)
         {
             query = query.Where(mission => mission.VehicleId == vehicleId.Value);
+        }
+        if (fromUtc.HasValue) query = query.Where(mission => mission.PlannedStartAtUtc >= fromUtc.Value);
+        if (toUtc.HasValue) query = query.Where(mission => mission.PlannedStartAtUtc <= toUtc.Value);
+        if (fromUtc.HasValue && toUtc.HasValue && fromUtc > toUtc)
+        {
+            throw new ArgumentException("ابتدای بازه نباید بعد از انتهای بازه باشد.", nameof(fromUtc));
         }
 
         var missions = await query
