@@ -1,3 +1,4 @@
+using FleetManagement.Domain.Notifications;
 using System.Text.Json;
 using FleetManagement.Application.Configuration;
 
