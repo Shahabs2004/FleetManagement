@@ -175,7 +175,7 @@ public sealed class MissionRequestReviewServiceTests
             todayUtc.Month,
             todayUtc.Day,
             0,
-            0,
+            30,
             0,
             TimeSpan.Zero).AddDays(2);
 
