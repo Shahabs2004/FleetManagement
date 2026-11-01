@@ -5,8 +5,10 @@
 @using FleetManagement.Infrastructure.Configuration
 @using FleetManagement.Web.Security
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Authorization
 @inject VehicleManagementService VehicleService
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IAuthorizationService AuthorizationService
 @inject ILogger<VehiclesPage> Logger
 
 <PageTitle>مدیریت خودروها</PageTitle>
@@ -40,6 +42,8 @@
         <div class="setup-error">@_error</div>
     }
 
+    <AuthorizeView Policy="Permission:vehicles.manage">
+        <Authorized Context="vehicleManageContext">
     <section class="driver-editor">
         <h2>@(_editingId.HasValue ? "ویرایش خودرو" : "ثبت خودروی جدید")</h2>
         <div class="driver-form-grid">
@@ -67,6 +71,8 @@
             }
         </div>
     </section>
+        </Authorized>
+    </AuthorizeView>
 
     @if (_loading)
     {
@@ -100,15 +106,19 @@
                             <td>@GetStatusName(vehicle.ManualStatus)</td>
                             <td>@(vehicle.IsArchived ? "بایگانی‌شده" : "فعال")</td>
                             <td>
-                                <button type="button" class="secondary-button" @onclick="() => Edit(vehicle)">ویرایش</button>
-                                @if (!vehicle.IsArchived)
-                                {
-                                    <button type="button" class="secondary-button" @onclick="() => ArchiveAsync(vehicle.Id)" disabled="@_busy">بایگانی</button>
-                                }
-                                else
-                                {
-                                    <button type="button" class="secondary-button" @onclick="() => ReactivateAsync(vehicle.Id)" disabled="@_busy">بازگردانی</button>
-                                }
+                                <AuthorizeView Policy="Permission:vehicles.manage">
+                                    <Authorized Context="vehicleActionsContext">
+                                        <button type="button" class="secondary-button" @onclick="() => Edit(vehicle)">ویرایش</button>
+                                        @if (!vehicle.IsArchived)
+                                        {
+                                            <button type="button" class="secondary-button" @onclick="() => ArchiveAsync(vehicle.Id)" disabled="@_busy">بایگانی</button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="secondary-button" @onclick="() => ReactivateAsync(vehicle.Id)" disabled="@_busy">بازگردانی</button>
+                                        }
+                                    </Authorized>
+                                </AuthorizeView>
                             </td>
                         </tr>
                     }
@@ -166,6 +176,11 @@
     /// <summary>ثبت یا اصلاح مشخصات خودرو.</summary>
     private async Task SaveAsync()
     {
+        if (!await HasPermissionAsync("Permission:vehicles.manage"))
+        {
+            return;
+        }
+
         _busy = true;
         _message = string.Empty;
         _error = string.Empty;
@@ -200,6 +215,11 @@
     /// <summary>بایگانی خودرو بدون حذف سوابق آن.</summary>
     private async Task ArchiveAsync(Guid vehicleId)
     {
+        if (!await HasPermissionAsync("Permission:vehicles.manage"))
+        {
+            return;
+        }
+
         _busy = true;
         try
         {
@@ -220,6 +240,11 @@
     /// <summary>بازگرداندن خودروی بایگانی‌شده در صورت آماده‌به‌کار بودن.</summary>
     private async Task ReactivateAsync(Guid vehicleId)
     {
+        if (!await HasPermissionAsync("Permission:vehicles.manage"))
+        {
+            return;
+        }
+
         _busy = true;
         try
         {
@@ -244,6 +269,20 @@
         _brand = string.Empty;
         _model = string.Empty;
         _plate = string.Empty;
+    }
+
+    /// <summary>بررسی مجوز عملیاتی در سمت سرور، مستقل از مخفی‌سازی کنترل‌های رابط.</summary>
+    private async Task<bool> HasPermissionAsync(string policy)
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var authorization = await AuthorizationService.AuthorizeAsync(state.User, policy);
+        if (authorization.Succeeded)
+        {
+            return true;
+        }
+
+        _error = "شما مجوز لازم برای انجام این عملیات را ندارید.";
+        return false;
     }
 
     /// <summary>دریافت شناسه عامل از هویت احرازشده.</summary>
