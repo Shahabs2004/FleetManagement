@@ -413,9 +413,15 @@ public sealed class MissionManagementService(
     {
         var rules = await GetRulesAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
-        if (plannedStartAtUtc > now.AddDays(rules.BookingHorizonDays))
+        if (plannedStartAtUtc < now)
         {
-            throw new InvalidOperationException("زمان انتخاب‌شده از افق مجاز رزرو مأموریت دورتر است.");
+            throw new InvalidOperationException("زمان شروع مأموریت نمی‌تواند در گذشته باشد.");
+        }
+
+        if (plannedStartAtUtc > now.AddDays(rules.BookingHorizonDays)
+            || plannedEndAtUtc > now.AddDays(rules.BookingHorizonDays))
+        {
+            throw new InvalidOperationException("بازه انتخاب‌شده از افق مجاز رزرو مأموریت دورتر است.");
         }
 
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -495,9 +501,15 @@ public sealed class MissionManagementService(
     {
         var rules = await GetRulesAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
-        if (plannedStartAtUtc > now.AddDays(rules.BookingHorizonDays))
+        if (plannedStartAtUtc < now)
         {
-            throw new InvalidOperationException("زمان انتخاب‌شده از افق مجاز رزرو مأموریت دورتر است.");
+            throw new InvalidOperationException("زمان شروع مأموریت نمی‌تواند در گذشته باشد.");
+        }
+
+        if (plannedStartAtUtc > now.AddDays(rules.BookingHorizonDays)
+            || plannedEndAtUtc > now.AddDays(rules.BookingHorizonDays))
+        {
+            throw new InvalidOperationException("بازه انتخاب‌شده از افق مجاز رزرو مأموریت دورتر است.");
         }
 
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
