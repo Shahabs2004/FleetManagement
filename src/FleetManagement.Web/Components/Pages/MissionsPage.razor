@@ -10,6 +10,7 @@
 @using FleetManagement.Infrastructure.Reporting
 @using FleetManagement.Web.Security
 @using FleetManagement.Web.Notifications
+@using FleetManagement.Web.Components.Shared
 @using Microsoft.AspNetCore.Components.Authorization
 @inject MissionManagementService MissionService
 @inject MissionAvailabilityService AvailabilityService
@@ -90,14 +91,14 @@
                                 }
                             </select>
                         </div>
-                        <div>
-                            <label for="mission-start">زمان شروع (به وقت تهران)</label>
-                            <input id="mission-start" type="datetime-local" step="3600" value="@_startLocal" @onchange="OnStartChanged" />
-                        </div>
-                        <div>
-                            <label for="mission-end">زمان پایان (به وقت تهران)</label>
-                            <input id="mission-end" type="datetime-local" step="3600" value="@_endLocal" @onchange="OnEndChanged" />
-                        </div>
+                        <JalaliDateTimeInput Id="mission-start"
+                                              Label="زمان شروع (به وقت تهران)"
+                                              @bind-Value="_startLocal"
+                                              MinValue="@GetMinimumDateTimeInput()" />
+                        <JalaliDateTimeInput Id="mission-end"
+                                              Label="زمان پایان (به وقت تهران)"
+                                              @bind-Value="_endLocal"
+                                              MinValue="@GetMinimumDateTimeInput()" />
                         <div>
                             <label for="mission-passengers">تعداد همراهان / مسافران</label>
                             <input id="mission-passengers" type="number" min="0" @bind="_passengerCount" />
@@ -522,6 +523,20 @@
         DateTime Date,
         IReadOnlyList<PublicAvailabilitySlot> Slots,
         string Label);
+
+    /// <summary>محاسبه نزدیک‌ترین ساعت آینده تهران برای محدودکردن انتخاب تاریخ.</summary>
+    private static string GetMinimumDateTimeInput()
+    {
+        var zone = GetTehranTimeZone();
+        var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone);
+        var local = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0);
+        if (now.Minute > 0 || now.Second > 0 || now.Millisecond > 0)
+        {
+            local = local.AddHours(1);
+        }
+
+        return local.ToString("yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture);
+    }
 
     /// <summary>دریافت زمان شروع از ورودی تاریخ و ساعت مرورگر.</summary>
     private void OnStartChanged(ChangeEventArgs args) => _startLocal = args.Value?.ToString() ?? string.Empty;
