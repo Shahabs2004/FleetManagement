@@ -1830,3 +1830,91 @@ h1 {
     font: inherit;
     font-size: .78rem;
 }
+
+
+.sms-template-variables {
+    margin: 18px 0;
+    padding: 14px;
+    border: 1px solid #e0e8e2;
+    border-radius: 9px;
+    background: #f6f9f7;
+    color: #53675c;
+}
+
+.sms-template-variables p {
+    margin: 8px 0 0;
+    overflow-wrap: anywhere;
+    font-size: .8rem;
+}
+
+.sms-template-card {
+    display: grid;
+    gap: 12px;
+    margin: 14px 0;
+    padding: 18px;
+    border: 1px solid #e0e8e2;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.sms-template-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.sms-template-heading h2 {
+    margin: 0;
+    color: #244e40;
+    font-size: 1rem;
+}
+
+.sms-template-enabled {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #53675c;
+}
+
+.sms-template-card label:not(.sms-template-enabled) {
+    display: grid;
+    gap: 6px;
+    color: #53675c;
+    font-size: .9rem;
+}
+
+.sms-template-card select,
+.sms-template-card textarea {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid #d6e0d9;
+    border-radius: 8px;
+    background: #fff;
+    color: #263d32;
+    font: inherit;
+}
+
+.theme-dark .sms-template-card {
+    background: #1b2b23;
+    border-color: #30483b;
+}
+
+.theme-dark .sms-template-heading h2,
+.theme-dark .sms-template-card label,
+.theme-dark .sms-template-enabled {
+    color: #dbe9df;
+}
+
+.theme-dark .sms-template-variables {
+    background: #24392d;
+    border-color: #30483b;
+    color: #dbe9df;
+}
+
+.theme-dark .sms-template-card select,
+.theme-dark .sms-template-card textarea {
+    background: #122019;
+    border-color: #405a4a;
+    color: #e5eee8;
+}
