@@ -189,9 +189,9 @@ public sealed class SmsQueueService(
             .Select(character =>
             {
                 var numericValue = (int)char.GetNumericValue(character);
-                return numericValue is >= 0 and <= 9 ? (char)('0' + numericValue) : '\\0';
+                return numericValue is >= 0 and <= 9 ? (char)('0' + numericValue) : '\0';
             })
-            .Where(character => character != '\\0')
+            .Where(character => character != '\0')
             .ToArray());
 
         if (digits.StartsWith("0098", StringComparison.Ordinal))
