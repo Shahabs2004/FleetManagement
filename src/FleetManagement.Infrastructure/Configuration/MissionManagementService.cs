@@ -1,3 +1,4 @@
+using FleetManagement.Application.Configuration;
 using FleetManagement.Domain.Locations;
 using Microsoft.Extensions.Logging;
 using System.Data;
@@ -17,6 +18,7 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// </summary>
 public sealed class MissionManagementService(
     IDbContextFactory<FleetDbContext> dbContextFactory,
+    IMissionRulesService missionRulesService,
     AuditLogService auditLog,
     NotificationService notificationService,
     SmsQueueService smsQueueService,
@@ -133,7 +135,7 @@ public sealed class MissionManagementService(
         string reviewer,
         CancellationToken cancellationToken = default)
     {
-        var rules = await GetRulesAsync(cancellationToken);
+        var rules = await missionRulesService.GetRulesAsync(cancellationToken);
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
