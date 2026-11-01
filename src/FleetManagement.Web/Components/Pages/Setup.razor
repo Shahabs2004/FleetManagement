@@ -39,7 +39,7 @@
     else if (!_hasLocalAdministrator)
     {
         <div class="setup-step">
-            <div class="step-caption">گام ۱ از ۵ · ایجاد مدیر محلی اضطراری</div>
+            <div class="step-caption">گام ۱ از ۶ · ایجاد مدیر محلی اضطراری</div>
             <p>کد یک‌بارمصرف را از فایل محدودشده روی Windows Server دریافت کنید.</p>
 
             <EditForm Model="_administratorModel" OnValidSubmit="CreateAdministratorAsync">
@@ -65,7 +65,7 @@
     else if (!_administratorVerified)
     {
         <div class="setup-step">
-            <div class="step-caption">گام ۲ از ۵ · تأیید مدیر محلی</div>
+            <div class="step-caption">گام ۲ از ۶ · تأیید مدیر محلی</div>
             <p>حساب مدیر محلی ایجاد شده است. برای ادامه، هویت مدیر را دوباره تأیید کنید.</p>
 
             <EditForm Model="_verificationModel" OnValidSubmit="VerifyAdministratorAsync">
@@ -85,7 +85,7 @@
     else if (!_sqlReady)
     {
         <div class="setup-step">
-            <div class="step-caption">گام ۳ از ۵ · اتصال و ایجاد پایگاه داده SQL Server</div>
+            <div class="step-caption">گام ۳ از ۶ · اتصال و ایجاد پایگاه داده SQL Server</div>
             <p>حساب SQL باید مجوز اتصال به master و ایجاد پایگاه داده را داشته باشد.</p>
 
             <EditForm Model="_sqlModel" OnValidSubmit="ConfigureSqlAsync">
@@ -118,7 +118,7 @@
     else if (!_adReady)
     {
         <div class="setup-step">
-            <div class="step-caption">گام ۳ از ۵ · تنظیم Active Directory</div>
+            <div class="step-caption">گام ۴ از ۶ · تنظیم Active Directory</div>
             <p>اطلاعات اتصال دایرکتوری و گروه‌های مجاز را وارد کنید. اگر AD موقتاً در دسترس نیست، می‌توانید این مرحله را رد کنید و بعداً تنظیمات را تکمیل کنید.</p>
 
             <EditForm Model="_adModel" OnValidSubmit="SaveAndTestActiveDirectoryAsync">
@@ -181,7 +181,7 @@
     else if (!_organizationReady)
     {
         <div class="setup-step">
-            <div class="step-caption">گام ۴ از ۵ · مشخصات سازمان</div>
+            <div class="step-caption">گام ۵ از ۶ · مشخصات سازمان</div>
             <p>نام سازمان در سربرگ سامانه، صفحه ورود و برگه مأموریت نمایش داده می‌شود.</p>
 
             <EditForm Model="_organizationModel" OnValidSubmit="SaveOrganizationAsync">
@@ -206,7 +206,7 @@
     else if (!_smsReady)
     {
         <div class="setup-step">
-            <div class="step-caption">گام ۵ از ۵ · تنظیم پیامک ADP (اختیاری)</div>
+            <div class="step-caption">گام ۶ از ۶ · تنظیم پیامک ADP (اختیاری)</div>
             <p>تنظیم پیامک اختیاری است. در این مرحله هیچ پیامک آزمایشی ارسال نمی‌شود؛ اختلال پیامک مانع فعالیت سامانه نخواهد شد.</p>
 
             @if (!HasCurrentTechnicalAdministratorAccess())
