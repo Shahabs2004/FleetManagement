@@ -263,10 +263,7 @@ public sealed class BootstrapSetupService(
         // پس از قفل شدن ویزارد، کد خام مدیر فنی نیز از فایل سرور پاک می‌شود.
         if (File.Exists(_technicalAdministratorCodePath))
         {
-            await File.WriteAllTextAsync(
-                _technicalAdministratorCodePath,
-                string.Empty,
-                cancellationToken);
+            File.Delete(_technicalAdministratorCodePath);
         }
     }
 
