@@ -1,0 +1,155 @@
+@page "/admin/sms-templates"
+@rendermode InteractiveServer
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "SystemAdministrator")]
+@using FleetManagement.Domain.Notifications
+@using FleetManagement.Infrastructure.Configuration
+@inject SmsSettingsService SmsSettings
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<SmsTemplateSettingsPage> Logger
+
+<PageTitle>قالب‌های پیامک</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">مدیریت اعلان‌ها</div>
+    <h1>قالب‌های پیامک</h1>
+    <p>مدیر سامانه می‌تواند متن و گیرندگان هر رویداد را تغییر دهد. اطلاعات اتصال، نام کاربری، رمز و شماره فرستنده در این صفحه خوانده یا نمایش داده نمی‌شوند.</p>
+
+    @if (_isLoading)
+    {
+        <p>در حال دریافت قالب‌ها...</p>
+    }
+    else if (!_isConfigured)
+    {
+        <div class="setup-info">اطلاعات اتصال پیامک هنوز در ویزارد اولیه توسط مدیر فنی ثبت نشده است.</div>
+    }
+    else
+    {
+        <div class="sms-template-variables">
+            <strong>متغیرهای قابل استفاده در متن قالب</strong>
+            <p dir="ltr">{MissionNumber} {MissionTitle} {MissionOrderNumber} {MissionOrderDate} {RequesterName} {RequesterPhone} {DriverName} {DriverPhone} {Vehicle} {LicensePlate} {Origin} {Destination} {Route} {StartDateTime} {EndDateTime} {MissionType} {Reason} {RejectionReason} {CancellationReason}</p>
+        </div>
+
+        @foreach (var template in _templates)
+        {
+            <article class="sms-template-card" @key="template.EventType">
+                <div class="sms-template-heading">
+                    <h2>@GetEventName(template.EventType)</h2>
+                    <label class="sms-template-enabled">
+                        <input type="checkbox" @bind="template.IsEnabled" />
+                        فعال
+                    </label>
+                </div>
+                <label>
+                    گیرندگان
+                    <select @bind="template.RecipientRule">
+                        <option value="@SmsRecipientRule.Requester">درخواست‌کننده</option>
+                        <option value="@SmsRecipientRule.Driver">راننده</option>
+                        <option value="@SmsRecipientRule.RequesterAndDriver">درخواست‌کننده و راننده</option>
+                    </select>
+                </label>
+                <label>
+                    متن پیامک
+                    <textarea rows="4" maxlength="2000" @bind="template.Template"></textarea>
+                </label>
+            </article>
+        }
+
+        @if (_error is not null)
+        {
+            <div class="setup-error">@_error</div>
+        }
+        @if (_message is not null)
+        {
+            <div class="setup-info">@_message</div>
+        }
+        <button type="button" class="primary-button" @onclick="SaveAsync" disabled="@_isBusy">
+            ذخیره قالب‌ها
+        </button>
+    }
+</section>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private bool _isConfigured;
+    private string? _error;
+    private string? _message;
+    private List<SmsEventTemplateConfiguration> _templates = [];
+
+    /// <summary>بارگذاری فقط قالب‌ها بدون دریافت اطلاعات محرمانه اتصال.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var configuration = await SmsSettings.GetAsync();
+            _isConfigured = configuration is not null;
+            _templates = configuration?.EventTemplates
+                .OrderBy(template => template.EventType)
+                .Select(template => new SmsEventTemplateConfiguration
+                {
+                    EventType = template.EventType,
+                    IsEnabled = template.IsEnabled,
+                    RecipientRule = template.RecipientRule,
+                    Template = template.Template
+                })
+                .ToList() ?? [];
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "بارگذاری قالب‌های پیامک");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    /// <summary>ذخیره قالب‌ها با هویت مدیر سامانه و بدون دست‌کاری تنظیمات اتصال.</summary>
+    private async Task SaveAsync()
+    {
+        _isBusy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var actor = state.User.FindFirst("fleet:username")?.Value
+                ?? state.User.Identity?.Name
+                ?? "Unknown";
+
+            await SmsSettings.UpdateTemplatesAsync(_templates, actor);
+            _message = "قالب‌ها و قواعد گیرندگان ذخیره شدند.";
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "ذخیره قالب‌های پیامک");
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    /// <summary>ثبت خطای فنی در گزارش سرور و نمایش شناسه پیگیری فارسی.</summary>
+    private void ReportError(Exception exception, string operation)
+    {
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "{Operation} ناموفق بود. شناسه پیگیری: {TrackingId}", operation, trackingId);
+        _error = $"عملیات انجام نشد. شناسه پیگیری: {trackingId}";
+    }
+
+    /// <summary>عنوان فارسی رویداد پیامکی.</summary>
+    private static string GetEventName(SmsEventType value) => value switch
+    {
+        SmsEventType.MissionApproved => "تأیید مأموریت",
+        SmsEventType.MissionRejected => "رد درخواست مأموریت",
+        SmsEventType.MissionChanged => "تغییر زمان یا جزئیات مأموریت",
+        SmsEventType.DriverOrVehicleChanged => "تغییر راننده یا خودرو",
+        SmsEventType.MissionCancelled => "لغو مأموریت",
+        SmsEventType.WithdrawalApproved => "تأیید انصراف",
+        SmsEventType.WithdrawalRejected => "رد انصراف",
+        SmsEventType.MissionStartReminder => "یادآوری پیش از شروع",
+        SmsEventType.MissionCompleted => "پایان مأموریت",
+        _ => "نامشخص"
+    };
+}
