@@ -202,7 +202,7 @@ public sealed class MissionChangeRequestServiceTests
         public void Add(MissionChangeRequest request) => AddedRequest = request;
     }
 
-    private sealed class RecordingAuditLogWriter : IAuditLogWriter
+    private sealed class RecordingAuditLogWriter : IMissionChangeAuditWriter
     {
         public int CallCount { get; private set; }
         public string? LastAction { get; private set; }
