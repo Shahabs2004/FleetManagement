@@ -146,14 +146,15 @@
         try
         {
             var end = _windowStart.AddHours(WindowHours);
-            var results = await Task.WhenAll(
-                DriverService.SearchAsync(includeArchived: true),
-                MissionService.GetTimelineAsync(_windowStart, end),
-                VehicleService.SearchAsync(includeArchived: true));
+            var driversTask = DriverService.SearchAsync(includeArchived: true);
+            var missionsTask = MissionService.GetTimelineAsync(_windowStart, end);
+            var vehiclesTask = VehicleService.SearchAsync(includeArchived: true);
 
-            _drivers = (IReadOnlyList<Driver>)results[0];
-            _missions = (IReadOnlyList<Mission>)results[1];
-            _vehicles = (IReadOnlyList<Vehicle>)results[2];
+            await Task.WhenAll(driversTask, missionsTask, vehiclesTask);
+
+            _drivers = await driversTask;
+            _missions = await missionsTask;
+            _vehicles = await vehiclesTask;
             BuildTicks();
         }
         catch (Exception exception)
