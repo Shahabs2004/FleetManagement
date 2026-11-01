@@ -34,12 +34,22 @@ public sealed class ActiveDirectorySettingsService(
         return settingsStore.SetAsync(SkippedSettingKey, true, cancellationToken);
     }
 
-    /// <summary>اعتبارسنجی اولیه و ذخیره تنظیمات AD.</summary>
-    public async Task SaveAsync(
+    /// <summary>ذخیره از مسیر راه‌اندازی اولیه با هویت مدیر فنی.</summary>
+    public Task SaveAsync(
         ActiveDirectoryConfiguration configuration,
         CancellationToken cancellationToken = default)
     {
+        return SaveAsync(configuration, "TechnicalAdministrator", cancellationToken);
+    }
+
+    /// <summary>اعتبارسنجی و ذخیره تنظیمات AD با ثبت عامل واقعی در ممیزی.</summary>
+    public async Task SaveAsync(
+        ActiveDirectoryConfiguration configuration,
+        string actorUsername,
+        CancellationToken cancellationToken = default)
+    {
         ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actorUsername);
 
         if (configuration.Port is < 1 or > 65535)
         {
@@ -62,6 +72,15 @@ public sealed class ActiveDirectorySettingsService(
             throw new ArgumentException(
                 "نام و Distinguished Name همه گروه‌های مجاز باید تکمیل شود.",
                 nameof(configuration));
+        }
+
+        if (string.IsNullOrWhiteSpace(configuration.DomainDnsName)
+            || string.IsNullOrWhiteSpace(configuration.LdapServer)
+            || string.IsNullOrWhiteSpace(configuration.BaseDistinguishedName)
+            || string.IsNullOrWhiteSpace(configuration.ServiceAccountUsername)
+            || string.IsNullOrWhiteSpace(configuration.ServiceAccountPassword))
+        {
+            throw new ArgumentException("اطلاعات اتصال و حساب سرویس AD باید کامل باشد.");
         }
 
         var previous = await GetAsync(cancellationToken);
@@ -104,7 +123,7 @@ public sealed class ActiveDirectorySettingsService(
         }
 
         await auditLog.RecordAsync(
-            "TechnicalAdministrator",
+            actorUsername,
             "UpdateActiveDirectorySettings",
             "ActiveDirectoryConfiguration",
             null,
