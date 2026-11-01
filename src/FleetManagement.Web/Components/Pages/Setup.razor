@@ -13,6 +13,7 @@
 @inject FleetManagement.Infrastructure.Configuration.OrganizationSettingsService OrganizationSettings
 @inject FleetManagement.Infrastructure.Configuration.SmsSettingsService SmsSettings
 @inject ILogger<Setup> Logger
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 
 <PageTitle>راه‌اندازی سامانه</PageTitle>
 
@@ -208,7 +209,7 @@
             <div class="step-caption">گام ۵ از ۵ · تنظیم پیامک ADP (اختیاری)</div>
             <p>تنظیم پیامک اختیاری است. در این مرحله هیچ پیامک آزمایشی ارسال نمی‌شود؛ اختلال پیامک مانع فعالیت سامانه نخواهد شد.</p>
 
-            @if (!_technicalAdministratorVerified)
+            @if (!HasCurrentTechnicalAdministratorAccess())
             {
                 <div class="setup-info">
                     این مرحله فقط برای مدیر فنی است. کد مستقل مدیر فنی را از فایل محافظت‌شده روی Windows Server دریافت کنید.
@@ -296,6 +297,7 @@
     private bool _organizationReady;
     private bool _smsReady;
     private bool _technicalAdministratorVerified;
+    private DateTimeOffset? _technicalAdministratorVerifiedUntilUtc;
     private bool _setupCompleted;
     private bool _isError;
     private string? _message;
@@ -331,6 +333,19 @@
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (_technicalAdministratorVerified
+            && (_technicalAdministratorVerifiedUntilUtc is null
+                || _technicalAdministratorVerifiedUntilUtc <= DateTimeOffset.UtcNow))
+        {
+            _technicalAdministratorVerified = false;
+            _technicalAdministratorVerifiedUntilUtc = null;
+            _smsModel.Password = string.Empty;
+            StateHasChanged();
         }
     }
 
@@ -596,7 +611,7 @@
         }
         catch (Exception exception)
         {
-            ShowUnexpectedError(exception, "ثبت عبور از مرحله AD");
+            ShowUnexpectedError(exception, "ثبت عبور از تنظیم AD");
         }
         finally
         {
@@ -679,8 +694,10 @@
 
         try
         {
-            _technicalAdministratorVerified =
-                await BootstrapSetup.VerifyTechnicalAdministratorAccessAsync(_technicalAdministratorModel.Code);
+            var attemptKey = $"technical:{HttpContextAccessor.HttpContext?.Connection.Id ?? "unknown"}";
+            _technicalAdministratorVerified = await BootstrapSetup.VerifyTechnicalAdministratorAccessAsync(
+                _technicalAdministratorModel.Code,
+                attemptKey);
 
             _technicalAdministratorModel.Code = string.Empty;
 
@@ -688,6 +705,8 @@
             {
                 throw new UnauthorizedAccessException("کد مدیر فنی نامعتبر یا منقضی شده است.");
             }
+
+            _technicalAdministratorVerifiedUntilUtc = DateTimeOffset.UtcNow.AddMinutes(15);
 
             _message = "دسترسی مدیر فنی تأیید شد.";
             _isError = false;
@@ -708,7 +727,7 @@
     /// </summary>
     private async Task SaveSmsSettingsAsync()
     {
-        if (!_technicalAdministratorVerified)
+        if (!HasCurrentTechnicalAdministratorAccess())
         {
             throw new UnauthorizedAccessException("برای تغییر تنظیمات پیامک، دسترسی مدیر فنی لازم است.");
         }
@@ -758,12 +777,26 @@
     /// </summary>
     private Task SkipSmsSettingsAsync()
     {
-        if (!_technicalAdministratorVerified)
+        if (!HasCurrentTechnicalAdministratorAccess())
         {
             throw new UnauthorizedAccessException("فقط مدیر فنی می‌تواند از مرحله پیامک عبور کند.");
         }
 
         return MarkSmsSkippedAsync();
+    }
+
+    private bool HasCurrentTechnicalAdministratorAccess()
+    {
+        if (_technicalAdministratorVerified
+            && _technicalAdministratorVerifiedUntilUtc > DateTimeOffset.UtcNow)
+        {
+            return true;
+        }
+
+        _technicalAdministratorVerified = false;
+        _technicalAdministratorVerifiedUntilUtc = null;
+        _smsModel.Password = string.Empty;
+        return false;
     }
 
     /// <summary>
