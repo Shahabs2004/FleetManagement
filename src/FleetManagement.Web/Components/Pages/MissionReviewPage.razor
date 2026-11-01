@@ -8,6 +8,7 @@
 @using FleetManagement.Infrastructure.Configuration
 @using FleetManagement.Web.Security
 @using FleetManagement.Web.Notifications
+@using FleetManagement.Web.Components.Shared
 @using Microsoft.AspNetCore.Components.Authorization
 @inject MissionManagementService MissionService
 @inject DriverManagementService DriverService
@@ -150,8 +151,10 @@
                 {
                     <section class="audit-detail">
                         <h3>@(_timeActionKind == "extend" ? "تمدید مأموریت" : "خاتمه زودهنگام")</h3>
-                        <label>زمان جدید (به وقت تهران)</label>
-                        <input type="datetime-local" step="3600" value="@_timeActionLocal" @onchange="OnTimeActionChanged" />
+                        <JalaliDateTimeInput Id="mission-time-action"
+                                              Label="زمان جدید (به وقت تهران)"
+                                              @bind-Value="_timeActionLocal"
+                                              MinValue="@GetMinimumDateTimeInput()" />
                         <div class="driver-actions">
                             <button type="button" class="primary-button" @onclick="SaveTimeActionAsync" disabled="@_busy">ثبت</button>
                             <button type="button" class="secondary-button" @onclick="() => _timeActionMissionId = null">انصراف</button>
@@ -188,8 +191,10 @@
                                 </select>
                             </div>
                             <div>
-                                <label>زمان تقسیم (به وقت تهران)</label>
-                                <input type="datetime-local" step="3600" value="@_splitAtLocal" @onchange="OnSplitTimeChanged" />
+                                <JalaliDateTimeInput Id="mission-split-time"
+                                                      Label="زمان تقسیم (به وقت تهران)"
+                                                      @bind-Value="_splitAtLocal"
+                                                      MinValue="@GetMinimumDateTimeInput()" />
                             </div>
                             <div>
                                 <label>کیلومترشمار پایان بخش اول</label>
@@ -661,6 +666,23 @@
     }
 
     /// <summary>نمایش زمان جلالی تهران.</summary>
+    /// <summary>محاسبه نزدیک‌ترین ساعت آینده تهران برای انتخاب زمان عملیات.</summary>
+    private static string GetMinimumDateTimeInput()
+    {
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+
+        var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone);
+        var local = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0);
+        if (now.Minute > 0 || now.Second > 0 || now.Millisecond > 0)
+        {
+            local = local.AddHours(1);
+        }
+
+        return local.ToString("yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture);
+    }
+
     private static string FormatTime(DateTimeOffset value)
     {
         TimeZoneInfo zone;
