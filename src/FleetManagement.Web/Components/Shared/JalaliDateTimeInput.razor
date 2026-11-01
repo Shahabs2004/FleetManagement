@@ -132,12 +132,12 @@
         {
             _selectedDate = parsed.Date;
             _hour = parsed.Hour;
-            _visibleMonth = new DateTime(parsed.Year, parsed.Month, 1);
+            _visibleMonth = GetPersianMonthStart(parsed);
         }
         else if (_selectedDate is null)
         {
             var current = GetTehranNow();
-            _visibleMonth = new DateTime(current.Year, current.Month, 1);
+            _visibleMonth = GetPersianMonthStart(current);
         }
 
         BuildDays();
@@ -149,7 +149,7 @@
         _isOpen = !_isOpen;
         if (_isOpen && _selectedDate.HasValue)
         {
-            _visibleMonth = new DateTime(_selectedDate.Value.Year, _selectedDate.Value.Month, 1);
+            _visibleMonth = GetPersianMonthStart(_selectedDate.Value);
         }
         BuildDays();
     }
@@ -158,7 +158,7 @@
     private void PreviousMonth()
     {
         var previous = _persianCalendar.AddMonths(_visibleMonth, -1);
-        _visibleMonth = new DateTime(previous.Year, previous.Month, 1);
+        _visibleMonth = GetPersianMonthStart(previous);
         BuildDays();
     }
 
@@ -166,7 +166,7 @@
     private void NextMonth()
     {
         var next = _persianCalendar.AddMonths(_visibleMonth, 1);
-        _visibleMonth = new DateTime(next.Year, next.Month, 1);
+        _visibleMonth = GetPersianMonthStart(next);
         BuildDays();
     }
 
@@ -210,9 +210,13 @@
         var gridStart = firstDay.AddDays(-offset);
 
         _days = Enumerable.Range(0, 42)
-            .Select(index => new CalendarDay(
-                gridStart.AddDays(index),
-                gridStart.AddDays(index).Month == _visibleMonth.Month))
+            .Select(index =>
+            {
+                var date = gridStart.AddDays(index);
+                var isInMonth = _persianCalendar.GetYear(date) == _persianCalendar.GetYear(_visibleMonth)
+                    && _persianCalendar.GetMonth(date) == _persianCalendar.GetMonth(_visibleMonth);
+                return new CalendarDay(date, isInMonth);
+            })
             .ToArray();
     }
 
@@ -265,6 +269,19 @@
     /// <summary>ساعت حداقلی برای روز جاری.</summary>
     private int GetMinimumHour() =>
         TryGetMinimum(out var minimum) ? minimum.Hour : 0;
+
+    /// <summary>محاسبه روز نخست ماه جلالی جاری.</summary>
+    private DateTime GetPersianMonthStart(DateTime date)
+    {
+        return _persianCalendar.ToDateTime(
+            _persianCalendar.GetYear(date),
+            _persianCalendar.GetMonth(date),
+            1,
+            0,
+            0,
+            0,
+            0);
+    }
 
     /// <summary>تاریخ جلالی با ارقام فارسی.</summary>
     private string FormatPersianDate(DateTime date)
