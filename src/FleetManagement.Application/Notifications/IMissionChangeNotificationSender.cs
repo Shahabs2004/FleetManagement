@@ -14,4 +14,14 @@ public interface IMissionChangeNotificationSender
         string? referenceType = null,
         string? referenceId = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>ثبت و انتشار اعلان برای کاربران دارای نقش‌های مشخص.</summary>
+    Task<int> CreateForRolesAsync(
+        IEnumerable<string> roleKeys,
+        string title,
+        string message,
+        string eventKey,
+        string? referenceType = null,
+        string? referenceId = null,
+        CancellationToken cancellationToken = default);
 }
