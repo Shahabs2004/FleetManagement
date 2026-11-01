@@ -40,7 +40,7 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<UserSessionService>();
         services.AddScoped<SessionPolicySettingsService>();
         services.AddScoped<AuditLogService>();
-        services.AddScoped<IAuditLogWriter>(provider => provider.GetRequiredService<AuditLogService>());
+        services.AddScoped<IMissionChangeAuditWriter, MissionChangeAuditWriter>();
         services.AddScoped<IMissionChangeRequestStore, EfMissionChangeRequestStore>();
         services.AddScoped<IMissionChangeNotificationSender, MissionChangeNotificationSender>();
         services.AddScoped<MissionChangeRequestService>();
