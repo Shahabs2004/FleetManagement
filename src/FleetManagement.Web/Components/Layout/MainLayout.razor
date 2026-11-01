@@ -78,6 +78,11 @@
                         <a href="/admin/audit">گزارش ممیزی</a>
                     </Authorized>
                 </AuthorizeView>
+                <AuthorizeView Policy="Permission:notifications.sms.view">
+                    <Authorized Context="smsPermissionContext">
+                        <a href="/admin/sms">گزارش پیامک‌ها</a>
+                    </Authorized>
+                </AuthorizeView>
                 <AuthorizeView Policy="Permission:security.sessions.view">
                     <Authorized Context="sessionPermissionContext">
                         <a href="/admin/sessions">سوابق ورود</a>
