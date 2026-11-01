@@ -106,7 +106,7 @@ public sealed class VehicleManagementService(
 
         var hasActiveMission = await db.Missions.AnyAsync(mission =>
             mission.VehicleId == vehicleId
-            && mission.Status is MissionStatus.Confirmed or MissionStatus.Running,
+            && (mission.Status == MissionStatus.Confirmed || mission.Status == MissionStatus.Running),
             cancellationToken);
 
         var before = JsonSerializer.Serialize(new
@@ -154,7 +154,7 @@ public sealed class VehicleManagementService(
 
         var hasActiveMission = await db.Missions.AnyAsync(mission =>
             mission.VehicleId == vehicleId
-            && mission.Status is MissionStatus.Confirmed or MissionStatus.Running,
+            && (mission.Status == MissionStatus.Confirmed || mission.Status == MissionStatus.Running),
             cancellationToken);
 
         if (hasActiveMission)
