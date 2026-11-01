@@ -3,9 +3,11 @@
 @attribute [FleetPermission("settings.authorization")]
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Authorization
 @using FleetManagement.Infrastructure.Configuration
 @using FleetManagement.Web.Security
 @inject AuthorizationSettingsService AuthorizationSettings
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ILogger<AuthorizationSettingsPage> Logger
 
 <PageTitle>مدیریت نقش‌ها و مجوزها</PageTitle>
@@ -333,7 +335,12 @@
                 role.Permissions = permissionsByRole[role.Key];
             }
 
-            await AuthorizationSettings.SaveAsync(_configuration);
+            var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var actorUsername = authenticationState.User.Identity?.Name
+                ?? authenticationState.User.FindFirst("fleet:username")?.Value
+                ?? "Unknown";
+
+            await AuthorizationSettings.SaveAsync(_configuration, actorUsername);
             _message = "تنظیمات نقش‌ها و مجوزها با موفقیت ذخیره شد. کاربران در ورود بعدی تغییرات را دریافت می‌کنند.";
             _isError = false;
         }
