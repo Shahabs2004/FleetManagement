@@ -225,6 +225,7 @@ public sealed class MissionReportExportService
 
         writer.WriteEndElement();
         writer.WriteEndDocument();
+        writer.Flush();
         return builder.ToString();
     }
 
@@ -241,6 +242,7 @@ public sealed class MissionReportExportService
         writer.WriteEndElement();
         writer.WriteEndElement();
         writer.WriteEndDocument();
+        writer.Flush();
         return builder.ToString();
     }
 
@@ -265,6 +267,7 @@ public sealed class MissionReportExportService
         writer.WriteEndElement();
         writer.WriteEndElement();
         writer.WriteEndDocument();
+        writer.Flush();
         return builder.ToString();
     }
 
@@ -286,6 +289,7 @@ public sealed class MissionReportExportService
 
         writer.WriteEndElement();
         writer.WriteEndDocument();
+        writer.Flush();
         return builder.ToString();
     }
 
