@@ -86,7 +86,8 @@ public sealed class UserSession : Entity
 
         if (status is not (UserSessionStatus.LoggedOut
             or UserSessionStatus.IdleExpired
-            or UserSessionStatus.AbsoluteExpired))
+            or UserSessionStatus.AbsoluteExpired
+            or UserSessionStatus.DirectoryRevoked))
         {
             throw new ArgumentOutOfRangeException(nameof(status));
         }
