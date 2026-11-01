@@ -83,7 +83,19 @@
         {
             var configuration = await SmsSettings.GetAsync();
             _isConfigured = configuration is not null;
-            _templates = configuration?.EventTemplates
+            var templatesByEvent = SmsProviderConfiguration.CreateDefault()
+                .EventTemplates
+                .ToDictionary(template => template.EventType);
+
+            if (configuration is not null)
+            {
+                foreach (var template in configuration.EventTemplates)
+                {
+                    templatesByEvent[template.EventType] = template;
+                }
+            }
+
+            _templates = templatesByEvent.Values
                 .OrderBy(template => template.EventType)
                 .Select(template => new SmsEventTemplateConfiguration
                 {
@@ -92,7 +104,7 @@
                     RecipientRule = template.RecipientRule,
                     Template = template.Template
                 })
-                .ToList() ?? [];
+                .ToList();
         }
         catch (Exception exception)
         {
