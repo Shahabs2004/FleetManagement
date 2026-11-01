@@ -619,9 +619,11 @@ public sealed class MissionManagementService(
     public async Task StartReviewAsync(Guid missionId, string actor, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var mission = await GetMissionAsync(db, missionId, cancellationToken);
         mission.StartReview(DateTimeOffset.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         await RecordMissionAuditAsync(actor, "StartReview", mission, "Success", cancellationToken);
     }
 
@@ -691,9 +693,11 @@ public sealed class MissionManagementService(
     public async Task RejectAsync(Guid missionId, string reason, string actor, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var mission = await GetMissionAsync(db, missionId, cancellationToken);
         mission.Reject(reason);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         await RecordMissionAuditAsync(actor, "Reject", mission, "Rejected", cancellationToken, reason);
         await notificationService.CreateAsync(
             mission.RequesterUsername,
@@ -720,9 +724,11 @@ public sealed class MissionManagementService(
     public async Task CancelAsync(Guid missionId, string reason, string actor, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var mission = await GetMissionAsync(db, missionId, cancellationToken);
         mission.Cancel(reason, DateTimeOffset.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         await RecordMissionAuditAsync(actor, "Cancel", mission, "Success", cancellationToken, reason);
         await notificationService.CreateAsync(
             mission.RequesterUsername,
@@ -759,10 +765,12 @@ public sealed class MissionManagementService(
         CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var mission = await GetMissionAsync(db, missionId, cancellationToken);
         var before = new { mission.Status, mission.PlannedEndAtUtc, mission.ActualEndAtUtc };
         mission.EndEarly(endedAtUtc, reason);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         await auditLog.RecordAsync(
             actor, "EndEarly", "Mission", mission.Id.ToString(), "Success", reason,
@@ -811,6 +819,7 @@ public sealed class MissionManagementService(
 
         mission.Cancel(reason, DateTimeOffset.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         await RecordMissionAuditAsync(requesterUsername, "CancelPendingRequest", mission, "Success", cancellationToken, reason);
     }
 
@@ -835,6 +844,7 @@ public sealed class MissionManagementService(
 
         mission.RequestWithdrawal(reason);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         await RecordMissionAuditAsync(requesterUsername, "RequestWithdrawal", mission, "Success", cancellationToken, reason);
         await notificationService.CreateForRolesAsync(
             ["FleetManager", "Operator"],
@@ -853,9 +863,11 @@ public sealed class MissionManagementService(
         CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var mission = await GetMissionAsync(db, missionId, cancellationToken);
         mission.ApproveWithdrawal(DateTimeOffset.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         await RecordMissionAuditAsync(reviewer, "ApproveWithdrawal", mission, "Success", cancellationToken);
         await notificationService.CreateAsync(
             mission.RequesterUsername,
@@ -891,9 +903,11 @@ public sealed class MissionManagementService(
         CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var mission = await GetMissionAsync(db, missionId, cancellationToken);
         mission.RejectWithdrawal(reason);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         await RecordMissionAuditAsync(reviewer, "RejectWithdrawal", mission, "Rejected", cancellationToken, reason);
         await notificationService.CreateAsync(
             mission.RequesterUsername,
@@ -986,6 +1000,7 @@ public sealed class MissionManagementService(
         CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var mission = await GetMissionAsync(db, missionId, cancellationToken);
         var before = new { mission.OdometerStartKm, mission.OdometerEndKm };
         if ((startKm.HasValue || endKm.HasValue) && !mission.VehicleId.HasValue)
@@ -1041,6 +1056,7 @@ public sealed class MissionManagementService(
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         await auditLog.RecordAsync(
             actor, "UpdateOdometer", "Mission", mission.Id.ToString(), "Success",
             beforeJson: JsonSerializer.Serialize(before),
@@ -1246,6 +1262,7 @@ public sealed class MissionManagementService(
     public async Task<int> ProcessDueMissionsAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var dueMissions = await db.Missions
             .Where(mission =>
@@ -1280,8 +1297,9 @@ public sealed class MissionManagementService(
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
-        foreach (var item in auditActions)
+        foreach (var item of auditActions)
         {
             await RecordMissionAuditAsync(
                 "system",
