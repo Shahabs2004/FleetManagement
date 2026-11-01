@@ -76,6 +76,21 @@ public sealed class UserSessionTests
     }
 
     [Fact]
+    public void نشست_پس_از_لغو_عضویت_مجاز_در_AD_خاتمه_می_یابد()
+    {
+        var session = new UserSession(
+            "a.rezaei",
+            UserSessionLoginMethod.DirectoryPassword,
+            true,
+            "10.0.0.14");
+
+        session.End(UserSessionStatus.DirectoryRevoked, DateTimeOffset.UtcNow);
+
+        Assert.Equal(UserSessionStatus.DirectoryRevoked, session.Status);
+        Assert.NotNull(session.EndedAtUtc);
+    }
+
+    [Fact]
     public void تلاش_ورود_ناموفق_به_عنوان_نشست_فعال_ثبت_نمی_شود()
     {
         // Arrange و Act
