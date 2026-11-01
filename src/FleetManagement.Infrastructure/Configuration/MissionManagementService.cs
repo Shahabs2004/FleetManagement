@@ -325,6 +325,15 @@ public sealed class MissionManagementService(
             mission.Id.ToString(),
             cancellationToken);
 
+        await notificationService.CreateForRolesAsync(
+            ["FleetManager", "Operator"],
+            "تغییرات مأموریت اعمال شد",
+            $"تغییرات مأموریت {mission.MissionNumber} تأیید و اعمال شد.",
+            "MissionChangeApproved",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
+
         await QueueSmsSafelyAsync(mission, SmsEventType.MissionChanged, change.Reason, cancellationToken);
 
         if (previousDriverId != mission.DriverId || previousVehicleId != mission.VehicleId)
@@ -665,6 +674,15 @@ public sealed class MissionManagementService(
             mission.Id.ToString(),
             cancellationToken);
 
+        await notificationService.CreateForRolesAsync(
+            ["FleetManager", "Operator"],
+            "مأموریت تأیید شد",
+            $"مأموریت {mission.MissionNumber} تأیید و برای اجرا آماده شد.",
+            "MissionApproved",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
+
         await QueueSmsSafelyAsync(mission, SmsEventType.MissionApproved, null, cancellationToken);
         await QueueSmsSafelyAsync(mission, SmsEventType.MissionStartReminder, null, cancellationToken);
     }
@@ -686,6 +704,15 @@ public sealed class MissionManagementService(
             mission.Id.ToString(),
             cancellationToken);
 
+        await notificationService.CreateForRolesAsync(
+            ["FleetManager", "Operator"],
+            "درخواست مأموریت رد شد",
+            $"درخواست {mission.MissionNumber} رد شد.",
+            "MissionRejected",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
+
         await QueueSmsSafelyAsync(mission, SmsEventType.MissionRejected, reason, cancellationToken);
     }
 
@@ -701,6 +728,15 @@ public sealed class MissionManagementService(
             mission.RequesterUsername,
             "مأموریت لغو شد",
             $"مأموریت {mission.MissionNumber} لغو شد. علت: {reason}",
+            "MissionCancelled",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
+
+        await notificationService.CreateForRolesAsync(
+            ["FleetManager", "Operator"],
+            "مأموریت لغو شد",
+            $"مأموریت {mission.MissionNumber} لغو شد.",
             "MissionCancelled",
             "Mission",
             mission.Id.ToString(),
@@ -735,6 +771,15 @@ public sealed class MissionManagementService(
             cancellationToken: cancellationToken);
         await notificationService.CreateAsync(
             mission.RequesterUsername,
+            "مأموریت زودتر از موعد خاتمه یافت",
+            $"مأموریت {mission.MissionNumber} پیش از زمان برنامه‌ریزی‌شده خاتمه یافت.",
+            "MissionEndedEarly",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
+
+        await notificationService.CreateForRolesAsync(
+            ["FleetManager", "Operator"],
             "مأموریت زودتر از موعد خاتمه یافت",
             $"مأموریت {mission.MissionNumber} پیش از زمان برنامه‌ریزی‌شده خاتمه یافت.",
             "MissionEndedEarly",
@@ -821,6 +866,15 @@ public sealed class MissionManagementService(
             mission.Id.ToString(),
             cancellationToken);
 
+        await notificationService.CreateForRolesAsync(
+            ["FleetManager", "Operator"],
+            "درخواست انصراف تأیید شد",
+            $"انصراف از مأموریت {mission.MissionNumber} تأیید شد.",
+            "WithdrawalApproved",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
+
         await CancelUnsentRemindersSafelyAsync(
             mission.Id,
             "درخواست انصراف تأیید شد.",
@@ -845,6 +899,15 @@ public sealed class MissionManagementService(
             mission.RequesterUsername,
             "درخواست انصراف رد شد",
             $"درخواست انصراف مأموریت {mission.MissionNumber} رد شد. علت: {reason}",
+            "WithdrawalRejected",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
+
+        await notificationService.CreateForRolesAsync(
+            ["FleetManager", "Operator"],
+            "درخواست انصراف رد شد",
+            $"درخواست انصراف مأموریت {mission.MissionNumber} رد شد.",
             "WithdrawalRejected",
             "Mission",
             mission.Id.ToString(),
@@ -895,6 +958,15 @@ public sealed class MissionManagementService(
             cancellationToken: cancellationToken);
         await notificationService.CreateAsync(
             mission.RequesterUsername,
+            "زمان مأموریت تغییر کرد",
+            $"زمان پایان مأموریت {mission.MissionNumber} به‌روزرسانی شد.",
+            "MissionExtended",
+            "Mission",
+            mission.Id.ToString(),
+            cancellationToken);
+
+        await notificationService.CreateForRolesAsync(
+            ["FleetManager", "Operator"],
             "زمان مأموریت تغییر کرد",
             $"زمان پایان مأموریت {mission.MissionNumber} به‌روزرسانی شد.",
             "MissionExtended",
