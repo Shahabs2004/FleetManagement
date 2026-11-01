@@ -21,13 +21,23 @@ public sealed class OrganizationSettingsService(
             cancellationToken);
     }
 
-    /// <summary>اعتبارسنجی و ذخیره نام و نشان سازمان.</summary>
+    /// <summary>ذخیره از مسیر راه‌اندازی اولیه با هویت مدیر فنی.</summary>
+    public Task SaveAsync(
+        OrganizationProfileConfiguration configuration,
+        CancellationToken cancellationToken = default)
+    {
+        return SaveAsync(configuration, "TechnicalAdministrator", cancellationToken);
+    }
+
+    /// <summary>ذخیره نام و نشان سازمان و ثبت عامل واقعی در ممیزی.</summary>
     public async Task SaveAsync(
         OrganizationProfileConfiguration configuration,
+        string actorUsername,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentException.ThrowIfNullOrWhiteSpace(configuration.OrganizationName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actorUsername);
 
         if (configuration.OrganizationName.Trim().Length > 200)
         {
@@ -45,10 +55,14 @@ public sealed class OrganizationSettingsService(
                     "حجم نشان سازمان بیش از حد مجاز است.");
             }
 
-            if (configuration.LogoContentType is not ("image/png" or "image/jpeg" or "image/svg+xml"))
+            if (configuration.LogoContentType is not ("image/png" or "image/jpeg"))
             {
-                throw new ArgumentException("قالب نشان سازمان باید PNG، JPEG یا SVG باشد.");
+                throw new ArgumentException("قالب نشان سازمان باید PNG یا JPEG باشد.");
             }
+        }
+        else
+        {
+            configuration.LogoContentType = null;
         }
 
         configuration.OrganizationName = configuration.OrganizationName.Trim();
@@ -61,7 +75,7 @@ public sealed class OrganizationSettingsService(
             cancellationToken);
 
         await auditLog.RecordAsync(
-            "TechnicalAdministrator",
+            actorUsername,
             "UpdateOrganizationProfile",
             "OrganizationProfile",
             null,
