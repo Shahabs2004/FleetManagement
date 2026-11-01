@@ -100,7 +100,9 @@ public sealed class SmsQueueService(
             ["MissionNumber"] = mission.MissionNumber,
             ["MissionTitle"] = mission.Title,
             ["MissionOrderNumber"] = mission.MissionOrderNumber ?? string.Empty,
-            ["MissionOrderDate"] = mission.MissionOrderDate?.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture) ?? string.Empty,
+            ["MissionOrderDate"] = mission.MissionOrderDate.HasValue
+                ? FormatJalaliDate(mission.MissionOrderDate.Value)
+                : string.Empty,
             ["RequesterName"] = mission.RequesterName,
             ["RequesterPhone"] = mission.RequesterPhoneSnapshot,
             ["DriverName"] = driver is null ? string.Empty : $"{driver.FirstName} {driver.LastName}",
@@ -109,7 +111,9 @@ public sealed class SmsQueueService(
             ["LicensePlate"] = vehicle?.LicensePlate ?? string.Empty,
             ["Origin"] = mission.Origin,
             ["Destination"] = mission.Destination,
-            ["Route"] = string.Join("، ", mission.GetIntermediateStops()),
+            ["Route"] = string.Join(" ← ", new[] { mission.Origin }
+                .Concat(mission.GetIntermediateStops())
+                .Append(mission.Destination)),
             ["StartDateTime"] = FormatTehranTime(mission.PlannedStartAtUtc),
             ["EndDateTime"] = FormatTehranTime(mission.PlannedEndAtUtc),
             ["MissionType"] = mission.Type == MissionType.Freight ? "بار" : "مسافر",
@@ -221,6 +225,14 @@ public sealed class SmsQueueService(
     {
         try { return NormalizeIranianMobile(phone); }
         catch (ArgumentException) { return null; }
+    }
+
+    /// <summary>نمایش تاریخ شمسی برای متغیرهای پیامک.</summary>
+    private static string FormatJalaliDate(DateOnly date)
+    {
+        var calendar = new PersianCalendar();
+        var value = date.ToDateTime(TimeOnly.MinValue);
+        return ToPersianDigits($"{calendar.GetYear(value):0000}/{calendar.GetMonth(value):00}/{calendar.GetDayOfMonth(value):00}");
     }
 
     /// <summary>قالب‌سازی زمان پیامک بر اساس منطقه زمانی تهران.</summary>
