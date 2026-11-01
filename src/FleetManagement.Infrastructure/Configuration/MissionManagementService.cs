@@ -470,6 +470,129 @@ public sealed class MissionManagementService(
         return mission.Id;
     }
 
+    /// <summary>
+    /// ویرایش درخواست فقط تا پیش از شروع بررسی توسط مسئول ناوگان.
+    /// </summary>
+    public async Task UpdatePendingRequestAsync(
+        Guid missionId,
+        string requesterUsername,
+        string title,
+        string requesterPhoneSnapshot,
+        string requestingGroup,
+        MissionType type,
+        string purpose,
+        string origin,
+        string destination,
+        IEnumerable<string>? intermediateStops,
+        DateTimeOffset plannedStartAtUtc,
+        DateTimeOffset plannedEndAtUtc,
+        string? description,
+        int? passengerCount,
+        string? missionOrderNumber,
+        DateOnly? missionOrderDate,
+        CancellationToken cancellationToken = default)
+    {
+        var rules = await GetRulesAsync(cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+        if (plannedStartAtUtc > now.AddDays(rules.BookingHorizonDays))
+        {
+            throw new InvalidOperationException("زمان انتخاب‌شده از افق مجاز رزرو مأموریت دورتر است.");
+        }
+
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var mission = await GetMissionAsync(db, missionId, cancellationToken);
+        if (!string.Equals(
+            mission.RequesterUsername,
+            requesterUsername,
+            StringComparison.OrdinalIgnoreCase))
+        {
+            throw new UnauthorizedAccessException("فقط درخواست‌کننده می‌تواند درخواست خود را ویرایش کند.");
+        }
+
+        var stops = intermediateStops?.Select(value => value.Trim())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToArray() ?? [];
+
+        var requestedLocations = stops
+            .Append(origin.Trim())
+            .Append(destination.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var approvedLocations = await db.Locations
+            .Where(location => location.Status == LocationStatus.Approved
+                && requestedLocations.Contains(location.Name))
+            .Select(location => location.Name)
+            .ToListAsync(cancellationToken);
+
+        if (approvedLocations.Count != requestedLocations.Length)
+        {
+            throw new InvalidOperationException("مبدأ، مقصد و توقف‌ها باید از فهرست مکان‌های تأییدشده انتخاب شوند.");
+        }
+
+        var before = JsonSerializer.Serialize(new
+        {
+            mission.Title,
+            mission.RequesterPhoneSnapshot,
+            mission.RequestingGroup,
+            mission.Type,
+            mission.Purpose,
+            mission.Origin,
+            mission.Destination,
+            mission.RouteJson,
+            mission.PlannedStartAtUtc,
+            mission.PlannedEndAtUtc,
+            mission.Description,
+            mission.PassengerCount,
+            mission.MissionOrderNumber,
+            mission.MissionOrderDate
+        });
+
+        mission.EditPendingRequest(
+            title,
+            requesterPhoneSnapshot,
+            requestingGroup,
+            type,
+            purpose,
+            origin,
+            destination,
+            stops,
+            plannedStartAtUtc,
+            plannedEndAtUtc,
+            description,
+            passengerCount,
+            missionOrderNumber,
+            missionOrderDate);
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        await auditLog.RecordAsync(
+            requesterUsername,
+            "EditPendingRequest",
+            "Mission",
+            mission.Id.ToString(),
+            "Success",
+            beforeJson: before,
+            afterJson: JsonSerializer.Serialize(new
+            {
+                mission.Title,
+                mission.RequesterPhoneSnapshot,
+                mission.RequestingGroup,
+                mission.Type,
+                mission.Purpose,
+                mission.Origin,
+                mission.Destination,
+                mission.RouteJson,
+                mission.PlannedStartAtUtc,
+                mission.PlannedEndAtUtc,
+                mission.Description,
+                mission.PassengerCount,
+                mission.MissionOrderNumber,
+                mission.MissionOrderDate
+            }),
+            cancellationToken: cancellationToken);
+    }
+
     /// <summary>شروع بررسی درخواست و ثبت زمان اولین بازبینی.</summary>
     public async Task StartReviewAsync(Guid missionId, string actor, CancellationToken cancellationToken = default)
     {
