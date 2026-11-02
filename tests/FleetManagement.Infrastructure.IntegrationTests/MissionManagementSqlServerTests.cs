@@ -1,6 +1,7 @@
 using FleetManagement.Application.Configuration;
 using FleetManagement.Application.Notifications;
 using FleetManagement.Domain.Drivers;
+using FleetManagement.Domain.Locations;
 using FleetManagement.Domain.Missions;
 using FleetManagement.Domain.Vehicles;
 using FleetManagement.Infrastructure.Configuration;
