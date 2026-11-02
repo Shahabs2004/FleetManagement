@@ -110,7 +110,7 @@ public sealed class MissionOdometerServiceTests
 
     private sealed class FakeStore(Mission mission) : IMissionOdometerStore
     {
-        private readonly Mission _mission = mission;
+        public Mission Mission { get; } = mission;
         public long? PreviousEndKm { get; init; }
         public long? NextStartKm { get; init; }
         public bool Committed { get; private set; }
@@ -127,7 +127,7 @@ public sealed class MissionOdometerServiceTests
     private sealed class FakeUnitOfWork(FakeStore owner) : IMissionOdometerUnitOfWork
     {
         public Task<Mission?> GetMissionAsync(Guid missionId, CancellationToken cancellationToken = default)
-            => Task.FromResult<Mission?>(owner._mission.Id == missionId ? owner._mission : null);
+            => Task.FromResult<Mission?>(owner.Mission.Id == missionId ? owner.Mission : null);
 
         public Task<long?> GetPreviousOdometerEndAsync(
             Guid missionId,
@@ -147,6 +147,7 @@ public sealed class MissionOdometerServiceTests
     private sealed class RecordingAuditWriter : IAuditLogWriter
     {
         public string? Action { get; private set; }
+        public string? AfterJson { get; private set; }
 
         public Task<Guid> RecordAsync(
             string actorUsername,
@@ -161,6 +162,7 @@ public sealed class MissionOdometerServiceTests
             CancellationToken cancellationToken = default)
         {
             Action = action;
+            AfterJson = afterJson;
             return Task.FromResult(Guid.NewGuid());
         }
     }
