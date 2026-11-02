@@ -32,7 +32,7 @@ jobs:
         run: dotnet build FleetManagement.sln --configuration Release --no-restore
 
       - name: اجرای آزمون‌های دامنه
-        run: dotnet test tests/FleetManagement.Domain.Tests/FleetManagement.Domain.Tests.csproj --configuration Release --no-build --verbosity normal
+        run: dotnet test tests/FleetManagement.Domain.Tests/FleetManagement.UnitTests.csproj --configuration Release --no-build --verbosity normal
 
       - name: انتشار خروجی وب
         if: matrix.os == 'windows-latest'
