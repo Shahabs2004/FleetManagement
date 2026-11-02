@@ -90,6 +90,7 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
     [Fact]
     public async Task زنجیره_۱۲_مهاجرت_روی_پایگاه_داده_خالی_اعمال_و_بدون_مهاجرت_معوق_است()
     {
+        // این آزمون مسیر production را می‌سنجد، نه EnsureCreated را.
         await using var database = await SqlServerTestDatabase.CreateAsync(applyMigrations: true);
         await using var db = new FleetDbContext(database.Options);
 
