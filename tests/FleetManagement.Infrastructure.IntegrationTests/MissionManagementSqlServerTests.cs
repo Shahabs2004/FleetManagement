@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FleetManagement.Application.Configuration;
 using FleetManagement.Application.Notifications;
 using FleetManagement.Domain.Drivers;
@@ -315,7 +316,7 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         Assert.Equal("گروه جدید", mission.RequestingGroup);
         Assert.Equal("مبدأ جدید", mission.Origin);
         Assert.Equal("مقصد جدید", mission.Destination);
-        Assert.Contains("توقف جدید", mission.RouteJson);
+        Assert.Contains("توقف جدید", JsonSerializer.Deserialize<string[]>(mission.RouteJson)!);
         Assert.Equal(start.AddHours(1), mission.PlannedStartAtUtc);
         Assert.Equal(start.AddHours(3), mission.PlannedEndAtUtc);
         Assert.Equal("ORDER-22", mission.MissionOrderNumber);
