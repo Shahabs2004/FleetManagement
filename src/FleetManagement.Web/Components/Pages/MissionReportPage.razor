@@ -89,9 +89,9 @@
             <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Reports.Export)">
                 <Authorized>
                     <button type="button" class="primary-button" @onclick="ExportExcel">دریافت فایل Excel</button>
+                    <button type="button" class="secondary-button" @onclick="PrintReportAsync">چاپ / ذخیره PDF</button>
                 </Authorized>
             </AuthorizeView>
-            <button type="button" class="secondary-button" @onclick="PrintReportAsync">چاپ / ذخیره PDF</button>
         </div>
         <div class="report-summary-grid">
             <div class="report-summary-item"><strong>@ToPersian(_report.Drivers.Sum(row => row.MissionCount).ToString())</strong><span>تعداد مأموریت‌های رانندگان</span></div>
