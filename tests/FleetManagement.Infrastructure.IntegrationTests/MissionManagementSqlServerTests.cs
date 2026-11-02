@@ -95,9 +95,8 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         var lifecycle = new FleetManagement.Application.Missions.MissionLifecycleProcessorService(
             new EfMissionLifecycleProcessorStore(_factory), audit, notifications, smsScheduler);
         var query = new MissionQueryService(_factory);
-        var extension = new MissionExtensionService(
-            _factory, rules, audit, notifications, smsQueue,
-            NullLogger<MissionExtensionService>.Instance);
+        var extension = new FleetManagement.Application.Missions.MissionExtensionService(
+            new EfMissionExtensionStore(_factory), rules, audit, notifications, smsScheduler);
         _service = new MissionManagementService(
             missionChanges, odometer, split, withdrawal, request, lifecycle, query, extension, rules);
     }
