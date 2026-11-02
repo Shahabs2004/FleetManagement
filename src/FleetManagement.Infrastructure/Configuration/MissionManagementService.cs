@@ -19,7 +19,6 @@ public sealed class MissionManagementService(
     IMissionRulesService rulesService)
 {
     /// <summary>خواندن قواعد برنامه‌ریزی مأموریت.</summary>
-    /// <summary>خواندن قواعد برنامه‌ریزی مأموریت.</summary>
     public Task<MissionRulesConfiguration> GetRulesAsync(CancellationToken cancellationToken = default)
         => rulesService.GetRulesAsync(cancellationToken);
 
@@ -204,6 +203,5 @@ public sealed class MissionManagementService(
         int take = 200,
         CancellationToken cancellationToken = default)
         => queryService.SearchAsync(requesterUsername, status, fromUtc, toUtc, take, cancellationToken);
-
 
 }
