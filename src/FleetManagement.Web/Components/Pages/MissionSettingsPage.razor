@@ -1,6 +1,6 @@
 @page "/admin/mission-settings"
 @rendermode InteractiveServer
-@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "SystemAdministrator")]
+@attribute [FleetPermission(PermissionCatalog.Administration.SystemManage)]
 @using FleetManagement.Infrastructure.Configuration
 @using FleetManagement.Application.Configuration
 @using Microsoft.AspNetCore.Components.Authorization
