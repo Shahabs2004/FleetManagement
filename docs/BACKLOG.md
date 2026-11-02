@@ -6,7 +6,7 @@
 1. آزمون یکپارچه با SQL Server (LocalDB/Testcontainers): تداخل راننده/خودرو هم‌زمان، فاصله اجباری، شماره‌گذاری سالانه بدون تکرار.
 2. آزمون‌های جریان کامل: تقسیم، انصراف (تأیید/رد/انقضا)، درخواست تغییر اتمی، پیوستگی کیلومتر.
 3. [x] تأیید قواعد پیوست پ: Pending/UnderReview با لغو مستقیم درخواست‌کننده بسته می‌شود؛ انصراف فقط از Confirmed/Running ثبت می‌شود؛ لغو مدیریتی از WithdrawalPending نیز مجاز است.
-4. بررسی RowVersion و Constraint در Migrationها.
+4. [x] بررسی RowVersion و Constraint در Migrationها؛ زنجیره ۱۳ Migration روی SQL Server خالی اعمال می‌شود، Snapshot با مدل جاری تطبیق دارد و آزمون‌های RowVersion/Constraint موفق‌اند.
 
 ## P1 — معماری
 5. انتقال منطق از `MissionManagementService` (≈۱۵۸۰ خط) به Application و شکستن آن به سرویس‌های کوچک (ثبت، تأیید، تغییر، تقسیم، کیلومتر، انصراف).
