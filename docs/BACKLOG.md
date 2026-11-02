@@ -9,7 +9,7 @@
 4. [x] بررسی RowVersion و Constraint در Migrationها؛ زنجیره ۱۳ Migration روی SQL Server خالی اعمال می‌شود، Snapshot با مدل جاری تطبیق دارد و آزمون‌های RowVersion/Constraint موفق‌اند.
 
 ## P1 — معماری
-5. [در حال انجام] تکمیل انتقال سناریوهای مأموریت به Application و تبدیل `MissionManagementService` به facade. قواعد، تمدید و همه مسیرهای ثبت/ویرایش/بررسی درخواست به Application منتقل شده‌اند؛ تغییر مأموریت، تقسیم، کیلومتر، انصراف و پردازش چرخه‌عمر هنوز در Infrastructure هستند.
+5. [در حال انجام] تکمیل انتقال سناریوهای مأموریت به Application و تبدیل `MissionManagementService` به facade. قواعد، تمدید، مسیرهای ثبت/ویرایش/بررسی درخواست و مدیریت تغییر مأموریت به Application منتقل شده‌اند؛ تقسیم، کیلومتر، انصراف و پردازش چرخه‌عمر هنوز در Infrastructure هستند.
 6. شکستن `FleetAuthenticationEndpoints` و فایل‌های بزرگ.
 7. تغییر نام پروژه آزمون یا جداسازی آن به Domain/Application/Infrastructure/Integration.
 8. کاتالوگ مرکزی مجوزها (ثابت‌ها) + ثبت مجوزهای مستقل مذکور در پیوست ب.

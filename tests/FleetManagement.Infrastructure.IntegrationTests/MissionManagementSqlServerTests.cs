@@ -46,9 +46,23 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         var smsSettings = new SmsSettingsService(_settings, audit);
         var smsQueue = new SmsQueueService(_factory, audit, smsSettings);
 
-        var missionChanges = new MissionChangeManagementService(
-            _factory, _settings, audit, notifications, smsQueue,
-            NullLogger<MissionChangeManagementService>.Instance);
+        var smsScheduler = new MissionSmsScheduler(
+            smsQueue,
+            NullLogger<MissionSmsScheduler>.Instance);
+        var changeStore = new EfMissionChangeRequestStore(_factory);
+        var changeRequestWorkflow = new MissionChangeRequestService(
+            changeStore,
+            audit,
+            notifications);
+        var changeApprovalWorkflow = new MissionChangeApprovalService(
+            changeStore,
+            rules,
+            audit,
+            notifications,
+            smsScheduler);
+        var missionChanges = new MissionChangeWorkflowService(
+            changeRequestWorkflow,
+            changeApprovalWorkflow);
         var odometer = new MissionOdometerService(_factory, audit);
         var split = new MissionSplitService(_factory, rules, audit, notifications);
         var withdrawal = new MissionWithdrawalService(
@@ -61,9 +75,6 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
             requestStore,
             audit,
             notifications);
-        var smsScheduler = new MissionSmsScheduler(
-            smsQueue,
-            NullLogger<MissionSmsScheduler>.Instance);
         var reviewWorkflow = new MissionReviewService(
             rules,
             reviewStore,

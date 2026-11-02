@@ -14,4 +14,10 @@ public interface IMissionSmsScheduler
         SmsEventType eventType,
         string? reason,
         CancellationToken cancellationToken = default);
+    /// <summary>لغو امن پیامک‌های یادآوری زمان شروع که هنوز ارسال نشده‌اند.</summary>
+    Task CancelUnsentRemindersSafelyAsync(
+        Guid missionId,
+        string reason,
+        string actor,
+        CancellationToken cancellationToken = default);
 }
