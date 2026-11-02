@@ -61,9 +61,6 @@ public sealed class MissionManagementService(
             cancellationToken: cancellationToken);
     }
 
-    /// <summary>
-    /// ثبت درخواست تغییر مأموریت؛ مقادیر اصلی تا زمان تأیید تغییر نمی‌کنند.
-    /// </summary>
     /// <summary>ثبت درخواست تغییر مأموریت؛ اجرای سناریو در سرویس تخصصی تغییر انجام می‌شود.</summary>
     public Task<Guid> RequestChangeAsync(
         Guid missionId,
