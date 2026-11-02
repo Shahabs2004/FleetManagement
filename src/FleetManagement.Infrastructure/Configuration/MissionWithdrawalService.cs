@@ -3,6 +3,7 @@ using System.Text.Json;
 using FleetManagement.Application.Configuration;
 using FleetManagement.Application.Missions;
 using FleetManagement.Domain.Missions;
+using FleetManagement.Domain.Notifications;
 using FleetManagement.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
