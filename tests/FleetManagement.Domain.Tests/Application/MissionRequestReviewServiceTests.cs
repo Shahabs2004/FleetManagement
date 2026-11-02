@@ -162,7 +162,7 @@ public sealed class MissionRequestReviewServiceTests
         RecordingNotificationSender notifications,
         RecordingSmsScheduler sms) =>
         new(
-            new FixedRulesProvider(new MissionPlanningRules(1, 90)),
+            new FixedRulesService(CreateRules(1, 90)),
             store,
             audit,
             notifications,
