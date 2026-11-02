@@ -49,6 +49,8 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<IMissionRequestService, MissionRequestService>();
         services.AddScoped<IMissionLifecycleProcessorService, MissionLifecycleProcessorService>();
         services.AddScoped<IMissionQueryService, MissionQueryService>();
+        services.AddScoped<IMissionExtensionService, MissionExtensionService>();
+        services.AddScoped<IMissionRulesService, MissionRulesService>();
         services.AddScoped<MissionManagementService>();
         services.AddScoped<MissionOrderTemplateService>();
         services.AddHostedService<MissionLifecycleHostedService>();
