@@ -15,27 +15,11 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// </summary>
 public sealed class MissionWithdrawalService(
     IDbContextFactory<FleetDbContext> dbContextFactory,
-    ISystemSettingsStore settingsStore,
     AuditLogService auditLog,
     NotificationService notificationService,
     SmsQueueService smsQueueService,
     ILogger<MissionWithdrawalService> logger) : IMissionWithdrawalService
 {
-    private const string RulesKey = "Missions.Rules";
-
-    private async Task<MissionRulesConfiguration> GetRulesAsync(CancellationToken cancellationToken = default)
-    {
-        var rules = await settingsStore.GetAsync<MissionRulesConfiguration>(RulesKey, cancellationToken)
-            ?? MissionRulesConfiguration.CreateDefault();
-
-        if (rules.MinimumGapHours is < 0 or > 24 || rules.BookingHorizonDays is < 1 or > 730)
-        {
-            throw new InvalidOperationException("قواعد برنامه‌ریزی مأموریت در تنظیمات معتبر نیست.");
-        }
-
-        return rules;
-    }
-
     public async Task CancelAsync(Guid missionId, string reason, string actor, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
