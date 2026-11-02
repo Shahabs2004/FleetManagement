@@ -47,14 +47,14 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
 
         var missionChanges = new MissionChangeManagementService(
             _factory,
-            missionRules,
+            _settings,
             audit,
             notifications,
             smsQueue,
             NullLogger<MissionChangeManagementService>.Instance);
         _service = new MissionManagementService(
             _factory,
-            _settings,
+            missionRules,
             audit,
             notifications,
             smsQueue,
