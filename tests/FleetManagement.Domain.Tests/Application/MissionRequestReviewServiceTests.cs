@@ -351,5 +351,14 @@ public sealed class MissionRequestReviewServiceTests
             LastEventType = eventType;
             return Task.CompletedTask;
         }
+
+        public Task CancelUnsentRemindersSafelyAsync(
+            Guid missionId,
+            string reason,
+            string actor,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
     }
 }
