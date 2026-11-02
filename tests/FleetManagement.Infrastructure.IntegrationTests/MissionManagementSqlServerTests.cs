@@ -69,11 +69,14 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
             audit,
             notifications,
             smsScheduler);
-        var request = new FleetManagement.Infrastructure.Configuration.MissionRequestService(
-            _factory,
+        var pendingRequestStore = new EfMissionPendingRequestStore(_factory);
+        var pendingRequestWorkflow = new MissionPendingRequestService(
             rules,
-            audit,
+            pendingRequestStore,
+            audit);
+        var request = new MissionRequestWorkflowService(
             requestWorkflow,
+            pendingRequestWorkflow,
             reviewWorkflow);
         var lifecycle = new MissionLifecycleProcessorService(
             _factory, audit, notifications, smsQueue,
@@ -278,6 +281,75 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         Assert.All(numbers, number => Assert.Matches(@"^\d{4}-\d{3,}$", number));
     }
 
+
+    [Fact]
+    public async Task ویرایش_درخواست_Pending_توسط_درخواست‌کننده_و_با_مکان‌های_تأییدشده_ذخیره_می‌شود()
+    {
+        var start = FutureWholeHour();
+        var missionId = await CreateRequestAsync(start, start.AddHours(2));
+        await AddApprovedLocationsAsync("مبدأ جدید", "مقصد جدید", "توقف جدید");
+
+        await _service.UpdatePendingRequestAsync(
+            missionId,
+            "integration.requester",
+            "عنوان ویرایش‌شده",
+            "09121111111",
+            "گروه جدید",
+            MissionType.Passenger,
+            "هدف ویرایش‌شده",
+            "مبدأ جدید",
+            "مقصد جدید",
+            ["توقف جدید"],
+            start.AddHours(1),
+            start.AddHours(3),
+            "شرح ویرایش‌شده",
+            2,
+            "ORDER-22",
+            new DateOnly(2026, 11, 2));
+
+        await using var db = await _factory.CreateDbContextAsync();
+        var mission = await db.Missions.SingleAsync(item => item.Id == missionId);
+        Assert.Equal(MissionStatus.Pending, mission.Status);
+        Assert.Equal("عنوان ویرایش‌شده", mission.Title);
+        Assert.Equal("09121111111", mission.RequesterPhoneSnapshot);
+        Assert.Equal("گروه جدید", mission.RequestingGroup);
+        Assert.Equal("مبدأ جدید", mission.Origin);
+        Assert.Equal("مقصد جدید", mission.Destination);
+        Assert.Contains("توقف جدید", mission.RouteJson);
+        Assert.Equal(start.AddHours(1), mission.PlannedStartAtUtc);
+        Assert.Equal(start.AddHours(3), mission.PlannedEndAtUtc);
+        Assert.Equal("ORDER-22", mission.MissionOrderNumber);
+    }
+
+    [Fact]
+    public async Task ویرایش_درخواست_Pending_توسط_کاربر_دیگر_رد_می‌شود()
+    {
+        var start = FutureWholeHour();
+        var missionId = await CreateRequestAsync(start, start.AddHours(2));
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _service.UpdatePendingRequestAsync(
+            missionId,
+            "another.user",
+            "عنوان غیرمجاز",
+            "09121111111",
+            "گروه جدید",
+            MissionType.Passenger,
+            "هدف جدید",
+            "مبدأ جدید",
+            "مقصد جدید",
+            [],
+            start,
+            start.AddHours(2),
+            null,
+            1,
+            null,
+            null));
+
+        await using var db = await _factory.CreateDbContextAsync();
+        var mission = await db.Missions.SingleAsync(item => item.Id == missionId);
+        Assert.Equal("آزمون یکپارچه مأموریت", mission.Title);
+        Assert.Equal(MissionStatus.Pending, mission.Status);
+    }
 
     [Fact]
     public async Task تقسیم_مأموریت_دو_بخش_پیوسته_با_کیلومتر_و_منابع_مستقل_ایجاد_می‌کند()
@@ -623,6 +695,19 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         {
             return false;
         }
+    }
+
+    private async Task AddApprovedLocationsAsync(params string[] names)
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+        foreach (var name in names)
+        {
+            var location = new Location(name, "integration.seed");
+            location.Approve("integration.admin");
+            db.Locations.Add(location);
+        }
+
+        await db.SaveChangesAsync();
     }
 
     private async Task<(Guid[] DriverIds, Guid[] VehicleIds)> AddResourcesAsync(
