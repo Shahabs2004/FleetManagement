@@ -47,6 +47,11 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
             entity.Property<bool>("IsArchived")
                 .HasColumnType("bit");
 
+            entity.Property<byte[]>("RowVersion")
+                .IsConcurrencyToken()
+                .ValueGeneratedOnAddOrUpdate()
+                .HasColumnType("rowversion");
+
             entity.HasKey("Id");
             entity.HasIndex("LastName", "FirstName");
             entity.ToTable("Drivers");
@@ -78,6 +83,11 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
 
             entity.Property<bool>("IsArchived")
                 .HasColumnType("bit");
+
+            entity.Property<byte[]>("RowVersion")
+                .IsConcurrencyToken()
+                .ValueGeneratedOnAddOrUpdate()
+                .HasColumnType("rowversion");
 
             entity.HasKey("Id");
             entity.HasIndex("LicensePlate").IsUnique();
@@ -221,6 +231,7 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
         modelBuilder.Entity("FleetManagement.Domain.Missions.Mission", entity =>
         {
             entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uniqueidentifier");
+            entity.Property<byte[]>("RowVersion").IsConcurrencyToken().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
             entity.Property<string>("MissionNumber").IsRequired().HasMaxLength(20).HasColumnType("nvarchar(20)");
             entity.Property<string>("Title").IsRequired().HasMaxLength(200).HasColumnType("nvarchar(200)");
             entity.Property<string>("RequesterUsername").IsRequired().HasMaxLength(64).HasColumnType("nvarchar(64)");
@@ -262,7 +273,12 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
             entity.HasIndex("DriverId", "PlannedStartAtUtc", "PlannedEndAtUtc");
             entity.HasIndex("VehicleId", "PlannedStartAtUtc", "PlannedEndAtUtc");
             entity.HasIndex("RequesterUsername");
-            entity.ToTable("Missions");
+            entity.ToTable("Missions", table =>
+            {
+                table.HasCheckConstraint("CK_Missions_PlannedTimeRange", "[PlannedEndAtUtc] > [PlannedStartAtUtc]");
+                table.HasCheckConstraint("CK_Missions_OdometerRange", "[OdometerStartKm] IS NULL OR [OdometerEndKm] IS NULL OR [OdometerEndKm] >= [OdometerStartKm]");
+                table.HasCheckConstraint("CK_Missions_PassengerCount_NonNegative", "[PassengerCount] IS NULL OR [PassengerCount] >= 0");
+            });
         });
 
         modelBuilder.Entity("FleetManagement.Domain.Missions.Mission", entity =>

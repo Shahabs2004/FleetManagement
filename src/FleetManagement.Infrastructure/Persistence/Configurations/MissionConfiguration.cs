@@ -14,8 +14,20 @@ public sealed class MissionConfiguration : IEntityTypeConfiguration<Mission>
     /// <summary>تعریف ستون‌ها، روابط و شاخص‌های جست‌وجوی مأموریت.</summary>
     public void Configure(EntityTypeBuilder<Mission> builder)
     {
-        builder.ToTable("Missions");
+        builder.ToTable("Missions", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_Missions_PlannedTimeRange",
+                "[PlannedEndAtUtc] > [PlannedStartAtUtc]");
+            table.HasCheckConstraint(
+                "CK_Missions_OdometerRange",
+                "[OdometerStartKm] IS NULL OR [OdometerEndKm] IS NULL OR [OdometerEndKm] >= [OdometerStartKm]");
+            table.HasCheckConstraint(
+                "CK_Missions_PassengerCount_NonNegative",
+                "[PassengerCount] IS NULL OR [PassengerCount] >= 0");
+        });
         builder.HasKey(mission => mission.Id);
+        builder.Property<byte[]>("RowVersion").IsRowVersion();
 
         builder.Property(mission => mission.MissionNumber).HasMaxLength(20).IsRequired();
         builder.Property(mission => mission.Title).HasMaxLength(200).IsRequired();

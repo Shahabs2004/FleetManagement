@@ -88,7 +88,7 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task زنجیره_۱۲_مهاجرت_روی_پایگاه_داده_خالی_اعمال_و_بدون_مهاجرت_معوق_است()
+    public async Task زنجیره_۱۳_مهاجرت_روی_پایگاه_داده_خالی_اعمال_و_بدون_مهاجرت_معوق_است()
     {
         // این آزمون مسیر production را می‌سنجد، نه EnsureCreated را.
         await using var database = await SqlServerTestDatabase.CreateAsync(applyMigrations: true);
@@ -98,7 +98,63 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         Assert.Empty(await db.Database.GetPendingMigrationsAsync());
 
         var appliedMigrations = await db.Database.GetAppliedMigrationsAsync();
-        Assert.Equal(12, appliedMigrations.Count());
+        Assert.Equal(13, appliedMigrations.Count());
+    }
+
+    [Fact]
+    public async Task RowVersion_برای_مأموریت_راننده_و_خودرو_توکن_همزمانی_است()
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+
+        foreach (var entityType in new[]
+        {
+            db.Model.FindEntityType(typeof(Mission)),
+            db.Model.FindEntityType(typeof(Driver)),
+            db.Model.FindEntityType(typeof(Vehicle))
+        })
+        {
+            Assert.NotNull(entityType);
+            var rowVersion = entityType!.FindProperty("RowVersion");
+            Assert.NotNull(rowVersion);
+            Assert.True(rowVersion!.IsConcurrencyToken);
+            Assert.Equal(ValueGenerated.OnAddOrUpdate, rowVersion.ValueGenerated);
+            Assert.Equal("rowversion", rowVersion.GetColumnType());
+        }
+    }
+
+    [Fact]
+    public async Task تغییر_همزمان_یک_مأموریت_با_RowVersion_رد_می‌شود()
+    {
+        var start = FutureWholeHour();
+        var missionId = await CreateRequestAsync(start, start.AddHours(2));
+
+        await using var first = await _factory.CreateDbContextAsync();
+        await using var second = await _factory.CreateDbContextAsync();
+        var firstMission = await first.Missions.SingleAsync(item => item.Id == missionId);
+        var secondMission = await second.Missions.SingleAsync(item => item.Id == missionId);
+
+        var now = DateTimeOffset.UtcNow;
+        firstMission.StartReview(now);
+        secondMission.StartReview(now);
+
+        await first.SaveChangesAsync();
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => second.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task قیود_SQL_از_بازه_زمانی_و_کیلومترشمار_نامعتبر_جلوگیری_می‌کنند()
+    {
+        var start = FutureWholeHour();
+        var missionId = await CreateRequestAsync(start, start.AddHours(2));
+        await using var db = await _factory.CreateDbContextAsync();
+
+        await Assert.ThrowsAsync<SqlException>(() =>
+            db.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE Missions SET PlannedEndAtUtc = {start} WHERE Id = {missionId}"));
+
+        await Assert.ThrowsAsync<SqlException>(() =>
+            db.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE Missions SET OdometerStartKm = 500, OdometerEndKm = 400 WHERE Id = {missionId}"));
     }
 
     [Fact]
