@@ -69,7 +69,7 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
             audit,
             notifications,
             smsScheduler);
-        var request = new MissionRequestService(
+        var request = new FleetManagement.Infrastructure.Configuration.MissionRequestService(
             _factory,
             rules,
             audit,
