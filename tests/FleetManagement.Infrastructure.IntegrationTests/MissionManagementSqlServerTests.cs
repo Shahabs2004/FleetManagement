@@ -209,8 +209,10 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
 
     private static DateTimeOffset FutureWholeHour()
     {
-        var date = DateTimeOffset.UtcNow.UtcDateTime.Date.AddDays(2);
-        return new DateTimeOffset(date.AddHours(9), TimeSpan.Zero);
+        // زمان ورودی باید روی ساعت کامل تهران باشد؛ ۹ صبح تهران معادل ۵:۳۰ UTC است.
+        var tehranOffset = TimeSpan.FromHours(3.5);
+        var tehranDate = DateTimeOffset.UtcNow.ToOffset(tehranOffset).Date.AddDays(2);
+        return new DateTimeOffset(tehranDate.AddHours(9), tehranOffset).ToUniversalTime();
     }
 
     private sealed class TestDbContextFactory(DbContextOptions<FleetDbContext> options)
