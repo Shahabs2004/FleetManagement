@@ -19,6 +19,7 @@ public sealed class MissionSplitServiceTests
         var vehicle = CreateVehicle();
         var first = CreateRunningMission(firstDriver.Id, vehicle.Id);
         var store = new FakeStore(first, nextDriver, vehicle);
+        var originalEnd = first.PlannedEndAtUtc;
         var audit = new RecordingAuditWriter();
         var notifications = new RecordingNotificationSender();
         var service = CreateService(store, audit, notifications);
@@ -39,7 +40,7 @@ public sealed class MissionSplitServiceTests
         Assert.True(store.Committed);
         Assert.Equal(MissionStatus.Completed, first.Status);
         Assert.Equal(MissionStatus.Running, second.Status);
-        Assert.Equal(first.PlannedEndAtUtc, second.PlannedEndAtUtc);
+        Assert.Equal(originalEnd, second.PlannedEndAtUtc);
         Assert.Equal(first.SplitAtUtc, second.PlannedStartAtUtc);
         Assert.Equal(125, first.OdometerEndKm);
         Assert.Equal(125, second.OdometerStartKm);
