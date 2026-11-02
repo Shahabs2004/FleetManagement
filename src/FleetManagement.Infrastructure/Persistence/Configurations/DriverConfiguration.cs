@@ -14,6 +14,7 @@ public sealed class DriverConfiguration : IEntityTypeConfiguration<Driver>
         builder.ToTable("Drivers");
 
         builder.HasKey(driver => driver.Id);
+        builder.Property<byte[]>("RowVersion").IsRowVersion();
 
         builder.Property(driver => driver.FirstName)
             .HasMaxLength(100)
