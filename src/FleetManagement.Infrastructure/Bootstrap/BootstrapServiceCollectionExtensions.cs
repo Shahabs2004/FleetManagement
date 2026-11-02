@@ -53,7 +53,10 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<IMissionReviewStore, EfMissionReviewStore>();
         services.AddScoped<FleetManagement.Application.Missions.MissionRequestService>();
         services.AddScoped<MissionReviewService>();
-        services.AddScoped<IMissionRequestService, FleetManagement.Infrastructure.Configuration.MissionRequestService>();
+        services.AddScoped<IMissionPendingRequestStore, EfMissionPendingRequestStore>();
+        services.AddScoped<MissionPendingRequestService>();
+        services.AddScoped<MissionRequestWorkflowService>();
+        services.AddScoped<IMissionRequestService, MissionRequestWorkflowService>();
         services.AddScoped<IMissionLifecycleProcessorService, MissionLifecycleProcessorService>();
         services.AddScoped<IMissionQueryService, MissionQueryService>();
         services.AddScoped<IMissionExtensionService, MissionExtensionService>();
