@@ -16,7 +16,7 @@ public sealed class AddDirectoryGroups : Migration
         migrationBuilder.AddColumn<string>(
             name: "DirectoryGroupsJson",
             table: "ApplicationUsers",
-            type: "nvarchar(12000)",
+            type: "nvarchar(max)",
             maxLength: 12000,
             nullable: false,
             defaultValue: "[]");
