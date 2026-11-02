@@ -14,6 +14,7 @@ public sealed class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
         builder.ToTable("Vehicles");
 
         builder.HasKey(vehicle => vehicle.Id);
+        builder.Property<byte[]>("RowVersion").IsRowVersion();
 
         builder.Property(vehicle => vehicle.Brand)
             .HasMaxLength(100)
