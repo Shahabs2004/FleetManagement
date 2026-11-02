@@ -1,6 +1,6 @@
 @page "/admin/mission-template"
 @rendermode InteractiveServer
-@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "SystemAdministrator")]
+@attribute [FleetPermission(PermissionCatalog.Administration.MissionTemplateManage)]
 @using FleetManagement.Infrastructure.Configuration
 @using Microsoft.AspNetCore.Components.Authorization
 @inject MissionOrderTemplateService TemplateService
