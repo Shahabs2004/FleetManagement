@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FleetManagement.Application.Notifications;
 using FleetManagement.Domain.Vehicles;
 using FleetManagement.Domain.Missions;
 using FleetManagement.Infrastructure.Persistence;
@@ -11,7 +12,8 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// </summary>
 public sealed class VehicleManagementService(
     IDbContextFactory<FleetDbContext> dbContextFactory,
-    AuditLogService auditLog)
+    AuditLogService auditLog,
+    IFleetDataChangePublisher dataChangePublisher)
 {
     /// <summary>جست‌وجوی خودروها بر اساس برند، مدل یا پلاک.</summary>
     public async Task<IReadOnlyList<Vehicle>> SearchAsync(
@@ -78,6 +80,7 @@ public sealed class VehicleManagementService(
             afterJson: JsonSerializer.Serialize(new { vehicle.Brand, vehicle.Model, vehicle.LicensePlate, vehicle.ManualStatus }),
             clientIpAddress: ipAddress,
             cancellationToken: cancellationToken);
+        await dataChangePublisher.PublishAsync(FleetDataChangeKind.Vehicles, cancellationToken);
 
         return vehicle.Id;
     }
@@ -105,6 +108,7 @@ public sealed class VehicleManagementService(
             actor, "Update", "Vehicle", vehicle.Id.ToString(), "Success",
             beforeJson: before, afterJson: after, clientIpAddress: ipAddress,
             cancellationToken: cancellationToken);
+        await dataChangePublisher.PublishAsync(FleetDataChangeKind.Vehicles, cancellationToken);
     }
 
     /// <summary>
@@ -159,6 +163,7 @@ public sealed class VehicleManagementService(
             afterJson: after,
             clientIpAddress: ipAddress,
             cancellationToken: cancellationToken);
+        await dataChangePublisher.PublishAsync(FleetDataChangeKind.Vehicles, cancellationToken);
     }
 
     /// <summary>بایگانی خودرو بدون حذف سابقه آن.</summary>
@@ -190,6 +195,7 @@ public sealed class VehicleManagementService(
             afterJson: JsonSerializer.Serialize(new { vehicle.IsArchived }),
             clientIpAddress: ipAddress,
             cancellationToken: cancellationToken);
+        await dataChangePublisher.PublishAsync(FleetDataChangeKind.Vehicles, cancellationToken);
     }
 
     /// <summary>بازگرداندن خودرو از بایگانی در صورت آماده‌به‌کار بودن.</summary>
@@ -211,5 +217,6 @@ public sealed class VehicleManagementService(
             afterJson: JsonSerializer.Serialize(new { vehicle.IsArchived }),
             clientIpAddress: ipAddress,
             cancellationToken: cancellationToken);
+        await dataChangePublisher.PublishAsync(FleetDataChangeKind.Vehicles, cancellationToken);
     }
 }

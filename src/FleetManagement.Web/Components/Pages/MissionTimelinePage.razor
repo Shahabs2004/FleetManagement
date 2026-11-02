@@ -152,6 +152,7 @@
             ?? state.User.Identity?.Name
             ?? string.Empty;
         NotificationEvents.Published += OnNotificationPublished;
+        NotificationEvents.DataChanged += OnFleetDataChanged;
         await LoadAsync();
     }
 
@@ -279,6 +280,7 @@
     public void Dispose()
     {
         NotificationEvents.Published -= OnNotificationPublished;
+        NotificationEvents.DataChanged -= OnFleetDataChanged;
     }
 
     /// <summary>انتخاب مأموریت برای نمایش جزئیات.</summary>

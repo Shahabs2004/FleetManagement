@@ -3,6 +3,8 @@ using FleetManagement.Infrastructure.Bootstrap;
 using FleetManagement.Web.Components;
 using FleetManagement.Web.Security;
 using FleetManagement.Web.Notifications;
+using FleetManagement.Web;
+using Microsoft.AspNetCore.Components.Server.Circuits;
 using FleetManagement.Application.Notifications;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,8 +18,10 @@ builder.Services
 builder.Services.AddFleetInfrastructure(builder.Configuration);
 builder.Services.AddFleetAuthentication();
 builder.Services.AddSignalR();
+builder.Services.AddScoped<CircuitHandler, FleetRealtimeCircuitHandler>();
 builder.Services.AddSingleton<NotificationEventBus>();
 builder.Services.AddScoped<INotificationPublisher, SignalRNotificationPublisher>();
+builder.Services.AddScoped<IFleetDataChangePublisher, SignalRFleetDataChangePublisher>();
 
 var app = builder.Build();
 
