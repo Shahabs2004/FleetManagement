@@ -1,7 +1,6 @@
 using FleetManagement.Domain.Locations;
 using Microsoft.Extensions.Logging;
 using System.Data;
-using System.Globalization;
 using System.Text.Json;
 using FleetManagement.Application.Configuration;
 using FleetManagement.Application.Missions;
@@ -426,45 +425,6 @@ public sealed class MissionManagementService(
     }
 
     /// <summary>تولید شماره یکتای سالانه بر اساس تقویم جلالی در تراکنش سریال‌پذیر.</summary>
-    private static async Task<string> GenerateMissionNumberAsync(
-        FleetDbContext db,
-        DateTimeOffset nowUtc,
-        CancellationToken cancellationToken)
-    {
-        TimeZoneInfo tehranZone;
-        try
-        {
-            tehranZone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
-        }
-        catch (TimeZoneNotFoundException)
-        {
-            tehranZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran");
-        }
-
-        var localNow = TimeZoneInfo.ConvertTime(nowUtc, tehranZone);
-        var jalaliYear = new PersianCalendar().GetYear(localNow.DateTime);
-
-        // A serializable range scan alone can deadlock with concurrent inserts when SQL Server
-        // chooses a broad scan plan. Serialize number allocation per Jalali year explicitly.
-        var lockResource = $"FleetManagement:MissionNumber:{jalaliYear}";
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"DECLARE @lockResult int; EXEC @lockResult = sys.sp_getapplock @Resource = {lockResource}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 15000; IF @lockResult < 0 THROW 51000, 'Unable to acquire mission number lock.', 1;",
-            cancellationToken);
-
-        var prefix = $"{jalaliYear}-";
-        var numbers = await db.Missions
-            .Where(mission => mission.MissionNumber.StartsWith(prefix))
-            .Select(mission => mission.MissionNumber)
-            .ToListAsync(cancellationToken);
-
-        var lastNumber = numbers
-            .Select(number => int.TryParse(number.AsSpan(prefix.Length), out var value) ? value : 0)
-            .DefaultIfEmpty(0)
-            .Max();
-
-        return $"{jalaliYear}-{lastNumber + 1:000}";
-    }
-
     /// <summary>بررسی هم‌پوشانی یا فاصله ناکافی برای راننده و خودرو.</summary>
     private static async Task<bool> HasResourceConflictAsync(
         FleetDbContext db,
