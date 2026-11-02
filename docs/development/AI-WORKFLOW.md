@@ -44,10 +44,12 @@
 ### وضعیت CI (از `.github/workflows/build.yml`)
 
 - اجرا با هر push و Pull Request روی `main` و `develop`.
-- job «build» (Ubuntu و Windows): restore، build کل Solution با Release، اجرای
-  `tests/FleetManagement.Domain.Tests/FleetManagement.UnitTests.csproj`، و روی Windows انتشار خروجی وب به‌صورت Artifact.
-- job «آزمون یکپارچه SQL Server» (Ubuntu): کانتینر SQL Server 2022 و اجرای
+- job «build (windows-latest)»: restore، build کل Solution با Release، اجرای
+  `tests/FleetManagement.Domain.Tests` (پروژه `FleetManagement.UnitTests`)، انتشار خروجی وب و Artifact.
+  مقصد استقرار Windows Server/IIS است؛ ساخت Ubuntu حذف شد.
+- job «آزمون یکپارچه SQL Server» (فقط Ubuntu، الزامی): SQL Server 2022 در کانتینر و اجرای
   `tests/FleetManagement.Infrastructure.IntegrationTests`.
+- شرط ادغام: هر دو check باید سبز باشند.
 - اگر پروژه تست جدیدی اضافه می‌کنی، مطمئن شو در یکی از این jobها اجرا می‌شود.
 
 ## مرحله ۲: گزارش کوتاه (فارسی، حداکثر یک صفحه)
