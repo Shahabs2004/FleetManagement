@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FleetManagement.Application.Notifications;
 using FleetManagement.Domain.Drivers;
 using FleetManagement.Domain.Missions;
 using FleetManagement.Infrastructure.Persistence;
@@ -11,7 +12,8 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// </summary>
 public sealed class DriverManagementService(
     IDbContextFactory<FleetDbContext> dbContextFactory,
-    AuditLogService auditLog)
+    AuditLogService auditLog,
+    IFleetDataChangePublisher dataChangePublisher)
 {
     /// <summary>دریافت رانندگان با امکان جست‌وجو بر اساس نام و نام خانوادگی.</summary>
     public async Task<IReadOnlyList<Driver>> SearchAsync(
@@ -59,6 +61,7 @@ public sealed class DriverManagementService(
             afterJson: JsonSerializer.Serialize(new { driver.FirstName, driver.LastName, driver.MobilePhone, driver.EmploymentStatus }),
             clientIpAddress: ipAddress,
             cancellationToken: cancellationToken);
+        await dataChangePublisher.PublishAsync(FleetDataChangeKind.Drivers, cancellationToken);
 
         return driver.Id;
     }
@@ -86,6 +89,7 @@ public sealed class DriverManagementService(
             actor, "Update", "Driver", driver.Id.ToString(), "Success",
             beforeJson: before, afterJson: after, clientIpAddress: ipAddress,
             cancellationToken: cancellationToken);
+        await dataChangePublisher.PublishAsync(FleetDataChangeKind.Drivers, cancellationToken);
     }
 
     /// <summary>
@@ -150,6 +154,7 @@ public sealed class DriverManagementService(
             afterJson: after,
             clientIpAddress: ipAddress,
             cancellationToken: cancellationToken);
+        await dataChangePublisher.PublishAsync(FleetDataChangeKind.Drivers, cancellationToken);
     }
 
     /// <summary>تغییر وضعیت استخدامی و ثبت ممیزی.</summary>
@@ -187,6 +192,7 @@ public sealed class DriverManagementService(
             afterJson: JsonSerializer.Serialize(new { Status = status.ToString() }),
             clientIpAddress: ipAddress,
             cancellationToken: cancellationToken);
+        await dataChangePublisher.PublishAsync(FleetDataChangeKind.Drivers, cancellationToken);
     }
 
     /// <summary>بایگانی راننده بدون حذف اطلاعات تاریخی.</summary>
@@ -218,6 +224,7 @@ public sealed class DriverManagementService(
             afterJson: JsonSerializer.Serialize(new { driver.IsArchived }),
             clientIpAddress: ipAddress,
             cancellationToken: cancellationToken);
+        await dataChangePublisher.PublishAsync(FleetDataChangeKind.Drivers, cancellationToken);
     }
 
     /// <summary>بازگرداندن راننده بایگانی‌شده در صورت فعال بودن وضعیت استخدامی.</summary>
@@ -239,5 +246,6 @@ public sealed class DriverManagementService(
             afterJson: JsonSerializer.Serialize(new { driver.IsArchived }),
             clientIpAddress: ipAddress,
             cancellationToken: cancellationToken);
+        await dataChangePublisher.PublishAsync(FleetDataChangeKind.Drivers, cancellationToken);
     }
 }
