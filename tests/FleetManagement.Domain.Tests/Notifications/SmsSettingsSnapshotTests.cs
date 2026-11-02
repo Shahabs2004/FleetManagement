@@ -15,6 +15,7 @@ public sealed class SmsSettingsSnapshotTests
               "Username": "private-user",
               "Password": "private-password",
               "SourceNumber": "1000",
+              "DeliveryStatusMappings": { "FAKE-DELIVERED": 1 },
               "EventTemplates": []
             }
             """;
@@ -25,6 +26,8 @@ public sealed class SmsSettingsSnapshotTests
 
         Assert.NotNull(snapshot);
         Assert.NotNull(snapshot.EventTemplates);
+        Assert.NotNull(snapshot.DeliveryStatusMappings);
+        Assert.Equal(AdpDeliveryStatusKind.Delivered, snapshot.DeliveryStatusMappings["FAKE-DELIVERED"]);
         Assert.DoesNotContain(
             typeof(SmsSettingsService.SmsTemplateSettingsSnapshot).GetProperties(BindingFlags.Instance | BindingFlags.Public),
             property => property.Name is "Organization" or "Username" or "Password" or "SourceNumber");

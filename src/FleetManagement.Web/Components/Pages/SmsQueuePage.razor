@@ -8,6 +8,7 @@
 @using FleetManagement.Infrastructure.Configuration
 @using FleetManagement.Web.Security
 @inject SmsQueueService SmsQueue
+@inject SmsSettingsService SmsSettings
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ILogger<SmsQueuePage> Logger
 
@@ -94,7 +95,7 @@
                             <td>@FormatTehranTime(item.CreatedAtUtc)</td>
                             <td>@ToPersianDigits(item.AttemptCount)</td>
                             <td>@GetStatusName(item.Status)</td>
-                            <td>@(item.ProviderDeliveryStatus ?? "نامشخص")</td>
+                            <td>@GetDeliveryStatusLabel(item.ProviderDeliveryStatus)</td>
                             <td dir="ltr">@item.ProviderMessageId</td>
                             <td>@item.ErrorReason</td>
                             <td>
@@ -132,6 +133,8 @@
     private string _missionId = string.Empty;
     private string? _error;
     private IReadOnlyList<SmsQueueItem> _items = [];
+    private IReadOnlyDictionary<string, AdpDeliveryStatusKind> _deliveryStatusMappings =
+        new Dictionary<string, AdpDeliveryStatusKind>(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<Guid, string> _retryReasons = [];
 
     /// <summary>بارگذاری اولیه گزارش پیامک‌ها.</summary>
@@ -156,6 +159,7 @@
                 ? parsedMission
                 : null;
 
+            _deliveryStatusMappings = await SmsSettings.GetDeliveryStatusMappingsAsync();
             _items = await SmsQueue.SearchAsync(
                 recipientPhone: _phone,
                 eventType: eventType,
@@ -221,6 +225,10 @@
             _isBusy = false;
         }
     }
+
+    /// <summary>نمایش وضعیت خام ADP فقط در صورت وجود نگاشت تأییدشده؛ در غیر این صورت نامشخص.</summary>
+    private string GetDeliveryStatusLabel(string? providerStatus) =>
+        AdpDeliveryStatusMapper.GetPersianLabel(providerStatus, _deliveryStatusMappings);
 
     /// <summary>عنوان فارسی نوع رویداد پیامکی.</summary>
     private static string GetEventName(SmsEventType value) => value switch
