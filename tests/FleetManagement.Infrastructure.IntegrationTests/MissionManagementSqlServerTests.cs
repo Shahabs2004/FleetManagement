@@ -53,9 +53,28 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         var withdrawal = new MissionWithdrawalService(
             _factory, audit, notifications, smsQueue,
             NullLogger<MissionWithdrawalService>.Instance);
+        var requestStore = new EfMissionRequestStore(_factory);
+        var reviewStore = new EfMissionReviewStore(_factory);
+        var requestWorkflow = new FleetManagement.Application.Missions.MissionRequestService(
+            rules,
+            requestStore,
+            audit,
+            notifications);
+        var smsScheduler = new MissionSmsScheduler(
+            smsQueue,
+            NullLogger<MissionSmsScheduler>.Instance);
+        var reviewWorkflow = new MissionReviewService(
+            rules,
+            reviewStore,
+            audit,
+            notifications,
+            smsScheduler);
         var request = new MissionRequestService(
-            _factory, rules, audit, notifications, smsQueue,
-            NullLogger<MissionRequestService>.Instance);
+            _factory,
+            rules,
+            audit,
+            requestWorkflow,
+            reviewWorkflow);
         var lifecycle = new MissionLifecycleProcessorService(
             _factory, audit, notifications, smsQueue,
             NullLogger<MissionLifecycleProcessorService>.Instance);
