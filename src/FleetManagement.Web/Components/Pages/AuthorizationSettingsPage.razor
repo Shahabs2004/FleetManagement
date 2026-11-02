@@ -1,9 +1,10 @@
 @page "/admin/security"
 @rendermode InteractiveServer
-@attribute [FleetPermission("settings.authorization")]
+@attribute [FleetPermission(PermissionCatalog.Administration.AuthorizationManage)]
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Authorization
+@using FleetManagement.Application.Authorization
 @using FleetManagement.Infrastructure.Configuration
 @using FleetManagement.Web.Security
 @inject AuthorizationSettingsService AuthorizationSettings
@@ -82,6 +83,32 @@
             <h2>مجوزهای مستقیم کاربران</h2>
             <p>هر خط به شکل نام کاربری دامنه|کلید مجوز|Grant یا Deny باشد. این مجوز مستقل از نقش‌های کاربر است و Deny بر تمام اعطاها اولویت دارد.</p>
             <InputTextArea @bind-Value="_manualPermissionsText" />
+        </div>
+
+        <div class="admin-section">
+            <h2>کاتالوگ مجوزهای معتبر</h2>
+            <p>فقط کلیدهای ثبت‌شده در این فهرست قابل تخصیص به نقش یا کاربر هستند. مجوزهای مستقل را می‌توانید جداگانه اعطا یا رد کنید.</p>
+            <div class="session-table-wrap">
+                <table class="session-table">
+                    <thead>
+                        <tr>
+                            <th>کلید مجوز</th>
+                            <th>عنوان</th>
+                            <th>شرح</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var permission in PermissionCatalog.Definitions)
+                        {
+                            <tr @key="permission.Code">
+                                <td><code>@permission.Code</code></td>
+                                <td>@permission.Title</td>
+                                <td>@permission.Description</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <div class="admin-section">
