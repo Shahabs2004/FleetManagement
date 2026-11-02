@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FleetManagement.Application.Auditing;
 using FleetManagement.Application.Configuration;
 using FleetManagement.Application.Missions;
@@ -43,7 +44,7 @@ public sealed class MissionPendingRequestServiceTests
         Assert.Equal("عنوان جدید", mission.Title);
         Assert.Equal("مبدأ جدید", mission.Origin);
         Assert.Equal("مقصد جدید", mission.Destination);
-        Assert.Contains("توقف جدید", mission.RouteJson);
+        Assert.Contains("توقف جدید", JsonSerializer.Deserialize<string[]>(mission.RouteJson)!);
         Assert.Equal("ORDER-22", mission.MissionOrderNumber);
         Assert.Equal(MissionStatus.Pending, mission.Status);
         Assert.Equal("EditPendingRequest", audit.Action);
