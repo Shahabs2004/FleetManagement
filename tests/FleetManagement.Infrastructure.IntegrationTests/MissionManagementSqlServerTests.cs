@@ -43,13 +43,21 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         var smsSettings = new SmsSettingsService(_settings, audit);
         var smsQueue = new SmsQueueService(_factory, audit, smsSettings);
 
+        var missionChanges = new MissionChangeManagementService(
+            _factory,
+            _settings,
+            audit,
+            notifications,
+            smsQueue,
+            NullLogger<MissionChangeManagementService>.Instance);
         _service = new MissionManagementService(
             _factory,
             _settings,
             audit,
             notifications,
             smsQueue,
-            NullLogger<MissionManagementService>.Instance);
+            NullLogger<MissionManagementService>.Instance,
+            missionChanges);
     }
 
     public async Task DisposeAsync()
