@@ -80,7 +80,8 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
                 audit,
                 notifications,
                 smsQueue,
-                NullLogger<MissionLifecycleProcessorService>.Instance));
+                NullLogger<MissionLifecycleProcessorService>.Instance),
+            new MissionQueryService(_factory));
     }
 
     public async Task DisposeAsync()
