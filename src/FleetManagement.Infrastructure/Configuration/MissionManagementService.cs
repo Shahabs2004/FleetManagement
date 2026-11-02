@@ -1443,9 +1443,7 @@ public sealed class MissionManagementService(
         // chooses a broad scan plan. Serialize number allocation per Jalali year explicitly.
         var lockResource = $"FleetManagement:MissionNumber:{jalaliYear}";
         await db.Database.ExecuteSqlInterpolatedAsync(
-            $"DECLARE @lockResult int; EXEC @lockResult = sys.sp_getapplock " +
-            $"@Resource = {lockResource}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', " +
-            $"@LockTimeout = 15000; IF @lockResult < 0 THROW 51000, 'Unable to acquire mission number lock.', 1;",
+            $"DECLARE @lockResult int; EXEC @lockResult = sys.sp_getapplock @Resource = {lockResource}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 15000; IF @lockResult < 0 THROW 51000, 'Unable to acquire mission number lock.', 1;",
             cancellationToken);
 
         var prefix = $"{jalaliYear}-";
