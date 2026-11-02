@@ -6,7 +6,7 @@ namespace FleetManagement.Application.Notifications;
 public interface IMissionNotificationSender
 {
     /// <summary>ارسال اعلان به یک کاربر.</summary>
-    Task CreateAsync(
+    Task<Guid> CreateAsync(
         string recipientUsername,
         string title,
         string message,
