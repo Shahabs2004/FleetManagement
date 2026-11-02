@@ -205,7 +205,9 @@ public sealed class MissionSplitServiceTests
 
     private static Mission CreateRunningMission(Guid driverId, Guid vehicleId)
     {
-        var start = new DateTimeOffset(DateTime.UtcNow.Date.AddDays(-2).AddHours(8), TimeSpan.Zero);
+        var tehranOffset = TimeSpan.FromHours(3.5);
+        var tehranDate = DateTimeOffset.UtcNow.ToOffset(tehranOffset).Date.AddDays(-2);
+        var start = new DateTimeOffset(tehranDate.AddHours(9), tehranOffset).ToUniversalTime();
         var mission = CreateMission("1405-001", start, start.AddHours(4));
         mission.Approve(driverId, vehicleId, "reviewer", start.AddHours(-1));
         mission.StartAutomatically(start);
