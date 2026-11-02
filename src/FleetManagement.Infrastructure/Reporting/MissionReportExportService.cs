@@ -100,7 +100,7 @@ public sealed class MissionReportExportService
             row.Title,
             row.RequesterUsername,
             row.Reason,
-            row.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
+            FormatJalaliTehran(row.CreatedAtUtc)
         }));
         return rows;
     }
@@ -117,6 +117,28 @@ public sealed class MissionReportExportService
             ["تعداد رانندگان دارای مأموریت", report.Drivers.Count],
             ["تعداد خودروهای دارای مأموریت", report.Vehicles.Count]
         ];
+    }
+
+    /// <summary>نمایش تاریخ به تقویم جلالی و ساعت تهران با ارقام فارسی.</summary>
+    private static string FormatJalaliTehran(DateTimeOffset value)
+    {
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+
+        var local = TimeZoneInfo.ConvertTime(value, zone);
+        var calendar = new PersianCalendar();
+        var formatted = $"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} {local:HH:mm}";
+        const string latin = "0123456789";
+        const string persian = "۰۱۲۳۴۵۶۷۸۹";
+        return string.Create(formatted.Length, formatted, (destination, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                var digit = latin.IndexOf(source[index]);
+                destination[index] = digit >= 0 ? persian[digit] : source[index];
+            }
+        });
     }
 
     private static byte[] BuildWorksheet(IReadOnlyList<object?[]> rows)
