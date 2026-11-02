@@ -539,6 +539,24 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task درخواست_در_انتظار_توسط_درخواست‌کننده_مستقیماً_لغو_می‌شود()
+    {
+        var start = FutureWholeHour();
+        var missionId = await CreateRequestAsync(start, start.AddHours(2));
+
+        await _service.CancelPendingRequestAsync(
+            missionId, "integration.requester", "درخواست دیگر موردنیاز نیست");
+
+        await using var db = await _factory.CreateDbContextAsync();
+        var mission = await db.Missions.SingleAsync(item => item.Id == missionId);
+        Assert.Equal(MissionStatus.Cancelled, mission.Status);
+        Assert.Equal("درخواست دیگر موردنیاز نیست", mission.DecisionReason);
+        Assert.Null(mission.StatusBeforeWithdrawal);
+        Assert.Null(mission.DriverId);
+        Assert.Null(mission.VehicleId);
+    }
+
+    [Fact]
     public async Task لغو_مدیریتی_درخواست_انصراف_در_انتظار_را_نهایی_و_وضعیت_موقت_را_پاک_می‌کند()
     {
         var resources = await AddResourcesAsync(driverCount: 1, vehicleCount: 1);
