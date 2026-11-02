@@ -9,7 +9,7 @@
 4. [x] بررسی RowVersion و Constraint در Migrationها؛ زنجیره ۱۳ Migration روی SQL Server خالی اعمال می‌شود، Snapshot با مدل جاری تطبیق دارد و آزمون‌های RowVersion/Constraint موفق‌اند.
 
 ## P1 — معماری
-5. [در حال انجام] تکمیل انتقال سناریوهای مأموریت به Application و تبدیل `MissionManagementService` به facade. قواعد، مسیرهای ثبت/ویرایش/بررسی درخواست، مدیریت تغییر مأموریت، کیلومترشمار، تقسیم، انصراف و پردازش چرخه‌عمر به Application منتقل شده‌اند؛ تمدید هنوز در Infrastructure است.
+5. [x] تکمیل انتقال سناریوهای مأموریت به Application و تبدیل `MissionManagementService` به facade. قواعد، تمدید، مسیرهای ثبت/ویرایش/بررسی درخواست، مدیریت تغییر مأموریت، کیلومترشمار، تقسیم، انصراف و پردازش چرخه‌عمر در Application اجرا می‌شوند؛ دسترسی EF Core و تراکنش‌ها در آداپتورهای Infrastructure باقی مانده‌اند.
 6. شکستن `FleetAuthenticationEndpoints` و فایل‌های بزرگ.
 7. تغییر نام پروژه آزمون یا جداسازی آن به Domain/Application/Infrastructure/Integration.
 8. کاتالوگ مرکزی مجوزها (ثابت‌ها) + ثبت مجوزهای مستقل مذکور در پیوست ب.
@@ -27,5 +27,5 @@
 - **۲۰۲۶-۱۱-۰۲** — انتقال منطق تقسیم مأموریت به Application در PR شماره ۲۶؛ CI شماره ۷۳۳ در Windows، Ubuntu و SQL Server 2022 موفق بود.
 - **۲۰۲۶-۱۱-۰۲** — انتقال گردش انصراف به Application در PR شماره ۲۷؛ CI شماره ۷۳۶ در Windows، Ubuntu و SQL Server 2022 موفق بود.
 
-## سابقه تغییر وضعیت
 - **۲۰۲۶-۱۱-۰۲** — انتقال پردازش چرخه عمر به Application در PR شماره ۲۸؛ CI شماره ۷۳۹ در Windows، Ubuntu و SQL Server 2022 موفق بود.
+- **۲۰۲۶-۱۱-۰۲** — انتقال تمدید مأموریت به Application و تکمیل P1-5 در PR شماره ۲۹؛ CI شماره ۷۴۲ در Windows، Ubuntu و SQL Server 2022 موفق بود.
