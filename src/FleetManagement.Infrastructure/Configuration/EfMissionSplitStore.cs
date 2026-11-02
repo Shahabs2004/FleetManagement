@@ -99,20 +99,15 @@ public sealed class EfMissionSplitStore(IDbContextFactory<FleetDbContext> dbCont
             return $"{jalaliYear}-{lastNumber + 1:000}";
         }
 
-        public Task<IReadOnlyList<Mission>> GetResourceConflictCandidatesAsync(
+        public async Task<IReadOnlyList<Mission>> GetResourceConflictCandidatesAsync(
             Guid excludedMissionId,
             Guid driverId,
             Guid vehicleId,
             CancellationToken cancellationToken = default) =>
-            db.Missions
+            await db.Missions
                 .Where(mission => mission.Id != excludedMissionId
                     && (mission.DriverId == driverId || mission.VehicleId == vehicleId))
-                .ToListAsync(cancellationToken)
-                .ContinueWith<IReadOnlyList<Mission>>(
-                    task => task.GetAwaiter().GetResult(),
-                    cancellationToken,
-                    TaskContinuationOptions.ExecuteSynchronously,
-                    TaskScheduler.Default);
+                .ToListAsync(cancellationToken);
 
         public void Add(Mission mission) => db.Missions.Add(mission);
 
