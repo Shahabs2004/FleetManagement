@@ -29,6 +29,35 @@ public sealed class MissionOrderTemplateConfiguration
     /// <summary>عنوان محل امضای راننده.</summary>
     public string DriverSignatureLabel { get; set; } = "امضای راننده";
 
+    /// <summary>تعداد ستون‌های چیدمان محل امضا؛ فقط یک یا دو ستون مجاز است.</summary>
+    public int SignatureColumns { get; set; } = 2;
+
+    /// <summary>اعتبارسنجی مقادیر قابل ذخیره الگوی چاپ.</summary>
+    public void Validate()
+    {
+        ValidateText(HeaderTitle, 100, nameof(HeaderTitle));
+        ValidateText(OrganizationName, 200, nameof(OrganizationName), allowEmpty: true);
+        ValidateText(IntroText, 1000, nameof(IntroText), allowEmpty: true);
+        ValidateText(FooterText, 1000, nameof(FooterText), allowEmpty: true);
+        ValidateText(RequesterSignatureLabel, 100, nameof(RequesterSignatureLabel));
+        ValidateText(OperatorSignatureLabel, 100, nameof(OperatorSignatureLabel));
+        ValidateText(ApproverSignatureLabel, 100, nameof(ApproverSignatureLabel));
+        ValidateText(DriverSignatureLabel, 100, nameof(DriverSignatureLabel));
+
+        if (SignatureColumns is not (1 or 2))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(SignatureColumns),
+                "چیدمان محل امضا باید یک یا دو ستون باشد.");
+        }
+    }
+
+    private static void ValidateText(string? value, int maxLength, string parameterName, bool allowEmpty = false)
+    {
+        if (!allowEmpty) ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
+        if (value?.Length > maxLength) throw new ArgumentOutOfRangeException(parameterName);
+    }
+
     /// <summary>مقادیر پیش‌فرض.</summary>
     public static MissionOrderTemplateConfiguration CreateDefault() => new();
 }

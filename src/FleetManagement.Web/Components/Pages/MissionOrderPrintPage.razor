@@ -94,7 +94,7 @@ else
             <p class="mission-order-footer-text">@_template.FooterText</p>
         }
 
-        <section class="mission-order-signatures">
+        <section class="mission-order-signatures" style="@($"--signature-columns:{_template.SignatureColumns};")">
             <div><strong>@_template.RequesterSignatureLabel</strong><span>نام و امضا</span></div>
             <div><strong>@_template.OperatorSignatureLabel</strong><span>نام و امضا</span></div>
             <div><strong>@_template.ApproverSignatureLabel</strong><span>نام و امضا</span></div>

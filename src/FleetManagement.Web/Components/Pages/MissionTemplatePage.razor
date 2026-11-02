@@ -49,6 +49,13 @@
                 <label>عنوان امضای راننده</label>
                 <input @bind="_driverSignature" maxlength="100" />
             </div>
+            <div>
+                <label>چیدمان محل امضاها</label>
+                <select @bind="_signatureColumns">
+                    <option value="2">دو ستون</option>
+                    <option value="1">یک ستون</option>
+                </select>
+            </div>
         </div>
         <div class="mission-route-editor">
             <label>متن مقدمه</label>
@@ -72,6 +79,7 @@
     private string _operatorSignature = "امضای مسئول ناوگان";
     private string _approverSignature = "امضای مقام تأییدکننده";
     private string _driverSignature = "امضای راننده";
+    private int _signatureColumns = 2;
     private string _actor = "unknown";
     private string _message = string.Empty;
     private string _error = string.Empty;
@@ -92,6 +100,7 @@
             _operatorSignature = template.OperatorSignatureLabel;
             _approverSignature = template.ApproverSignatureLabel;
             _driverSignature = template.DriverSignatureLabel;
+            _signatureColumns = template.SignatureColumns;
         }
         catch (Exception exception)
         {
@@ -115,7 +124,8 @@
                 RequesterSignatureLabel = _requesterSignature,
                 OperatorSignatureLabel = _operatorSignature,
                 ApproverSignatureLabel = _approverSignature,
-                DriverSignatureLabel = _driverSignature
+                DriverSignatureLabel = _driverSignature,
+                SignatureColumns = _signatureColumns
             }, _actor);
 
             _message = "الگوی دستور مأموریت ذخیره شد.";
