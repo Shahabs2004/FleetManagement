@@ -48,19 +48,19 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
             _factory, _settings, audit, notifications, smsQueue,
             NullLogger<MissionChangeManagementService>.Instance);
         var odometer = new MissionOdometerService(_factory, audit);
-        var split = new MissionSplitService(_factory, _settings, audit, notifications);
+        var split = new MissionSplitService(_factory, rules, audit, notifications);
         var withdrawal = new MissionWithdrawalService(
-            _factory, _settings, audit, notifications, smsQueue,
+            _factory, audit, notifications, smsQueue,
             NullLogger<MissionWithdrawalService>.Instance);
         var request = new MissionRequestService(
-            _factory, _settings, audit, notifications, smsQueue,
+            _factory, rules, audit, notifications, smsQueue,
             NullLogger<MissionRequestService>.Instance);
         var lifecycle = new MissionLifecycleProcessorService(
             _factory, audit, notifications, smsQueue,
             NullLogger<MissionLifecycleProcessorService>.Instance);
         var query = new MissionQueryService(_factory);
         var extension = new MissionExtensionService(
-            _factory, _settings, audit, notifications, smsQueue,
+            _factory, rules, audit, notifications, smsQueue,
             NullLogger<MissionExtensionService>.Instance);
         var rules = new MissionRulesService(_settings, audit);
         _service = new MissionManagementService(
