@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FleetManagement.Application.Auditing;
 using FleetManagement.Application.Missions;
 using FleetManagement.Domain.Missions;
@@ -115,6 +114,7 @@ public sealed class MissionOdometerServiceTests
 
     private sealed class FakeMissionOdometerStore(Mission mission) : IMissionOdometerStore
     {
+        private readonly Mission _mission = mission;
         public long? PreviousEndKm { get; init; }
         public long? NextStartKm { get; init; }
         public bool Committed { get; private set; }
@@ -131,7 +131,7 @@ public sealed class MissionOdometerServiceTests
         private sealed class FakeUnitOfWork(FakeMissionOdometerStore owner) : IMissionOdometerUnitOfWork
         {
             public Task<Mission?> GetMissionAsync(Guid missionId, CancellationToken cancellationToken = default) =>
-                Task.FromResult<Mission?>(mission.Id == missionId ? mission : null);
+                Task.FromResult<Mission?>(owner._mission.Id == missionId ? owner._mission : null);
 
             public Task<long?> GetPreviousEndOdometerAsync(
                 Guid missionId,
