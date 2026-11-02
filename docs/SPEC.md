@@ -192,7 +192,7 @@ IIS + Windows Auth + LDAPS واقعی، ارسال واقعی پیامک و نگ
 ### مغایرت‌های مشاهده‌شده بین مشخصات و کد
 1. **لایه Application تقریباً خالی است** (فقط `ISystemSettingsStore` و `INotificationPublisher`)؛ منطق کسب‌وکار در Infrastructure (`MissionManagementService.cs` ≈ ۱۵۸۰ خط) و Web است. این با تصمیم Clean Architecture و `ARCHITECTURE.md` نمی‌خواند.
 2. فایل‌های بسیار بزرگ (`MissionManagementService` ≈ ۱۵۸۰، `Mission.cs` ≈ ۶۵۰، `FleetAuthenticationEndpoints` ≈ ۴۶۰ خط) با قاعده «کد کوچک و خوانا» مغایرند.
-3. آزمون‌ها فقط در یک پروژه (`FleetManagement.Domain.Tests`، ≈ ۱۱۰۰ خط) هستند و نام آن با محتوا (آزمون‌های Infrastructure و SMS هم در آن است) نمی‌خواند؛ آزمون یکپارچه (SQL، تداخل هم‌زمان، تراکنش) دیده نشد.
+3. آزمون‌های واحد در پروژه `FleetManagement.UnitTests` و آزمون‌های یکپارچه SQL Server در پروژه مستقل `FleetManagement.Infrastructure.IntegrationTests` نگهداری می‌شوند؛ پوشش و نتیجه هر دو باید از CI بررسی شود.
 4. SignalR فقط برای اعلان‌ها است؛ به‌روزرسانی زنده تایم‌لاین/فهرست‌ها تأیید نشد.
 5. کتابخانه PDF در کد نیست؛ «ذخیره PDF حکم» به چاپ مرورگر متکی است (باید تأیید شود).
 6. کد مجوزها پراکنده در رشته‌های داخل صفحات/تنظیمات است و کاتالوگ مرکزی ندارد (نگاه کنید به پیوست ب). بعضی کدها (`settings.sessions`، `security.sessions.view`) هم‌پوشان به‌نظر می‌رسند.

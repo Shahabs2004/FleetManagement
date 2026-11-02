@@ -45,7 +45,7 @@
 
 - اجرا با هر push و Pull Request روی `main` و `develop`.
 - job «build» (Ubuntu و Windows): restore، build کل Solution با Release، اجرای
-  `tests/FleetManagement.Domain.Tests`، و روی Windows انتشار خروجی وب به‌صورت Artifact.
+  `tests/FleetManagement.Domain.Tests/FleetManagement.UnitTests.csproj`، و روی Windows انتشار خروجی وب به‌صورت Artifact.
 - job «آزمون یکپارچه SQL Server» (Ubuntu): کانتینر SQL Server 2022 و اجرای
   `tests/FleetManagement.Infrastructure.IntegrationTests`.
 - اگر پروژه تست جدیدی اضافه می‌کنی، مطمئن شو در یکی از این jobها اجرا می‌شود.

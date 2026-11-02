@@ -10,7 +10,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FleetManagement.Infrastruct
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FleetManagement.Web", "src\FleetManagement.Web\FleetManagement.Web.csproj", "{6B4C4D61-1F45-4A5A-8F14-444444444444}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FleetManagement.Domain.Tests", "tests\FleetManagement.Domain.Tests\FleetManagement.Domain.Tests.csproj", "{6B4C4D61-1F45-4A5A-8F14-555555555555}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FleetManagement.UnitTests", "tests\FleetManagement.Domain.Tests\FleetManagement.UnitTests.csproj", "{6B4C4D61-1F45-4A5A-8F14-555555555555}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FleetManagement.Infrastructure.IntegrationTests", "tests\FleetManagement.Infrastructure.IntegrationTests\FleetManagement.Infrastructure.IntegrationTests.csproj", "{6B4C4D61-1F45-4A5A-8F14-666666666666}"
 EndProject
