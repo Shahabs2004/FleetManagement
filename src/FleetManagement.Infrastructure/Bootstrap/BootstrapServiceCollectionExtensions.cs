@@ -1,3 +1,4 @@
+using FleetManagement.Application.Auditing;
 using FleetManagement.Application.Configuration;
 using FleetManagement.Application.Missions;
 using FleetManagement.Infrastructure.Configuration;
@@ -39,6 +40,7 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<UserSessionService>();
         services.AddScoped<SessionPolicySettingsService>();
         services.AddScoped<AuditLogService>();
+        services.AddScoped<IAuditLogWriter>(provider => provider.GetRequiredService<AuditLogService>());
         services.AddScoped<DriverManagementService>();
         services.AddScoped<DriverVehiclePreferenceService>();
         services.AddScoped<VehicleManagementService>();
@@ -49,6 +51,8 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<IMissionRequestService, MissionRequestService>();
         services.AddScoped<IMissionLifecycleProcessorService, MissionLifecycleProcessorService>();
         services.AddScoped<IMissionQueryService, MissionQueryService>();
+        services.AddScoped<IMissionExtensionService, MissionExtensionService>();
+        services.AddScoped<IMissionRulesService, MissionRulesService>();
         services.AddScoped<MissionManagementService>();
         services.AddScoped<MissionOrderTemplateService>();
         services.AddHostedService<MissionLifecycleHostedService>();

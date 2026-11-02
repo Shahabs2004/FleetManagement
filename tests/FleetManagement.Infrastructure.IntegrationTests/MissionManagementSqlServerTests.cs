@@ -34,6 +34,7 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         _settings = new SqlSystemSettingsStore(_factory);
 
         var audit = new AuditLogService(_factory);
+        var rules = new MissionRulesService(_settings, audit);
         var authorization = new AuthorizationSettingsService(_settings, audit);
         var recipients = new UserNotificationRecipientResolver(_factory, authorization);
         var notifications = new NotificationService(
@@ -45,43 +46,25 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         var smsQueue = new SmsQueueService(_factory, audit, smsSettings);
 
         var missionChanges = new MissionChangeManagementService(
-            _factory,
-            _settings,
-            audit,
-            notifications,
-            smsQueue,
+            _factory, _settings, audit, notifications, smsQueue,
             NullLogger<MissionChangeManagementService>.Instance);
+        var odometer = new MissionOdometerService(_factory, audit);
+        var split = new MissionSplitService(_factory, rules, audit, notifications);
+        var withdrawal = new MissionWithdrawalService(
+            _factory, audit, notifications, smsQueue,
+            NullLogger<MissionWithdrawalService>.Instance);
+        var request = new MissionRequestService(
+            _factory, rules, audit, notifications, smsQueue,
+            NullLogger<MissionRequestService>.Instance);
+        var lifecycle = new MissionLifecycleProcessorService(
+            _factory, audit, notifications, smsQueue,
+            NullLogger<MissionLifecycleProcessorService>.Instance);
+        var query = new MissionQueryService(_factory);
+        var extension = new MissionExtensionService(
+            _factory, rules, audit, notifications, smsQueue,
+            NullLogger<MissionExtensionService>.Instance);
         _service = new MissionManagementService(
-            _factory,
-            _settings,
-            audit,
-            notifications,
-            smsQueue,
-            NullLogger<MissionManagementService>.Instance,
-            missionChanges,
-            new MissionOdometerService(_factory, audit),
-            new MissionSplitService(_factory, _settings, audit, notifications),
-            new MissionWithdrawalService(
-                _factory,
-                _settings,
-                audit,
-                notifications,
-                smsQueue,
-                NullLogger<MissionWithdrawalService>.Instance),
-            new MissionRequestService(
-                _factory,
-                _settings,
-                audit,
-                notifications,
-                smsQueue,
-                NullLogger<MissionRequestService>.Instance),
-            new MissionLifecycleProcessorService(
-                _factory,
-                audit,
-                notifications,
-                smsQueue,
-                NullLogger<MissionLifecycleProcessorService>.Instance),
-            new MissionQueryService(_factory));
+            missionChanges, odometer, split, withdrawal, request, lifecycle, query, extension, rules);
     }
 
     public async Task DisposeAsync()

@@ -1,4 +1,4 @@
-namespace FleetManagement.Infrastructure.Configuration;
+namespace FleetManagement.Application.Configuration;
 
 /// <summary>
 /// قواعد قابل تنظیم برنامه‌ریزی مأموریت‌ها.
