@@ -10,7 +10,7 @@
 
 ## P1 — معماری
 5. [x] تکمیل انتقال سناریوهای مأموریت به Application و تبدیل `MissionManagementService` به facade. قواعد، تمدید، مسیرهای ثبت/ویرایش/بررسی درخواست، مدیریت تغییر مأموریت، کیلومترشمار، تقسیم، انصراف و پردازش چرخه‌عمر در Application اجرا می‌شوند؛ دسترسی EF Core و تراکنش‌ها در آداپتورهای Infrastructure باقی مانده‌اند.
-6. شکستن `FleetAuthenticationEndpoints` و فایل‌های بزرگ.
+6. [x] شکستن `FleetAuthenticationEndpoints` به فایل‌های تک‌مسئولیتی برای مسیرهای Directory، Local Administrator و Windows؛ CI در PR شماره ۳۱ (Ubuntu، Windows و SQL Server) موفق بود.
 7. تغییر نام پروژه آزمون یا جداسازی آن به Domain/Application/Infrastructure/Integration.
 8. کاتالوگ مرکزی مجوزها (ثابت‌ها) + ثبت مجوزهای مستقل مذکور در پیوست ب.
 
@@ -29,3 +29,4 @@
 
 - **۲۰۲۶-۱۱-۰۲** — انتقال پردازش چرخه عمر به Application در PR شماره ۲۸؛ CI شماره ۷۳۹ در Windows، Ubuntu و SQL Server 2022 موفق بود.
 - **۲۰۲۶-۱۱-۰۲** — انتقال تمدید مأموریت به Application و تکمیل P1-5 در PR شماره ۲۹؛ CI شماره ۷۴۲ در Windows، Ubuntu و SQL Server 2022 موفق بود.
+- **۲۰۲۶-۱۱-۰۲** — تفکیک endpointهای احراز هویت و تکمیل P1-6 در PR شماره ۳۱؛ CI run `41418139266` در Ubuntu، Windows و SQL Server موفق بود.
