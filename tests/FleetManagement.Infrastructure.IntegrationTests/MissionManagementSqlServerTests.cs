@@ -66,7 +66,8 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         var odometer = new FleetManagement.Application.Missions.MissionOdometerService(
             new EfMissionOdometerStore(_factory),
             audit);
-        var split = new MissionSplitService(_factory, rules, audit, notifications);
+        var split = new FleetManagement.Application.Missions.MissionSplitService(
+            new EfMissionSplitStore(_factory), rules, audit, notifications);
         var withdrawal = new MissionWithdrawalService(
             _factory, audit, notifications, smsQueue,
             NullLogger<MissionWithdrawalService>.Instance);
