@@ -68,9 +68,8 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
             audit);
         var split = new FleetManagement.Application.Missions.MissionSplitService(
             new EfMissionSplitStore(_factory), rules, audit, notifications);
-        var withdrawal = new MissionWithdrawalService(
-            _factory, audit, notifications, smsQueue,
-            NullLogger<MissionWithdrawalService>.Instance);
+        var withdrawal = new FleetManagement.Application.Missions.MissionWithdrawalService(
+            new EfMissionWithdrawalStore(_factory), audit, notifications, smsScheduler);
         var requestStore = new EfMissionRequestStore(_factory);
         var reviewStore = new EfMissionReviewStore(_factory);
         var requestWorkflow = new FleetManagement.Application.Missions.MissionRequestService(

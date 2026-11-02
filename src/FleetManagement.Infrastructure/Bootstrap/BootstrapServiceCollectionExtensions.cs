@@ -54,7 +54,8 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<IMissionOdometerService, FleetManagement.Application.Missions.MissionOdometerService>();
         services.AddScoped<IMissionSplitStore, EfMissionSplitStore>();
         services.AddScoped<IMissionSplitService, FleetManagement.Application.Missions.MissionSplitService>();
-        services.AddScoped<IMissionWithdrawalService, MissionWithdrawalService>();
+        services.AddScoped<IMissionWithdrawalStore, EfMissionWithdrawalStore>();
+        services.AddScoped<IMissionWithdrawalService, FleetManagement.Application.Missions.MissionWithdrawalService>();
         services.AddScoped<IMissionRequestStore, EfMissionRequestStore>();
         services.AddScoped<IMissionReviewStore, EfMissionReviewStore>();
         services.AddScoped<FleetManagement.Application.Missions.MissionRequestService>();
