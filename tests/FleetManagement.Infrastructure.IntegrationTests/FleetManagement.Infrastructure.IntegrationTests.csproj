@@ -16,6 +16,8 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\src\FleetManagement.Infrastructure\FleetManagement.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\FleetManagement.Web\FleetManagement.Web.csproj" />
   </ItemGroup>
 </Project>
