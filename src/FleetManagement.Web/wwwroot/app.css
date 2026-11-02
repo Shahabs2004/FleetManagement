@@ -1047,7 +1047,7 @@ h1 {
 
 .mission-order-signatures {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(var(--signature-columns, 2), minmax(0, 1fr));
     gap: 12mm 8mm;
     margin-top: 18mm;
 }
@@ -1093,6 +1093,10 @@ h1 {
         margin: 0;
         padding: 14mm;
         box-shadow: none;
+        direction: rtl;
+        font-family: Tahoma, "Segoe UI", Arial, sans-serif;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
         break-after: avoid;
     }
 }
