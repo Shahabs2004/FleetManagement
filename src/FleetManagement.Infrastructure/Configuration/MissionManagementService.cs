@@ -1438,6 +1438,16 @@ public sealed class MissionManagementService(
 
         var localNow = TimeZoneInfo.ConvertTime(nowUtc, tehranZone);
         var jalaliYear = new PersianCalendar().GetYear(localNow.DateTime);
+
+        // A serializable range scan alone can deadlock with concurrent inserts when SQL Server
+        // chooses a broad scan plan. Serialize number allocation per Jalali year explicitly.
+        var lockResource = $"FleetManagement:MissionNumber:{jalaliYear}";
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"DECLARE @lockResult int; EXEC @lockResult = sys.sp_getapplock " +
+            $"@Resource = {lockResource}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', " +
+            $"@LockTimeout = 15000; IF @lockResult < 0 THROW 51000, 'Unable to acquire mission number lock.', 1;",
+            cancellationToken);
+
         var prefix = $"{jalaliYear}-";
         var numbers = await db.Missions
             .Where(mission => mission.MissionNumber.StartsWith(prefix))
