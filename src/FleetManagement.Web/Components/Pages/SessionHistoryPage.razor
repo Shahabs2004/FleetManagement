@@ -1,6 +1,7 @@
 @page "/admin/sessions"
+@using FleetManagement.Application.Authorization
 @rendermode InteractiveServer
-@attribute [FleetPermission("security.sessions.view")]
+@attribute [FleetPermission(PermissionCatalog.Security.SessionsView)]
 @using System.Globalization
 @using FleetManagement.Domain.Sessions
 @using FleetManagement.Infrastructure.Configuration
