@@ -37,6 +37,70 @@ public sealed class MissionOdometerServiceTests
         Assert.Null(audit.Action);
     }
 
+
+    [Fact]
+    public async Task SetOdometerAsync_WhenStartIsBelowPreviousMissionEnd_RejectsUpdate()
+    {
+        var mission = CreateApprovedMission();
+        var store = new FakeStore(mission) { PreviousEndKm = 250 };
+        var audit = new RecordingAuditWriter();
+        var service = new MissionOdometerService(store, audit);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.SetOdometerAsync(mission.Id, 200, null, "operator"));
+
+        Assert.Contains("آخرین مقدار ثبت‌شده", exception.Message);
+        Assert.Null(mission.OdometerStartKm);
+        Assert.False(store.Committed);
+        Assert.Null(audit.Action);
+    }
+
+    [Fact]
+    public async Task SetOdometerAsync_WhenEndExceedsNextMissionStart_RejectsUpdate()
+    {
+        var mission = CreateApprovedMission();
+        var store = new FakeStore(mission) { NextStartKm = 400 };
+        var audit = new RecordingAuditWriter();
+        var service = new MissionOdometerService(store, audit);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.SetOdometerAsync(mission.Id, 200, 450, "operator"));
+
+        Assert.Contains("مأموریت بعدی", exception.Message);
+        Assert.Null(mission.OdometerStartKm);
+        Assert.False(store.Committed);
+        Assert.Null(audit.Action);
+    }
+
+    [Fact]
+    public async Task SetOdometerAsync_WhenValuesPreserveContinuity_UpdatesAndAudits()
+    {
+        var mission = CreateApprovedMission();
+        var store = new FakeStore(mission) { PreviousEndKm = 100, NextStartKm = 500 };
+        var audit = new RecordingAuditWriter();
+        var service = new MissionOdometerService(store, audit);
+
+        await service.SetOdometerAsync(mission.Id, 200, 300, "operator");
+
+        Assert.True(store.Committed);
+        Assert.Equal(200, mission.OdometerStartKm);
+        Assert.Equal(300, mission.OdometerEndKm);
+        Assert.Equal(100, mission.DistanceKm);
+        Assert.Equal("UpdateOdometer", audit.Action);
+        Assert.Contains("\"DistanceKm\":100", audit.AfterJson);
+    }
+
+    private static Mission CreateApprovedMission()
+    {
+        var start = FutureWholeHour();
+        var mission = new Mission(
+            "1405-002", "مأموریت آزمون", "requester", "درخواست‌کننده", "09120000000",
+            "واحد آزمون", "گروه آزمون", MissionType.Passenger, "هدف آزمون", "مبدأ", "مقصد",
+            [], start, start.AddHours(2));
+        mission.Approve(Guid.NewGuid(), Guid.NewGuid(), "reviewer", DateTimeOffset.UtcNow);
+        return mission;
+    }
+
     private static DateTimeOffset FutureWholeHour()
     {
         var tehranOffset = TimeSpan.FromHours(3.5);
@@ -46,30 +110,38 @@ public sealed class MissionOdometerServiceTests
 
     private sealed class FakeStore(Mission mission) : IMissionOdometerStore
     {
-        public Task<TResult> ExecuteSerializableAsync<TResult>(
+        private readonly Mission _mission = mission;
+        public long? PreviousEndKm { get; init; }
+        public long? NextStartKm { get; init; }
+        public bool Committed { get; private set; }
+        public async Task<TResult> ExecuteSerializableAsync<TResult>(
             Func<IMissionOdometerUnitOfWork, CancellationToken, Task<TResult>> operation,
             CancellationToken cancellationToken = default)
-            => operation(new FakeUnitOfWork(mission), cancellationToken);
+        {
+            var result = await operation(new FakeUnitOfWork(this), cancellationToken);
+            Committed = true;
+            return result;
+        }
     }
 
-    private sealed class FakeUnitOfWork(Mission mission) : IMissionOdometerUnitOfWork
+    private sealed class FakeUnitOfWork(FakeStore owner) : IMissionOdometerUnitOfWork
     {
         public Task<Mission?> GetMissionAsync(Guid missionId, CancellationToken cancellationToken = default)
-            => Task.FromResult<Mission?>(mission.Id == missionId ? mission : null);
+            => Task.FromResult<Mission?>(owner._mission.Id == missionId ? owner._mission : null);
 
         public Task<long?> GetPreviousOdometerEndAsync(
             Guid missionId,
             Guid vehicleId,
             DateTimeOffset missionStartAtUtc,
             CancellationToken cancellationToken = default)
-            => Task.FromResult<long?>(null);
+            => Task.FromResult(owner.PreviousEndKm);
 
         public Task<long?> GetNextOdometerStartAsync(
             Guid missionId,
             Guid vehicleId,
             DateTimeOffset effectiveEndAtUtc,
             CancellationToken cancellationToken = default)
-            => Task.FromResult<long?>(null);
+            => Task.FromResult(owner.NextStartKm);
     }
 
     private sealed class RecordingAuditWriter : IAuditLogWriter
