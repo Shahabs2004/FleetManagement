@@ -81,4 +81,15 @@ public sealed class MissionQueryService(
 
     /// <summary>تولید شماره یکتای سالانه بر اساس تقویم جلالی در تراکنش سریال‌پذیر.</summary>
     /// <summary>بررسی هم‌پوشانی یا فاصله ناکافی برای راننده و خودرو.</summary>
+    private static async Task<Mission> GetMissionAsync(
+        FleetDbContext db,
+        Guid missionId,
+        CancellationToken cancellationToken)
+    {
+        return await db.Missions.SingleOrDefaultAsync(
+            mission => mission.Id == missionId,
+            cancellationToken)
+            ?? throw new KeyNotFoundException("مأموریت موردنظر پیدا نشد.");
+    }
+
 }
