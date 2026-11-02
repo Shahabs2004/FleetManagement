@@ -1,5 +1,4 @@
 using System.Data;
-using System.Text.Json;
 using FleetManagement.Application.Missions;
 using FleetManagement.Domain.Missions;
 using FleetManagement.Infrastructure.Persistence;
@@ -8,94 +7,62 @@ using Microsoft.EntityFrameworkCore;
 namespace FleetManagement.Infrastructure.Configuration;
 
 /// <summary>
-/// اجرای ثبت کیلومترشمار و کنترل پیوستگی مقادیر خودرو در ترتیب مأموریت‌ها.
+/// آداپتور EF Core برای اجرای تراکنشی سناریوی کیلومترشمار.
 /// </summary>
-public sealed class MissionOdometerService(
-    IDbContextFactory<FleetDbContext> dbContextFactory,
-    AuditLogService auditLog) : IMissionOdometerService
+public sealed class EfMissionOdometerStore(IDbContextFactory<FleetDbContext> dbContextFactory)
+    : IMissionOdometerStore
 {
-    public async Task SetOdometerAsync(
-        Guid missionId,
-        long? startKm,
-        long? endKm,
-        string actor,
+    /// <inheritdoc />
+    public async Task<TResult> ExecuteSerializableAsync<TResult>(
+        Func<IMissionOdometerUnitOfWork, CancellationToken, Task<TResult>> operation,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(operation);
+
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        var mission = await GetMissionAsync(db, missionId, cancellationToken);
-        var before = new { mission.OdometerStartKm, mission.OdometerEndKm };
-        if ((startKm.HasValue || endKm.HasValue) && !mission.VehicleId.HasValue)
-        {
-            throw new InvalidOperationException("ابتدا باید خودرو برای مأموریت تعیین شده باشد.");
-        }
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable,
+            cancellationToken);
 
-        var effectiveEndAtUtc = mission.ActualEndAtUtc ?? mission.PlannedEndAtUtc;
-        var resultingStartKm = startKm ?? mission.OdometerStartKm;
-        var resultingEndKm = endKm ?? mission.OdometerEndKm;
+        var result = await operation(new EfUnitOfWork(db), cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
 
-        if (mission.VehicleId.HasValue && resultingStartKm.HasValue)
-        {
-            var previousEnd = await db.Missions
-                .Where(item => item.Id != mission.Id
-                    && item.VehicleId == mission.VehicleId
+    private sealed class EfUnitOfWork(FleetDbContext db) : IMissionOdometerUnitOfWork
+    {
+        public Task<Mission?> GetMissionAsync(
+            Guid missionId,
+            CancellationToken cancellationToken = default) =>
+            db.Missions.SingleOrDefaultAsync(item => item.Id == missionId, cancellationToken);
+
+        public Task<long?> GetPreviousEndOdometerAsync(
+            Guid missionId,
+            Guid vehicleId,
+            DateTimeOffset beforeOrAtUtc,
+            CancellationToken cancellationToken = default) =>
+            db.Missions
+                .Where(item => item.Id != missionId
+                    && item.VehicleId == vehicleId
                     && item.OdometerEndKm.HasValue
-                    && (item.ActualEndAtUtc ?? item.PlannedEndAtUtc) <= mission.PlannedStartAtUtc)
+                    && (item.ActualEndAtUtc ?? item.PlannedEndAtUtc) <= beforeOrAtUtc)
                 .OrderByDescending(item => item.ActualEndAtUtc ?? item.PlannedEndAtUtc)
                 .Select(item => item.OdometerEndKm)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            if (previousEnd.HasValue && resultingStartKm.Value < previousEnd.Value)
-            {
-                throw new InvalidOperationException("کیلومترشمار شروع از آخرین مقدار ثبت‌شده برای این خودرو کمتر است.");
-            }
-        }
-
-        var lastCurrentMissionOdometer = resultingEndKm ?? resultingStartKm;
-        if (mission.VehicleId.HasValue && lastCurrentMissionOdometer.HasValue)
-        {
-            var nextStart = await db.Missions
-                .Where(item => item.Id != mission.Id
-                    && item.VehicleId == mission.VehicleId
+        public Task<long?> GetNextStartOdometerAsync(
+            Guid missionId,
+            Guid vehicleId,
+            DateTimeOffset afterOrAtUtc,
+            CancellationToken cancellationToken = default) =>
+            db.Missions
+                .Where(item => item.Id != missionId
+                    && item.VehicleId == vehicleId
                     && item.OdometerStartKm.HasValue
-                    && item.PlannedStartAtUtc >= effectiveEndAtUtc)
+                    && item.PlannedStartAtUtc >= afterOrAtUtc)
                 .OrderBy(item => item.PlannedStartAtUtc)
                 .Select(item => item.OdometerStartKm)
                 .FirstOrDefaultAsync(cancellationToken);
-
-            if (nextStart.HasValue && lastCurrentMissionOdometer.Value > nextStart.Value)
-            {
-                throw new InvalidOperationException("مقدار کیلومترشمار این مأموریت از شروع مأموریت بعدی بیشتر است.");
-            }
-        }
-
-        if (startKm.HasValue)
-        {
-            mission.SetOdometerStart(startKm.Value);
-        }
-
-        if (endKm.HasValue)
-        {
-            mission.SetOdometerEnd(endKm.Value);
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        await auditLog.RecordAsync(
-            actor, "UpdateOdometer", "Mission", mission.Id.ToString(), "Success",
-            beforeJson: JsonSerializer.Serialize(before),
-            afterJson: JsonSerializer.Serialize(new { mission.OdometerStartKm, mission.OdometerEndKm, mission.DistanceKm }),
-            cancellationToken: cancellationToken);
-    }
-
-    private static async Task<Mission> GetMissionAsync(
-        FleetDbContext db,
-        Guid missionId,
-        CancellationToken cancellationToken)
-    {
-        return await db.Missions.SingleOrDefaultAsync(
-            mission => mission.Id == missionId,
-            cancellationToken)
-            ?? throw new KeyNotFoundException("مأموریت موردنظر پیدا نشد.");
     }
 }
