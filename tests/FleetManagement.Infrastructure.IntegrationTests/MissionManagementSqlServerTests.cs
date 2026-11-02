@@ -389,6 +389,61 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         Assert.Equal(160L, second.OdometerStartKm);
     }
 
+    [Fact]
+    public async Task درخواست_در_حال_بررسی_توسط_درخواست‌کننده_مستقیماً_لغو_می‌شود()
+    {
+        var start = FutureWholeHour();
+        var missionId = await CreateRequestAsync(start, start.AddHours(2));
+        await _service.StartReviewAsync(missionId, "fleet-reviewer");
+
+        await _service.CancelPendingRequestAsync(
+            missionId, "integration.requester", "دیگر نیازی به مأموریت نیست");
+
+        await using var db = await _factory.CreateDbContextAsync();
+        var mission = await db.Missions.SingleAsync(item => item.Id == missionId);
+        Assert.Equal(MissionStatus.Cancelled, mission.Status);
+        Assert.Equal("دیگر نیازی به مأموریت نیست", mission.DecisionReason);
+        Assert.Null(mission.StatusBeforeWithdrawal);
+    }
+
+    [Fact]
+    public async Task لغو_مدیریتی_درخواست_انصراف_در_انتظار_را_نهایی_و_وضعیت_موقت_را_پاک_می‌کند()
+    {
+        var resources = await AddResourcesAsync(driverCount: 1, vehicleCount: 1);
+        var start = FutureWholeHour();
+        var missionId = await CreateApprovedMissionAsync(
+            resources.DriverIds[0], resources.VehicleIds[0], start, start.AddHours(2));
+
+        await _service.RequestWithdrawalAsync(missionId, "integration.requester", "تغییر برنامه");
+        await _service.CancelAsync(missionId, "لغو مدیریتی با فوریت", "fleet-reviewer");
+
+        await using var db = await _factory.CreateDbContextAsync();
+        var mission = await db.Missions.SingleAsync(item => item.Id == missionId);
+        Assert.Equal(MissionStatus.Cancelled, mission.Status);
+        Assert.Equal("لغو مدیریتی با فوریت", mission.DecisionReason);
+        Assert.Null(mission.StatusBeforeWithdrawal);
+    }
+
+    [Fact]
+    public async Task درخواست_انصراف_از_درخواست_تأییدنشده_رد_و_به_لغو_مستقیم_هدایت_می‌شود()
+    {
+        var start = FutureWholeHour();
+        var missionId = await CreateRequestAsync(start, start.AddHours(2));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.RequestWithdrawalAsync(
+                missionId, "integration.requester", "تغییر برنامه"));
+
+        await _service.StartReviewAsync(missionId, "fleet-reviewer");
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.RequestWithdrawalAsync(
+                missionId, "integration.requester", "تغییر برنامه"));
+
+        await using var db = await _factory.CreateDbContextAsync();
+        var mission = await db.Missions.SingleAsync(item => item.Id == missionId);
+        Assert.Equal(MissionStatus.UnderReview, mission.Status);
+    }
+
     /// <summary>ایجاد درخواست و تخصیص منابع برای سناریوهای چرخه عمر.</summary>
     private async Task<Guid> CreateApprovedMissionAsync(
         Guid driverId,

@@ -815,9 +815,9 @@ public sealed class MissionManagementService(
             throw new UnauthorizedAccessException("فقط درخواست‌کننده می‌تواند درخواست خود را لغو کند.");
         }
 
-        if (mission.Status != MissionStatus.Pending)
+        if (mission.Status is not (MissionStatus.Pending or MissionStatus.UnderReview))
         {
-            throw new InvalidOperationException("لغو مستقیم فقط برای درخواست در انتظار بررسی مجاز است.");
+            throw new InvalidOperationException("لغو مستقیم فقط برای درخواست تأییدنشده مجاز است.");
         }
 
         mission.Cancel(reason, DateTimeOffset.UtcNow);
@@ -841,7 +841,7 @@ public sealed class MissionManagementService(
             throw new UnauthorizedAccessException("فقط درخواست‌کننده می‌تواند برای مأموریت خود درخواست انصراف ثبت کند.");
         }
 
-        if (mission.Status == MissionStatus.Pending)
+        if (mission.Status is MissionStatus.Pending or MissionStatus.UnderReview)
         {
             throw new InvalidOperationException("درخواست تأییدنشده باید مستقیماً لغو شود و نیاز به درخواست انصراف ندارد.");
         }
