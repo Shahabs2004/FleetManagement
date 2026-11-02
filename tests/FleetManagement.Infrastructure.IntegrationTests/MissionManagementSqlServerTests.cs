@@ -3,6 +3,7 @@ using FleetManagement.Application.Notifications;
 using FleetManagement.Domain.Drivers;
 using FleetManagement.Domain.Locations;
 using FleetManagement.Domain.Missions;
+using FleetManagement.Application.Missions;
 using FleetManagement.Domain.Vehicles;
 using FleetManagement.Infrastructure.Configuration;
 using FleetManagement.Infrastructure.Persistence;
@@ -43,13 +44,21 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         var smsSettings = new SmsSettingsService(_settings, audit);
         var smsQueue = new SmsQueueService(_factory, audit, smsSettings);
 
+        var missionChanges = new MissionChangeManagementService(
+            _factory,
+            _settings,
+            audit,
+            notifications,
+            smsQueue,
+            NullLogger<MissionChangeManagementService>.Instance);
         _service = new MissionManagementService(
             _factory,
             _settings,
             audit,
             notifications,
             smsQueue,
-            NullLogger<MissionManagementService>.Instance);
+            NullLogger<MissionManagementService>.Instance,
+            missionChanges);
     }
 
     public async Task DisposeAsync()
