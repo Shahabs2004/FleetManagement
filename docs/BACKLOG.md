@@ -9,7 +9,7 @@
 4. [x] بررسی RowVersion و Constraint در Migrationها؛ زنجیره ۱۳ Migration روی SQL Server خالی اعمال می‌شود، Snapshot با مدل جاری تطبیق دارد و آزمون‌های RowVersion/Constraint موفق‌اند.
 
 ## P1 — معماری
-5. انتقال منطق از `MissionManagementService` (≈۱۵۸۰ خط) به Application و شکستن آن به سرویس‌های کوچک (ثبت، تأیید، تغییر، تقسیم، کیلومتر، انصراف).
+5. [در حال انجام] تکمیل انتقال منطق مأموریت از Infrastructure به Application و تفکیک سرویس‌های کوچک (ثبت، تأیید، تغییر، تقسیم، کیلومتر، انصراف). سناریوی قواعد برنامه‌ریزی به `MissionRulesService` منتقل شده است؛ انتقال سایر سناریوها باقی است.
 6. شکستن `FleetAuthenticationEndpoints` و فایل‌های بزرگ.
 7. تغییر نام پروژه آزمون یا جداسازی آن به Domain/Application/Infrastructure/Integration.
 8. کاتالوگ مرکزی مجوزها (ثابت‌ها) + ثبت مجوزهای مستقل مذکور در پیوست ب.
