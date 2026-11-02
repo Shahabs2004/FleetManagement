@@ -6,9 +6,16 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: دریافت سورس
         uses: actions/checkout@v4
@@ -23,3 +30,50 @@ jobs:
 
       - name: ساخت نسخه
         run: dotnet build FleetManagement.sln --configuration Release --no-restore
+
+      - name: اجرای آزمون‌های دامنه
+        run: dotnet test tests/FleetManagement.Domain.Tests/FleetManagement.UnitTests.csproj --configuration Release --no-build --verbosity normal
+
+      - name: انتشار خروجی وب
+        if: matrix.os == 'windows-latest'
+        run: dotnet publish src/FleetManagement.Web/FleetManagement.Web.csproj --configuration Release --no-build --output publish
+
+      - name: نگهداری خروجی قابل‌دانلود
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: FleetManagement-web
+          path: publish/
+          if-no-files-found: error
+          retention-days: 14
+
+  integration-tests:
+    name: آزمون یکپارچه SQL Server
+    runs-on: ubuntu-latest
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: FleetTest!2026_SqlServer
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'FleetTest!2026_SqlServer' -Q 'SELECT 1' || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      FLEETMANAGEMENT_TEST_SQL_CONNECTION: "Server=localhost,1433;Database=master;User Id=sa;Password=FleetTest!2026_SqlServer;TrustServerCertificate=True;Encrypt=False"
+    steps:
+      - name: دریافت سورس
+        uses: actions/checkout@v4
+
+      - name: نصب .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: اجرای آزمون‌های یکپارچه SQL Server
+        run: dotnet test tests/FleetManagement.Infrastructure.IntegrationTests/FleetManagement.Infrastructure.IntegrationTests.csproj --configuration Release --verbosity normal
+

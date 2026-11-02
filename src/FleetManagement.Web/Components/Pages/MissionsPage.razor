@@ -1,0 +1,893 @@
+@page "/missions"
+@using FleetManagement.Application.Authorization
+@rendermode InteractiveServer
+@implements IDisposable
+@attribute [FleetPermission(PermissionCatalog.Missions.ViewOwn)]
+@using System.Globalization
+@using System.Security.Claims
+@using FleetManagement.Domain.Missions
+@using FleetManagement.Domain.Locations
+@using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Infrastructure.Reporting
+@using FleetManagement.Web.Security
+@using FleetManagement.Web.Notifications
+@using FleetManagement.Web.Components.Shared
+@using Microsoft.AspNetCore.Components.Authorization
+@inject MissionManagementService MissionService
+@inject MissionAvailabilityService AvailabilityService
+@inject LocationManagementService LocationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NotificationEventBus NotificationEvents
+@inject ILogger<MissionsPage> Logger
+
+<PageTitle>درخواست‌های مأموریت</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">مدیریت مأموریت</div>
+    <h1>درخواست‌های مأموریت من</h1>
+    <p>درخواست ثبت‌شده تا زمان تأیید، راننده و خودرو را رزرو نمی‌کند. پس از شروع بررسی توسط مسئول ناوگان، امکان ویرایش مستقیم درخواست بسته می‌شود.</p>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="setup-info">@_message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="setup-error">@_error</div>
+    }
+
+    <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Missions.Create)">
+        <Authorized>
+            <section class="driver-editor">
+                <h2>@(_editingMissionId.HasValue ? "ویرایش درخواست مأموریت" : "ثبت درخواست جدید")</h2>
+                @if (_locations.Count == 0)
+                {
+                    <div class="setup-info">برای ثبت درخواست ابتدا باید حداقل یک مکان توسط مدیر سامانه تأیید شود.</div>
+                }
+                else
+                {
+                    <div class="driver-form-grid">
+                        <div>
+                            <label for="mission-title">عنوان مأموریت</label>
+                            <input id="mission-title" @bind="_title" maxlength="200" />
+                        </div>
+                        <div>
+                            <label for="mission-phone">شماره همراه درخواست‌کننده</label>
+                            <input id="mission-phone" @bind="_requesterPhone" maxlength="20" dir="ltr" />
+                        </div>
+                        <div>
+                            <label for="mission-group">گروه درخواست‌کننده</label>
+                            <select id="mission-group" @bind="_requestingGroup">
+                                <option value="">انتخاب گروه</option>
+                                @foreach (var group in _groups)
+                                {
+                                    <option value="@group">@group</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label for="mission-type">نوع مأموریت</label>
+                            <select id="mission-type" @bind="_type">
+                                <option value="@MissionType.Passenger">حمل مسافر</option>
+                                <option value="@MissionType.Freight">حمل بار</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="mission-origin">مبدأ</label>
+                            <select id="mission-origin" @bind="_origin">
+                                <option value="">انتخاب مبدأ</option>
+                                @foreach (var location in _locations)
+                                {
+                                    <option value="@location.Name">@location.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label for="mission-destination">مقصد نهایی</label>
+                            <select id="mission-destination" @bind="_destination">
+                                <option value="">انتخاب مقصد</option>
+                                @foreach (var location in _locations)
+                                {
+                                    <option value="@location.Name">@location.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <JalaliDateTimeInput Id="mission-start"
+                                              Label="زمان شروع (به وقت تهران)"
+                                              @bind-Value="_startLocal"
+                                              MinValue="@GetMinimumDateTimeInput()" />
+                        <JalaliDateTimeInput Id="mission-end"
+                                              Label="زمان پایان (به وقت تهران)"
+                                              @bind-Value="_endLocal"
+                                              MinValue="@GetMinimumDateTimeInput()" />
+                        <div>
+                            <label for="mission-passengers">تعداد همراهان / مسافران</label>
+                            <input id="mission-passengers" type="number" min="0" @bind="_passengerCount" />
+                        </div>
+                        <div>
+                            <label for="mission-purpose">هدف یا علت مأموریت</label>
+                            <input id="mission-purpose" @bind="_purpose" maxlength="500" />
+                        </div>
+                        <div>
+                            <label for="mission-order">شماره دستور مأموریت (اختیاری)</label>
+                            <input id="mission-order" @bind="_missionOrderNumber" maxlength="50" />
+                        </div>
+                        <JalaliDateTimeInput Id="mission-order-date"
+                                              Label="تاریخ دستور مأموریت (اختیاری)"
+                                              IncludeTime="false"
+                                              @bind-Value="_missionOrderDate" />
+                    </div>
+                    <section class="public-availability">
+                        <button type="button" class="secondary-button" @onclick="ToggleAvailabilityAsync" disabled="@_availabilityLoading">
+                            @(_showAvailability ? "بستن جدول ظرفیت عمومی" : "انتخاب زمان از جدول ظرفیت عمومی")
+                        </button>
+                        <p>این جدول فقط ظرفیت کلی را نشان می‌دهد و نام راننده یا خودرو را افشا نمی‌کند. ثبت درخواست، منابع را رزرو نمی‌کند؛ تخصیص نهایی پس از بررسی انجام می‌شود.</p>
+                        @if (_availabilityLoading)
+                        {
+                            <p>در حال محاسبه ظرفیت هفتگی...</p>
+                        }
+                        @if (_showAvailability && _availabilityDays.Count > 0)
+                        {
+                            <div class="availability-selection">
+                                @if (_selectionStart.HasValue && !_selectionEnd.HasValue)
+                                {
+                                    <span>شروع انتخاب شد: @FormatAvailabilityTime(_selectionStart.Value)؛ اکنون زمان پایان را انتخاب کنید.</span>
+                                }
+                                else if (_selectionStart.HasValue && _selectionEnd.HasValue)
+                                {
+                                    <span>بازه انتخاب‌شده: @FormatAvailabilityTime(_selectionStart.Value) تا @FormatAvailabilityTime(_selectionEnd.Value)</span>
+                                    <button type="button" class="secondary-button" @onclick="ClearAvailabilitySelection">پاک‌کردن انتخاب</button>
+                                }
+                                else
+                                {
+                                    <span>برای شروع، یک ساعت آزاد را انتخاب کنید؛ سپس ساعت پایان را با کلیک دوم مشخص کنید.</span>
+                                }
+                            </div>
+                            <div class="availability-grid-wrap">
+                                <div class="availability-grid">
+                                    <div class="availability-grid-header">
+                                        <span>ساعت</span>
+                                        @foreach (var day in _availabilityDays)
+                                        {
+                                            <strong>@day.Label</strong>
+                                        }
+                                    </div>
+                                    @for (var hour = 0; hour < 24; hour++)
+                                    {
+                                        <div class="availability-grid-row">
+                                            <span class="availability-hour">@ToPersianDigits($"{hour:00}:00")</span>
+                                            @foreach (var day in _availabilityDays)
+                                            {
+                                                var slot = day.Slots[hour];
+                                                <button type="button"
+                                                        class="@GetAvailabilitySlotClass(slot)"
+                                                        disabled="@(!CanSelectAvailabilitySlot(slot))"
+                                                        @onpointerdown="() => BeginAvailabilityDrag(slot)"
+                                                        @onpointerenter="() => UpdateAvailabilityDrag(slot)"
+                                                        @onpointerup="() => CompleteAvailabilityDrag(slot)"
+                                                        @onclick="() => HandleAvailabilityClick(slot)">
+                                                    @(slot.IsAvailable ? "آزاد" : "—")
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </section>
+                    <div class="mission-route-editor">
+                        <label for="mission-stops">توقف‌های میانی (هر مکان در یک خط و از فهرست تأییدشده)</label>
+                        <textarea id="mission-stops" @bind="_intermediateStops" rows="3" placeholder="نام مکان اول&#10;نام مکان دوم"></textarea>
+                        <label for="mission-description">توضیحات تکمیلی</label>
+                        <textarea id="mission-description" @bind="_description" rows="3" maxlength="2000"></textarea>
+                    </div>
+                    <div class="driver-actions">
+                        <button type="button" class="primary-button" @onclick="CreateAsync" disabled="@_busy">
+                            @(_editingMissionId.HasValue ? "ذخیره تغییرات درخواست" : "ثبت درخواست مأموریت")
+                        </button>
+                        @if (_editingMissionId.HasValue)
+                        {
+                            <button type="button" class="secondary-button" @onclick="ResetForm" disabled="@_busy">انصراف از ویرایش</button>
+                        }
+                    </div>
+                }
+            </section>
+        </Authorized>
+    </AuthorizeView>
+
+    <h2>سوابق درخواست‌ها</h2>
+    <div class="session-filters">
+        <div>
+            <label for="request-action-reason">علت لغو یا درخواست انصراف</label>
+            <input id="request-action-reason" @bind="_requestActionReason" maxlength="1000" placeholder="ثبت علت الزامی است" />
+        </div>
+    </div>
+    @if (_loading)
+    {
+        <p>در حال دریافت درخواست‌ها...</p>
+    }
+    else if (_missions.Count == 0)
+    {
+        <div class="setup-info">هنوز درخواستی ثبت نکرده‌اید.</div>
+    }
+    else
+    {
+        <div class="session-table-wrap">
+            <table class="session-table">
+                <thead>
+                    <tr>
+                        <th>شماره مأموریت</th>
+                        <th>عنوان</th>
+                        <th>مسیر</th>
+                        <th>زمان برنامه‌ریزی</th>
+                        <th>نوع</th>
+                        <th>وضعیت</th>
+                        <th>علت تصمیم</th>
+                        <th>عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var mission in _missions)
+                    {
+                        <tr @key="mission.Id">
+                            <td>@mission.MissionNumber</td>
+                            <td>@mission.Title</td>
+                            <td>@mission.Origin ← @mission.Destination</td>
+                            <td>@FormatTime(mission.PlannedStartAtUtc) تا @FormatTime(mission.PlannedEndAtUtc)</td>
+                            <td>@(mission.Type == MissionType.Freight ? "بار" : "مسافر")</td>
+                            <td>@GetStatusName(mission.Status)</td>
+                            <td>@mission.DecisionReason</td>
+                            <td>
+                                @if (mission.Status is MissionStatus.Confirmed or MissionStatus.Running or MissionStatus.Completed or MissionStatus.Cancelled)
+                                {
+                                    <a class="secondary-button" href="@("/missions/" + mission.Id + "/print")">چاپ دستور</a>
+                                }
+                                @if (mission.Status == MissionStatus.Pending)
+                                {
+                                    <button type="button" class="secondary-button" @onclick="() => StartEdit(mission)" disabled="@_busy">ویرایش درخواست</button>
+                                    <button type="button" class="secondary-button" @onclick="() => CancelPendingAsync(mission.Id)" disabled="@_busy">لغو درخواست</button>
+                                }
+                                else if (mission.Status is MissionStatus.UnderReview or MissionStatus.Confirmed or MissionStatus.Running)
+                                {
+                                    <button type="button" class="secondary-button" @onclick="() => RequestWithdrawalAsync(mission.Id)" disabled="@_busy">درخواست انصراف</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private bool _loading = true;
+    private bool _busy;
+    private string _title = string.Empty;
+    private string _requesterPhone = string.Empty;
+    private string _requestingGroup = string.Empty;
+    private string _origin = string.Empty;
+    private string _destination = string.Empty;
+    private string _startLocal = string.Empty;
+    private string _endLocal = string.Empty;
+    private string _purpose = string.Empty;
+    private string _intermediateStops = string.Empty;
+    private string _description = string.Empty;
+    private string _missionOrderNumber = string.Empty;
+    private string _missionOrderDate = string.Empty;
+    private int? _passengerCount;
+    private MissionType _type = MissionType.Passenger;
+    private string _username = string.Empty;
+    private string _requesterName = string.Empty;
+    private string _organizationalUnit = string.Empty;
+    private string _message = string.Empty;
+    private string _error = string.Empty;
+    private string _requestActionReason = string.Empty;
+    private IReadOnlyList<string> _groups = [];
+    private IReadOnlyList<Location> _locations = [];
+    private IReadOnlyList<Mission> _missions = [];
+    private Guid? _editingMissionId;
+    private bool _showAvailability;
+    private bool _availabilityLoading;
+    private IReadOnlyList<PublicAvailabilitySlot> _availabilitySlots = [];
+    private IReadOnlyList<AvailabilityDay> _availabilityDays = [];
+    private DateTimeOffset? _selectionStart;
+    private DateTimeOffset? _selectionEnd;
+    private bool _isAvailabilityDragging;
+    private DateTimeOffset? _dragStart;
+    private DateTimeOffset? _dragEnd;
+
+    /// <summary>بارگذاری پروفایل، گروه‌های مجاز، مکان‌ها و سوابق شخصی.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = auth.User;
+            _username = user.FindFirst("fleet:username")?.Value ?? user.Identity?.Name ?? string.Empty;
+            NotificationEvents.Published += OnNotificationPublished;
+            _requesterName = user.Identity?.Name ?? _username;
+            _organizationalUnit = user.FindFirst("fleet:organizational-unit")?.Value ?? string.Empty;
+            _groups = user.FindAll("fleet:ad-group-name")
+                .Select(claim => claim.Value)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            _locations = await LocationService.GetApprovedAsync();
+            _missions = await MissionService.SearchAsync(requesterUsername: _username);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "بارگذاری درخواست‌های مأموریت");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>تازه‌سازی سوابق درخواست پس از اعلان زنده مرتبط با مأموریت.</summary>
+    private void OnNotificationPublished(
+        string username,
+        FleetManagement.Application.Notifications.NotificationPush notification)
+    {
+        if (string.Equals(username, _username, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(notification.ReferenceType, "Mission", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = InvokeAsync(RefreshMissionListAsync);
+        }
+    }
+
+    /// <summary>دریافت دوباره درخواست‌های متعلق به کاربر جاری.</summary>
+    private async Task RefreshMissionListAsync()
+    {
+        try
+        {
+            _missions = await MissionService.SearchAsync(requesterUsername: _username);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "به‌روزرسانی سوابق درخواست‌ها");
+        }
+    }
+
+    /// <summary>قطع اشتراک از اعلان‌های زنده هنگام خروج از صفحه.</summary>
+    public void Dispose()
+    {
+        NotificationEvents.Published -= OnNotificationPublished;
+    }
+
+    /// <summary>نمایش یا بستن جدول ظرفیت عمومی هفته جاری.</summary>
+    private async Task ToggleAvailabilityAsync()
+    {
+        _showAvailability = !_showAvailability;
+        if (!_showAvailability || _availabilitySlots.Count > 0)
+        {
+            return;
+        }
+
+        _availabilityLoading = true;
+        try
+        {
+            _availabilitySlots = await AvailabilityService.GetCurrentWeekAsync();
+            var zone = GetTehranTimeZone();
+            _availabilityDays = _availabilitySlots
+                .GroupBy(slot => TimeZoneInfo.ConvertTime(slot.StartAtUtc, zone).Date)
+                .OrderBy(group => group.Key)
+                .Select(group =>
+                {
+                    var localDate = group.Key;
+                    var calendar = new PersianCalendar();
+                    var dayName = localDate.DayOfWeek switch
+                    {
+                        DayOfWeek.Saturday => "شنبه",
+                        DayOfWeek.Sunday => "یکشنبه",
+                        DayOfWeek.Monday => "دوشنبه",
+                        DayOfWeek.Tuesday => "سه‌شنبه",
+                        DayOfWeek.Wednesday => "چهارشنبه",
+                        DayOfWeek.Thursday => "پنجشنبه",
+                        DayOfWeek.Friday => "جمعه",
+                        _ => string.Empty
+                    };
+                    var date = $"{calendar.GetYear(localDate):0000}/{calendar.GetMonth(localDate):00}/{calendar.GetDayOfMonth(localDate):00}";
+                    return new AvailabilityDay(
+                        localDate,
+                        group.OrderBy(slot => slot.StartAtUtc).ToArray(),
+                        $"{dayName} {ToPersianDigits(date)}");
+                })
+                .ToArray();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "محاسبه ظرفیت عمومی");
+            _showAvailability = false;
+        }
+        finally
+        {
+            _availabilityLoading = false;
+        }
+    }
+
+    /// <summary>کنترل انتخاب بازه با دو کلیک روی ساعت شروع و پایان.</summary>
+    private void SelectAvailabilitySlot(PublicAvailabilitySlot slot)
+    {
+        _error = string.Empty;
+        _message = string.Empty;
+
+        if (!_selectionStart.HasValue || _selectionEnd.HasValue)
+        {
+            if (!slot.IsAvailable)
+            {
+                return;
+            }
+
+            _selectionStart = slot.StartAtUtc;
+            _selectionEnd = null;
+            return;
+        }
+
+        if (slot.StartAtUtc <= _selectionStart.Value)
+        {
+            if (slot.IsAvailable)
+            {
+                _selectionStart = slot.StartAtUtc;
+            }
+            return;
+        }
+
+        var intervalSlots = _availabilitySlots
+            .Where(item => item.StartAtUtc >= _selectionStart.Value
+                && item.StartAtUtc < slot.StartAtUtc)
+            .ToArray();
+
+        if (intervalSlots.Length == 0 || intervalSlots.Any(item => !item.IsAvailable))
+        {
+            _error = "بازه انتخاب‌شده در تمام ساعات ظرفیت عمومی ندارد؛ لطفاً زمان دیگری انتخاب کنید.";
+            _selectionStart = null;
+            _selectionEnd = null;
+            return;
+        }
+
+        _selectionEnd = slot.StartAtUtc;
+        _startLocal = ToTehranInputValue(_selectionStart.Value);
+        _endLocal = ToTehranInputValue(_selectionEnd.Value);
+        _message = "زمان شروع و پایان از جدول ظرفیت عمومی به فرم منتقل شد.";
+    }
+
+    /// <summary>آغاز انتخاب با کشیدن ماوس یا لمس‌پذیر.</summary>
+    private void BeginAvailabilityDrag(PublicAvailabilitySlot slot)
+    {
+        if (!_selectionStart.HasValue || _selectionEnd.HasValue)
+        {
+            if (!slot.IsAvailable)
+            {
+                return;
+            }
+
+            _selectionStart = slot.StartAtUtc;
+            _selectionEnd = null;
+            _dragStart = slot.StartAtUtc;
+        }
+        else if (slot.StartAtUtc <= _selectionStart.Value && slot.IsAvailable)
+        {
+            _selectionStart = slot.StartAtUtc;
+            _dragStart = slot.StartAtUtc;
+        }
+        else
+        {
+            _dragStart = _selectionStart;
+        }
+
+        _dragEnd = slot.StartAtUtc;
+        _isAvailabilityDragging = true;
+    }
+
+    /// <summary>نمایش پیش‌نمایش بازه هنگام حرکت روی خانه‌های جدول.</summary>
+    private void UpdateAvailabilityDrag(PublicAvailabilitySlot slot)
+    {
+        if (_isAvailabilityDragging && _dragStart.HasValue
+            && slot.StartAtUtc > _dragStart.Value)
+        {
+            _dragEnd = slot.StartAtUtc;
+        }
+    }
+
+    /// <summary>تأیید بازه پس از پایان کشیدن.</summary>
+    private void CompleteAvailabilityDrag(PublicAvailabilitySlot slot)
+    {
+        if (!_isAvailabilityDragging)
+        {
+            return;
+        }
+
+        _isAvailabilityDragging = false;
+
+        if (_dragStart.HasValue && slot.StartAtUtc > _dragStart.Value)
+        {
+            SelectAvailabilitySlot(slot);
+        }
+    }
+
+    /// <summary>پشتیبانی از انتخاب صفحه‌کلید و دو کلیک در کنار کشیدن ماوس.</summary>
+    private void HandleAvailabilityClick(PublicAvailabilitySlot slot)
+    {
+        if (_selectionEnd.HasValue && slot.StartAtUtc == _selectionEnd.Value)
+        {
+            return;
+        }
+
+        SelectAvailabilitySlot(slot);
+    }
+
+    /// <summary>پاک‌کردن بازه انتخاب‌شده.</summary>
+    private void ClearAvailabilitySelection()
+    {
+        _selectionStart = null;
+        _selectionEnd = null;
+        _dragStart = null;
+        _dragEnd = null;
+        _isAvailabilityDragging = false;
+    }
+
+    /// <summary>تعیین امکان کلیک روی خانه جدول.</summary>
+    private bool CanSelectAvailabilitySlot(PublicAvailabilitySlot slot)
+    {
+        if (!_selectionStart.HasValue || _selectionEnd.HasValue)
+        {
+            return slot.IsAvailable;
+        }
+
+        return slot.StartAtUtc > _selectionStart.Value;
+    }
+
+    /// <summary>کلاس نمایشی خانه آزاد، مشغول یا انتخاب‌شده.</summary>
+    private string GetAvailabilitySlotClass(PublicAvailabilitySlot slot)
+    {
+        var selected = _selectionStart.HasValue
+            && slot.StartAtUtc >= _selectionStart.Value
+            && (_selectionEnd.HasValue
+                ? slot.StartAtUtc < _selectionEnd.Value
+                : slot.StartAtUtc == _selectionStart.Value);
+
+        var preview = _isAvailabilityDragging
+            && _dragStart.HasValue
+            && _dragEnd.HasValue
+            && slot.StartAtUtc >= _dragStart.Value
+            && slot.StartAtUtc <= _dragEnd.Value;
+
+        return selected || preview
+            ? "availability-slot selected"
+            : slot.IsAvailable
+                ? "availability-slot free"
+                : "availability-slot busy";
+    }
+
+    /// <summary>تبدیل ساعت UTC به مقدار ورودی تاریخ و ساعت محلی تهران.</summary>
+    private static string ToTehranInputValue(DateTimeOffset utc)
+    {
+        var local = TimeZoneInfo.ConvertTime(utc, GetTehranTimeZone());
+        return local.ToString("yyyy-MM-dd'T'HH:00", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>نمایش تاریخ و ساعت انتخاب‌شده در تقویم جلالی.</summary>
+    private static string FormatAvailabilityTime(DateTimeOffset utc)
+    {
+        var local = TimeZoneInfo.ConvertTime(utc, GetTehranTimeZone());
+        var calendar = new PersianCalendar();
+        var text = $"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} {local.Hour:00}:00";
+        return ToPersianDigits(text);
+    }
+
+    /// <summary>یافتن منطقه زمانی تهران در Windows یا Linux.</summary>
+    private static TimeZoneInfo GetTehranTimeZone()
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+    }
+
+    /// <summary>تبدیل ارقام لاتین به فارسی.</summary>
+    private static string ToPersianDigits(string value)
+    {
+        const string latin = "0123456789";
+        const string persian = "۰۱۲۳۴۵۶۷۸۹";
+        return string.Create(value.Length, value, (destination, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                var digit = latin.IndexOf(source[index]);
+                destination[index] = digit >= 0 ? persian[digit] : source[index];
+            }
+        });
+    }
+
+    private sealed record AvailabilityDay(
+        DateTime Date,
+        IReadOnlyList<PublicAvailabilitySlot> Slots,
+        string Label);
+
+    /// <summary>محاسبه نزدیک‌ترین ساعت آینده تهران برای محدودکردن انتخاب تاریخ.</summary>
+    private static string GetMinimumDateTimeInput()
+    {
+        var zone = GetTehranTimeZone();
+        var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone);
+        var local = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0);
+        if (now.Minute > 0 || now.Second > 0 || now.Millisecond > 0)
+        {
+            local = local.AddHours(1);
+        }
+
+        return local.ToString("yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>دریافت زمان شروع از ورودی تاریخ و ساعت مرورگر.</summary>
+    private void OnStartChanged(ChangeEventArgs args) => _startLocal = args.Value?.ToString() ?? string.Empty;
+
+    /// <summary>دریافت زمان پایان از ورودی تاریخ و ساعت مرورگر.</summary>
+    private void OnEndChanged(ChangeEventArgs args) => _endLocal = args.Value?.ToString() ?? string.Empty;
+
+    /// <summary>دریافت تاریخ اختیاری دستور مأموریت.</summary>
+    private void OnOrderDateChanged(ChangeEventArgs args) => _missionOrderDate = args.Value?.ToString() ?? string.Empty;
+
+    /// <summary>بارگذاری اطلاعات درخواست در انتظار برای ویرایش توسط درخواست‌کننده.</summary>
+    private void StartEdit(Mission mission)
+    {
+        if (mission.Status != MissionStatus.Pending
+            || !string.Equals(mission.RequesterUsername, _username, StringComparison.OrdinalIgnoreCase))
+        {
+            _error = "این درخواست دیگر قابل ویرایش نیست.";
+            return;
+        }
+
+        _editingMissionId = mission.Id;
+        _title = mission.Title;
+        _requesterPhone = mission.RequesterPhoneSnapshot;
+        _requestingGroup = mission.RequestingGroup;
+        _type = mission.Type;
+        _origin = mission.Origin;
+        _destination = mission.Destination;
+        _startLocal = ToTehranInputValue(mission.PlannedStartAtUtc);
+        _endLocal = ToTehranInputValue(mission.PlannedEndAtUtc);
+        _passengerCount = mission.PassengerCount;
+        _purpose = mission.Purpose;
+        _intermediateStops = string.Join(Environment.NewLine, mission.GetIntermediateStops());
+        _description = mission.Description ?? string.Empty;
+        _missionOrderNumber = mission.MissionOrderNumber ?? string.Empty;
+        _missionOrderDate = mission.MissionOrderDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+        _selectionStart = null;
+        _selectionEnd = null;
+        _message = $"درخواست {mission.MissionNumber} برای ویرایش بارگذاری شد.";
+    }
+
+    /// <summary>ثبت درخواست پس از کنترل فهرست مکان‌ها و زمان‌های انتخاب‌شده.</summary>
+    private async Task CreateAsync()
+    {
+        _busy = true;
+        _error = string.Empty;
+        _message = string.Empty;
+
+        try
+        {
+            if (!_locations.Any(location => location.Name == _origin)
+                || !_locations.Any(location => location.Name == _destination))
+            {
+                throw new InvalidOperationException("مبدأ و مقصد باید از فهرست مکان‌های تأییدشده انتخاب شوند.");
+            }
+
+            if (!_groups.Contains(_requestingGroup, StringComparer.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("گروه انتخاب‌شده در گروه‌های مجاز حساب شما نیست.");
+            }
+
+            var stops = _intermediateStops
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            if (stops.Any(stop => !_locations.Any(location => location.Name == stop)))
+            {
+                throw new InvalidOperationException("تمام توقف‌های میانی باید از فهرست مکان‌های تأییدشده انتخاب شوند.");
+            }
+
+            var start = ParseTehranLocalTime(_startLocal);
+            var end = ParseTehranLocalTime(_endLocal);
+            DateOnly? orderDate = string.IsNullOrWhiteSpace(_missionOrderDate)
+                ? null
+                : DateOnly.ParseExact(_missionOrderDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+            if (_editingMissionId.HasValue)
+            {
+                await MissionService.UpdatePendingRequestAsync(
+                    _editingMissionId.Value,
+                    _username,
+                    _title,
+                    _requesterPhone,
+                    _requestingGroup,
+                    _type,
+                    _purpose,
+                    _origin,
+                    _destination,
+                    stops,
+                    start,
+                    end,
+                    _description,
+                    _passengerCount,
+                    _missionOrderNumber,
+                    orderDate);
+
+                _message = "تغییرات درخواست ذخیره شد.";
+            }
+            else
+            {
+                await MissionService.CreateRequestAsync(
+                    _title,
+                    _username,
+                    _requesterName,
+                    _requesterPhone,
+                    _organizationalUnit,
+                    _requestingGroup,
+                    _type,
+                    _purpose,
+                    _origin,
+                    _destination,
+                    stops,
+                    start,
+                    end,
+                    _description,
+                    _passengerCount,
+                    _missionOrderNumber,
+                    orderDate,
+                    _username);
+
+                _message = "درخواست مأموریت ثبت شد و برای بررسی ارسال گردید.";
+            }
+
+            ResetForm();
+            _missions = await MissionService.SearchAsync(requesterUsername: _username);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "ثبت درخواست مأموریت");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>لغو مستقیم درخواست تأییدنشده توسط درخواست‌کننده.</summary>
+    private Task CancelPendingAsync(Guid missionId) => ExecuteRequestActionAsync(async () =>
+    {
+        EnsureRequestReason();
+        await MissionService.CancelPendingRequestAsync(missionId, _username, _requestActionReason);
+        _message = "درخواست مأموریت لغو شد.";
+    });
+
+    /// <summary>ثبت درخواست انصراف برای مأموریت بررسی‌شده یا تأییدشده.</summary>
+    private Task RequestWithdrawalAsync(Guid missionId) => ExecuteRequestActionAsync(async () =>
+    {
+        EnsureRequestReason();
+        await MissionService.RequestWithdrawalAsync(missionId, _username, _requestActionReason);
+        _message = "درخواست انصراف برای بررسی مسئول ناوگان ارسال شد.";
+    });
+
+    /// <summary>اجرای عملیات درخواست‌کننده و تازه‌سازی سوابق.</summary>
+    private async Task ExecuteRequestActionAsync(Func<Task> action)
+    {
+        _busy = true;
+        _error = string.Empty;
+        try
+        {
+            await action();
+            _requestActionReason = string.Empty;
+            _missions = await MissionService.SearchAsync(requesterUsername: _username);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "ثبت تصمیم درخواست مأموریت");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>الزام ثبت علت برای لغو یا انصراف.</summary>
+    private void EnsureRequestReason()
+    {
+        if (string.IsNullOrWhiteSpace(_requestActionReason))
+        {
+            throw new InvalidOperationException("ثبت علت الزامی است.");
+        }
+    }
+
+    /// <summary>تبدیل تاریخ و ساعت ورودی تهران به زمان UTC.</summary>
+    private static DateTimeOffset ParseTehranLocalTime(string value)
+    {
+        if (!DateTime.TryParseExact(
+            value,
+            "yyyy-MM-ddTHH:mm",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out var localTime))
+        {
+            throw new InvalidOperationException("تاریخ و ساعت شروع و پایان را وارد کنید.");
+        }
+
+        if (localTime.Minute != 0)
+        {
+            throw new InvalidOperationException("زمان مأموریت فقط با دقت ساعت کامل قابل ثبت است.");
+        }
+
+        TimeZoneInfo zone;
+        try
+        {
+            zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran");
+        }
+
+        var unspecified = DateTime.SpecifyKind(localTime, DateTimeKind.Unspecified);
+        var utc = TimeZoneInfo.ConvertTimeToUtc(unspecified, zone);
+        return new DateTimeOffset(utc, TimeSpan.Zero);
+    }
+
+    /// <summary>پاک‌سازی فرم پس از ثبت موفق درخواست.</summary>
+    private void ResetForm()
+    {
+        _editingMissionId = null;
+        _title = string.Empty;
+        _requesterPhone = string.Empty;
+        _requestingGroup = string.Empty;
+        _origin = string.Empty;
+        _destination = string.Empty;
+        _startLocal = string.Empty;
+        _endLocal = string.Empty;
+        _purpose = string.Empty;
+        _intermediateStops = string.Empty;
+        _description = string.Empty;
+        _missionOrderNumber = string.Empty;
+        _missionOrderDate = string.Empty;
+        _passengerCount = null;
+    }
+
+    /// <summary>نمایش زمان جلالی و ساعت تهران.</summary>
+    private static string FormatTime(DateTimeOffset utcValue)
+    {
+        TimeZoneInfo zone;
+        try
+        {
+            zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran");
+        }
+
+        var local = TimeZoneInfo.ConvertTime(utcValue, zone);
+        var calendar = new PersianCalendar();
+        return $"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} ساعت {local.Hour:00}";
+    }
+
+    /// <summary>عنوان فارسی وضعیت چرخه عمر درخواست.</summary>
+    private static string GetStatusName(MissionStatus status) => status switch
+    {
+        MissionStatus.Pending => "در انتظار بررسی",
+        MissionStatus.UnderReview => "در حال بررسی",
+        MissionStatus.Confirmed => "تأیید شده",
+        MissionStatus.Running => "در حال اجرا",
+        MissionStatus.Completed => "پایان‌یافته",
+        MissionStatus.Cancelled => "لغوشده",
+        MissionStatus.Rejected => "ردشده",
+        MissionStatus.WithdrawalPending => "در انتظار تصمیم انصراف",
+        _ => "نامشخص"
+    };
+
+    /// <summary>ثبت خطا با شناسه پیگیری.</summary>
+    private void ReportError(Exception exception, string operation)
+    {
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "{Operation} ناموفق بود. شناسه پیگیری: {TrackingId}", operation, trackingId);
+        _error = $"عملیات انجام نشد. شناسه پیگیری: {trackingId}";
+    }
+}

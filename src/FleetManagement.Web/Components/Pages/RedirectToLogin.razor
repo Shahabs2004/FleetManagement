@@ -1,0 +1,15 @@
+@inject NavigationManager Navigation
+
+<div class="login-redirect" role="status">
+    انتقال به صفحه ورود...
+</div>
+
+@code {
+    /// <summary>
+    /// کاربر ناشناس را به صفحه ورود هدایت می‌کند.
+    /// </summary>
+    protected override void OnInitialized()
+    {
+        Navigation.NavigateTo("/login", replace: true);
+    }
+}

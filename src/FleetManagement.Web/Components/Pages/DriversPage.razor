@@ -1,0 +1,429 @@
+@page "/drivers"
+@using FleetManagement.Application.Authorization
+@rendermode InteractiveServer
+@attribute [FleetPermission(PermissionCatalog.Drivers.View)]
+@using FleetManagement.Domain.Drivers
+@using FleetManagement.Domain.Vehicles
+@using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Web.Security
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Authorization
+@inject DriverManagementService DriverService
+@inject VehicleManagementService VehicleService
+@inject DriverVehiclePreferenceService DriverVehiclePreferences
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IAuthorizationService AuthorizationService
+@inject ILogger<DriversPage> Logger
+
+<PageTitle>مدیریت رانندگان</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">مدیریت ناوگان</div>
+    <h1>رانندگان</h1>
+    <p>اطلاعات پایه رانندگان و وضعیت استخدامی آن‌ها. راننده غیرفعال یا بایگانی‌شده برای مأموریت جدید قابل انتخاب نیست.</p>
+
+    <div class="session-filters">
+        <div>
+            <label for="driver-search">جست‌وجوی نام یا نام خانوادگی</label>
+            <input id="driver-search" @bind="_search" @bind:event="oninput" placeholder="عبارت جست‌وجو" />
+        </div>
+        <div>
+            <label for="driver-archived">نمایش بایگانی</label>
+            <select id="driver-archived" @bind="_includeArchived">
+                <option value="false">فقط فعال‌ها</option>
+                <option value="true">همه، شامل بایگانی</option>
+            </select>
+        </div>
+        <button type="button" class="primary-button" @onclick="LoadAsync" disabled="@_busy">جست‌وجو</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="setup-info">@_message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="setup-error">@_error</div>
+    }
+
+    <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Drivers.Manage)">
+        <Authorized Context="driverManageContext">
+    <section class="driver-editor">
+        <h2>@(_editingId.HasValue ? "ویرایش راننده" : "ثبت راننده جدید")</h2>
+        <div class="driver-form-grid">
+            <div>
+                <label for="driver-first">نام</label>
+                <input id="driver-first" @bind="_firstName" maxlength="100" />
+            </div>
+            <div>
+                <label for="driver-last">نام خانوادگی</label>
+                <input id="driver-last" @bind="_lastName" maxlength="100" />
+            </div>
+            <div>
+                <label for="driver-mobile">تلفن همراه</label>
+                <input id="driver-mobile" @bind="_mobile" maxlength="20" dir="ltr" />
+            </div>
+            @if (_editingId.HasValue)
+            {
+                <div>
+                    <label for="driver-status">وضعیت استخدامی</label>
+                    <select id="driver-status" @bind="_status">
+                        <option value="@DriverEmploymentStatus.Active">فعال</option>
+                        <option value="@DriverEmploymentStatus.OnLeave">مرخصی</option>
+                        <option value="@DriverEmploymentStatus.EmploymentTerminated">خاتمه کار</option>
+                        <option value="@DriverEmploymentStatus.Inactive">غیرفعال</option>
+                    </select>
+                </div>
+            }
+        </div>
+        <div class="driver-actions">
+            <button type="button" class="primary-button" @onclick="SaveAsync" disabled="@_busy">
+                @(_editingId.HasValue ? "ذخیره تغییرات" : "ثبت راننده")
+            </button>
+            @if (_editingId.HasValue)
+            {
+                <button type="button" class="secondary-button" @onclick="ResetEditor">انصراف</button>
+            }
+        </div>
+    </section>
+        </Authorized>
+    </AuthorizeView>
+
+    @if (_loading)
+    {
+        <p>در حال دریافت اطلاعات...</p>
+    }
+    else if (_drivers.Count == 0)
+    {
+        <div class="setup-info">راننده‌ای یافت نشد.</div>
+    }
+    else
+    {
+        <div class="session-table-wrap">
+            <table class="session-table">
+                <thead>
+                    <tr>
+                        <th>نام و نام خانوادگی</th>
+                        <th>تلفن همراه</th>
+                        <th>وضعیت استخدامی</th>
+                        <th>وضعیت بایگانی</th>
+                        <th>خودروی پیش‌فرض</th>
+                        <th>عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var driver in _drivers)
+                    {
+                        <tr @key="driver.Id">
+                            <td>@driver.FirstName @driver.LastName</td>
+                            <td dir="ltr">@driver.MobilePhone</td>
+                            <td>@GetStatusName(driver.EmploymentStatus)</td>
+                            <td>@(driver.IsArchived ? "بایگانی‌شده" : "فعال")</td>
+                            <td>
+                                <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Drivers.DefaultVehicleManage)">
+                                    <Authorized Context="defaultVehiclePermissionContext">
+                                        <select value="@GetDefaultVehicleSelection(driver.Id)"
+                                                @onchange="args => SetDefaultVehicleAsync(driver.Id, args)"
+                                                disabled="@_busy">
+                                            <option value="">بدون خودروی پیش‌فرض</option>
+                                            @foreach (var vehicle in _vehicles.Where(item => !item.IsArchived && item.ManualStatus == ManualVehicleStatus.Ready))
+                                            {
+                                                <option value="@vehicle.Id">@vehicle.Brand @vehicle.Model — @vehicle.LicensePlate</option>
+                                            }
+                                        </select>
+                                    </Authorized>
+                                    <NotAuthorized>
+                                        <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Vehicles.View)">
+                                            <Authorized Context="vehicleViewPermissionContext">
+                                                @GetDefaultVehicleName(driver.Id)
+                                            </Authorized>
+                                            <NotAuthorized Context="vehicleNotAuthorizedContext">—</NotAuthorized>
+                                        </AuthorizeView>
+                                    </NotAuthorized>
+                                </AuthorizeView>
+                            </td>
+                            <td>
+                                <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Drivers.Manage)">
+                                    <Authorized Context="driverActionsContext">
+                                        <button type="button" class="secondary-button" @onclick="() => Edit(driver)">ویرایش</button>
+                                        @if (!driver.IsArchived)
+                                        {
+                                            <button type="button" class="secondary-button" @onclick="() => ArchiveAsync(driver.Id)" disabled="@_busy">بایگانی</button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="secondary-button" @onclick="() => ReactivateAsync(driver.Id)" disabled="@_busy">بازگردانی</button>
+                                        }
+                                    </Authorized>
+                                </AuthorizeView>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private bool _loading = true;
+    private bool _busy;
+    private bool _includeArchived;
+    private string _search = string.Empty;
+    private string _firstName = string.Empty;
+    private string _lastName = string.Empty;
+    private string _mobile = string.Empty;
+    private string _message = string.Empty;
+    private string _error = string.Empty;
+    private Guid? _editingId;
+    private DriverEmploymentStatus _status = DriverEmploymentStatus.Active;
+    private IReadOnlyList<Driver> _drivers = [];
+    private IReadOnlyList<Vehicle> _vehicles = [];
+    private IReadOnlyDictionary<Guid, Guid> _defaultVehicleIds = new Dictionary<Guid, Guid>();
+
+    /// <summary>بارگذاری اولیه فهرست رانندگان.</summary>
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    /// <summary>جست‌وجوی رانندگان با فیلترهای جاری.</summary>
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var driversTask = DriverService.SearchAsync(_search, _includeArchived);
+            var vehiclesTask = VehicleService.SearchAsync(includeArchived: true);
+            var defaultsTask = DriverVehiclePreferences.GetAllAsync();
+
+            await Task.WhenAll(driversTask, vehiclesTask, defaultsTask);
+            _drivers = await driversTask;
+            _vehicles = await vehiclesTask;
+            _defaultVehicleIds = await defaultsTask;
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "دریافت فهرست رانندگان");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>خواندن شناسه خودروی پیش‌فرض برای کنترل انتخاب.</summary>
+    private string GetDefaultVehicleSelection(Guid driverId) =>
+        _defaultVehicleIds.TryGetValue(driverId, out var vehicleId)
+            ? vehicleId.ToString()
+            : string.Empty;
+
+    /// <summary>نمایش نام خودروی پیش‌فرض ثبت‌شده.</summary>
+    private string GetDefaultVehicleName(Guid driverId)
+    {
+        if (!_defaultVehicleIds.TryGetValue(driverId, out var vehicleId))
+        {
+            return "—";
+        }
+
+        var vehicle = _vehicles.FirstOrDefault(item => item.Id == vehicleId);
+        return vehicle is null
+            ? "خودروی پیش‌فرض ناموجود"
+            : $"{vehicle.Brand} {vehicle.Model} — {vehicle.LicensePlate}";
+    }
+
+    /// <summary>ثبت یا حذف خودروی پیش‌فرض راننده.</summary>
+    private async Task SetDefaultVehicleAsync(Guid driverId, ChangeEventArgs args)
+    {
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Drivers.DefaultVehicleManage)))
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = string.Empty;
+        try
+        {
+            Guid? vehicleId = Guid.TryParse(args.Value?.ToString(), out var parsed)
+                ? parsed
+                : null;
+
+            await DriverVehiclePreferences.SetDefaultVehicleAsync(
+                driverId,
+                vehicleId,
+                await GetActorAsync());
+
+            _defaultVehicleIds = await DriverVehiclePreferences.GetAllAsync();
+            _message = "خودروی پیش‌فرض راننده به‌روزرسانی شد.";
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "تغییر خودروی پیش‌فرض راننده");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>انتقال اطلاعات راننده انتخاب‌شده به فرم ویرایش.</summary>
+    private void Edit(Driver driver)
+    {
+        _editingId = driver.Id;
+        _firstName = driver.FirstName;
+        _lastName = driver.LastName;
+        _mobile = driver.MobilePhone;
+        _status = driver.EmploymentStatus;
+        _message = string.Empty;
+        _error = string.Empty;
+    }
+
+    /// <summary>ثبت راننده جدید یا ذخیره تغییرات راننده موجود.</summary>
+    private async Task SaveAsync()
+    {
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Drivers.Manage)))
+        {
+            return;
+        }
+
+        _busy = true;
+        _message = string.Empty;
+        _error = string.Empty;
+
+        try
+        {
+            var actor = await GetActorAsync();
+            if (_editingId.HasValue)
+            {
+                await DriverService.UpdateAsync(
+                    _editingId.Value,
+                    _firstName,
+                    _lastName,
+                    _mobile,
+                    _status,
+                    actor);
+                _message = "تغییرات راننده ذخیره شد.";
+            }
+            else
+            {
+                await DriverService.CreateAsync(_firstName, _lastName, _mobile, actor);
+                _message = "راننده جدید ثبت شد.";
+            }
+
+            ResetEditor();
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "ذخیره اطلاعات راننده");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>بایگانی راننده بدون حذف اطلاعات او.</summary>
+    private async Task ArchiveAsync(Guid driverId)
+    {
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Drivers.Manage)))
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await DriverService.ArchiveAsync(driverId, await GetActorAsync());
+            _message = "راننده بایگانی شد.";
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "بایگانی راننده");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>بازگرداندن راننده بایگانی‌شده.</summary>
+    private async Task ReactivateAsync(Guid driverId)
+    {
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Drivers.Manage)))
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await DriverService.ReactivateAsync(driverId, await GetActorAsync());
+            _message = "راننده بازگردانی شد.";
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "بازگردانی راننده");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>پاک‌سازی فرم ثبت یا ویرایش.</summary>
+    private void ResetEditor()
+    {
+        _editingId = null;
+        _firstName = string.Empty;
+        _lastName = string.Empty;
+        _mobile = string.Empty;
+        _status = DriverEmploymentStatus.Active;
+    }
+
+    /// <summary>بررسی مجوز عملیاتی در سمت سرور، مستقل از مخفی‌سازی کنترل‌های رابط.</summary>
+    private async Task<bool> HasPermissionAsync(string policy)
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var authorization = await AuthorizationService.AuthorizeAsync(state.User, policy);
+        if (authorization.Succeeded)
+        {
+            return true;
+        }
+
+        _error = "شما مجوز لازم برای انجام این عملیات را ندارید.";
+        return false;
+    }
+
+    /// <summary>استخراج نام کاربری عامل از هویت احرازشده.</summary>
+    private async Task<string> GetActorAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        return state.User.FindFirst("fleet:username")?.Value
+            ?? state.User.Identity?.Name
+            ?? "unknown";
+    }
+
+    /// <summary>ثبت خطای فنی در لاگ و نمایش پیام دارای شناسه پیگیری.</summary>
+    private void ReportError(Exception exception, string operation)
+    {
+        if (exception is InvalidOperationException or ArgumentException or KeyNotFoundException)
+        {
+            _error = exception.Message;
+            return;
+        }
+
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "{Operation} ناموفق بود. شناسه پیگیری: {TrackingId}", operation, trackingId);
+        _error = $"عملیات انجام نشد. شناسه پیگیری: {trackingId}";
+    }
+
+    /// <summary>عنوان فارسی وضعیت استخدامی.</summary>
+    private static string GetStatusName(DriverEmploymentStatus status) => status switch
+    {
+        DriverEmploymentStatus.Active => "فعال",
+        DriverEmploymentStatus.OnLeave => "مرخصی",
+        DriverEmploymentStatus.EmploymentTerminated => "خاتمه کار",
+        DriverEmploymentStatus.Inactive => "غیرفعال",
+        _ => "نامشخص"
+    };
+}

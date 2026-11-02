@@ -1,0 +1,74 @@
+using System.Security.Claims;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authentication.Cookies;
+
+namespace FleetManagement.Web.Security;
+
+/// <summary>
+/// ثبت احراز هویت مبتنی بر کوکی و سیاست‌های نشست سامانه.
+/// </summary>
+public static class FleetAuthenticationExtensions
+{
+    /// <summary>
+    /// احراز هویت کوکی را ثبت می‌کند؛ کنترل مهلت نشست به سیاست ذخیره‌شده در SQL واگذار می‌شود.
+    /// </summary>
+    public static IServiceCollection AddFleetAuthentication(this IServiceCollection services)
+    {
+        services
+            .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+            .AddCookie(options =>
+            {
+                options.Cookie.Name = ".FleetManagement.Authentication";
+                options.Cookie.HttpOnly = true;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                options.Cookie.SameSite = SameSiteMode.Lax;
+                options.LoginPath = "/login";
+                options.AccessDeniedPath = "/login?error=denied";
+                // بیشترین مهلت بیکاری قابل تنظیم دو ساعت است؛ middleware مهلت دقیق را از SQL کنترل می‌کند.
+                options.ExpireTimeSpan = TimeSpan.FromHours(2);
+                options.SlidingExpiration = true;
+
+                // اعتبار واقعی نشست با شناسه ثبت‌شده در SQL و سیاست جاری بررسی می‌شود.
+                options.Events.OnValidatePrincipal = async context =>
+                {
+                    var rawSessionId = context.Principal?.FindFirstValue("fleet:session-id");
+                    if (!Guid.TryParse(rawSessionId, out _))
+                    {
+                        context.RejectPrincipal();
+                        await context.HttpContext.SignOutAsync(
+                            CookieAuthenticationDefaults.AuthenticationScheme);
+                    }
+                };
+            });
+
+        // محدودسازی تلاش‌های ورود بر اساس IP برای کاهش brute-force روی AD و حساب اضطراری.
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.AddPolicy("authentication", httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+        });
+
+        services.AddAuthorization();
+        services.AddSingleton<IAuthorizationPolicyProvider, FleetAuthorizationPolicyProvider>();
+        services.AddSingleton<IAuthorizationHandler, FleetPermissionAuthorizationHandler>();
+        services.AddCascadingAuthenticationState();
+        services.AddSingleton<SessionActivityTracker>();
+        services.AddSingleton<DirectorySessionValidationTracker>();
+        services.AddHttpContextAccessor();
+        services.AddAntiforgery();
+
+        return services;
+    }
+}

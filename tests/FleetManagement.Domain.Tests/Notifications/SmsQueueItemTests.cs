@@ -1,0 +1,143 @@
+using FleetManagement.Domain.Notifications;
+
+namespace FleetManagement.Domain.Tests.Notifications;
+
+/// <summary>
+/// آزمون قواعد صف پیامک، تلاش مجدد دستی و لغو یادآوری.
+/// </summary>
+public sealed class SmsQueueItemTests
+{
+    [Fact]
+    public void تلاش_مجدد_دستی_به_علت_اصلاح_خطا_نیاز_دارد()
+    {
+        // Arrange
+        var now = DateTimeOffset.UtcNow;
+        var item = CreateItem(SmsEventType.MissionApproved, maximumRetryCount: 0);
+        item.MarkSending(now);
+        item.MarkTransientFailure("خطای ارتباط", now);
+
+        // Act
+        item.RetryManually(now.AddMinutes(1), "تنظیم اتصال اصلاح شد.");
+
+        // Assert
+        Assert.Equal(SmsQueueStatus.Queued, item.Status);
+        Assert.Equal(now.AddMinutes(1), item.NextAttemptAtUtc);
+        Assert.Null(item.ErrorReason);
+    }
+
+    [Fact]
+    public void تلاش_مجدد_بدون_علت_اصلاح_پذیرفته_نمی_شود()
+    {
+        var item = CreateItem(SmsEventType.MissionApproved, maximumRetryCount: 0);
+        var now = DateTimeOffset.UtcNow;
+        item.MarkSending(now);
+        item.MarkTransientFailure("خطای دائمی", now);
+
+        Assert.Throws<ArgumentException>(() => item.RetryManually(now, " "));
+        Assert.Equal(SmsQueueStatus.Failed, item.Status);
+    }
+
+    [Fact]
+    public void پیام_تحویل_شده_نمی_تواند_به_خطای_دائمی_تبدیل_شود()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var item = CreateItem(SmsEventType.MissionApproved);
+        item.MarkSending(now);
+        item.MarkAccepted("12345", now, 30);
+        item.RecordDeliveryStatus("Delivered", true, now.AddSeconds(30), 30);
+
+        Assert.Throws<InvalidOperationException>(
+            () => item.MarkPermanentFailure("خطای دیرهنگام", now.AddMinutes(1)));
+        Assert.Equal(SmsQueueStatus.Delivered, item.Status);
+    }
+
+    [Fact]
+    public void یادآوری_ارسال_نشده_قابل_لغو_است()
+    {
+        var item = CreateItem(SmsEventType.MissionStartReminder);
+
+        item.CancelScheduledReminder("زمان مأموریت تغییر کرد.");
+
+        Assert.Equal(SmsQueueStatus.Cancelled, item.Status);
+        Assert.Equal("زمان مأموریت تغییر کرد.", item.ErrorReason);
+        Assert.Null(item.NextAttemptAtUtc);
+    }
+
+    [Fact]
+    public void پیام_غیر_یادآوری_قابل_لغو_از_این_مسیر_نیست()
+    {
+        var item = CreateItem(SmsEventType.MissionApproved);
+
+        Assert.Throws<InvalidOperationException>(
+            () => item.CancelScheduledReminder("لغو"));
+    }
+
+    [Fact]
+    public void ارسال_نیمه_تمام_پس_از_توقف_پردازش_به_خطای_دائمی_منتقل_می‌شود()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var item = CreateItem(SmsEventType.MissionApproved);
+        item.MarkSending(now);
+
+        item.MarkInterruptedSendingAsPermanentFailure(now.AddMinutes(5));
+
+        Assert.Equal(SmsQueueStatus.PermanentFailure, item.Status);
+        Assert.Null(item.NextAttemptAtUtc);
+        Assert.Contains("نتیجه نزد ارائه‌دهنده نامشخص است", item.ErrorReason);
+        Assert.Equal(now, item.LastAttemptAtUtc);
+    }
+
+    [Fact]
+    public void پیام_غیر_در_حال_ارسال_نمی‌تواند_به‌عنوان_ارسال_نیمه_تمام_ثبت_شود()
+    {
+        var item = CreateItem(SmsEventType.MissionApproved);
+
+        Assert.Throws<InvalidOperationException>(
+            () => item.MarkInterruptedSendingAsPermanentFailure(DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
+    public void استعلام_ناموفق_تا_سقف_تلاش_بعدی_زمان‌بندی_می‌شود()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var item = CreateItem(SmsEventType.MissionApproved);
+        item.MarkSending(now);
+        item.MarkAccepted("12345", now, 30);
+
+        item.DeferStatusPoll(now.AddSeconds(30), 60);
+        Assert.Equal(1, item.StatusPollCount);
+        Assert.Equal(now.AddSeconds(90), item.NextStatusPollAtUtc);
+
+        item.DeferStatusPoll(now.AddSeconds(90), 60);
+        item.DeferStatusPoll(now.AddSeconds(150), 60);
+
+        Assert.Equal(3, item.StatusPollCount);
+        Assert.Null(item.NextStatusPollAtUtc);
+        Assert.Equal(SmsQueueStatus.Accepted, item.Status);
+    }
+
+    [Fact]
+    public void استعلام_مجدد_برای_پیام_پذیرفته_نشده_مجاز_نیست()
+    {
+        var item = CreateItem(SmsEventType.MissionApproved);
+
+        Assert.Throws<InvalidOperationException>(
+            () => item.DeferStatusPoll(DateTimeOffset.UtcNow, 30));
+    }
+
+    private static SmsQueueItem CreateItem(
+        SmsEventType eventType,
+        int maximumRetryCount = 3)
+    {
+        return new SmsQueueItem(
+            eventType,
+            "کاربر آزمون",
+            "989121234567",
+            "متن پیام آزمون",
+            Guid.NewGuid(),
+            DateTimeOffset.UtcNow.AddHours(1),
+            maximumRetryCount,
+            30,
+            3);
+    }
+}

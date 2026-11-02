@@ -3,7 +3,7 @@ using FleetManagement.Domain.Missions;
 namespace FleetManagement.Application.Missions;
 
 /// <summary>
-/// قرارداد داده‌ای مقادیر پیشنهادی برای تغییر مأموریت؛ تا زمان تأیید به مأموریت اصلی اعمال نمی‌شود.
+/// تصویر کامل اطلاعات قابل تغییر مأموریت که تا زمان تأیید به رکورد اصلی اعمال نمی‌شود.
 /// </summary>
 public sealed record MissionChangeProposal(
     string Title,

@@ -1,19 +1,266 @@
 @inherits LayoutComponentBase
+@using FleetManagement.Web.Components.Shared
+@inject FleetManagement.Infrastructure.Bootstrap.IBootstrapStateStore BootstrapStateStore
+@inject FleetManagement.Infrastructure.Bootstrap.SqlAvailabilityService SqlAvailability
+@inject FleetManagement.Infrastructure.Configuration.OrganizationSettingsService OrganizationSettings
+@inject FleetManagement.Infrastructure.Configuration.UserAppearanceSettingsService AppearanceSettings
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+@inject ILogger<MainLayout> Logger
 
-<div class="app-shell">
+<div class="app-shell @(_theme == "Dark" ? "theme-dark" : "theme-light")">
     <header class="app-header">
-        <div class="brand-mark" aria-hidden="true">ن</div>
+        @if (_organizationProfile is not null
+            && !string.IsNullOrWhiteSpace(_organizationProfile.LogoBase64)
+            && !string.IsNullOrWhiteSpace(_organizationProfile.LogoContentType))
+        {
+            <img class="organization-logo" src="@GetLogoDataUri()" alt="نشان سازمان" />
+        }
+        else
+        {
+            <div class="brand-mark" aria-hidden="true">ن</div>
+        }
         <div>
-            <strong>سامانه مدیریت ناوگان</strong>
+            <strong>@(_organizationProfile?.OrganizationName ?? "سامانه مدیریت ناوگان")</strong>
             <div class="subtitle">مدیریت یکپارچه مأموریت‌ها و ناوگان سازمان</div>
         </div>
+        <AuthorizeView>
+            <Authorized Context="appearanceContext">
+                <button type="button" class="theme-toggle" @onclick="ToggleThemeAsync">
+                    @(_theme == "Dark" ? "حالت روشن" : "حالت تاریک")
+                </button>
+            </Authorized>
+        </AuthorizeView>
     </header>
+
+    <AuthorizeView>
+        <Authorized Context="authenticatedContext">
+            <NotificationCenter />
+            <nav class="admin-navigation" aria-label="ناوبری سامانه">
+                <a href="/notifications">صندوق اعلان‌ها</a>
+                <AuthorizeView Policy="Permission:missions.view.own">
+                    <Authorized Context="missionChangesPermissionContext">
+                        <a href="/missions/changes">درخواست تغییر مأموریت</a>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Policy="Permission:missions.review">
+                    <Authorized Context="missionReviewPermissionContext">
+                        <a href="/admin/missions">بررسی مأموریت‌ها</a>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Policy="Permission:missions.timeline.view">
+                    <Authorized Context="timelinePermissionContext">
+                        <a href="/timeline">جدول زمانی رانندگان</a>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Policy="Permission:missions.view.own">
+                    <Authorized Context="missionsPermissionContext">
+                        <a href="/missions">درخواست‌های مأموریت</a>
+                    </Authorized>
+                </AuthorizeView>
+                <a href="/locations">مکان‌های مأموریت</a>
+                <AuthorizeView Policy="Permission:vehicles.view">
+                    <Authorized Context="vehiclesPermissionContext">
+                        <a href="/vehicles">خودروها</a>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Policy="Permission:drivers.view">
+                    <Authorized Context="driversPermissionContext">
+                        <a href="/drivers">رانندگان</a>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Roles="SystemAdministrator">
+                    <Authorized Context="administratorContext">
+                        <a href="/admin/security">نقش‌ها و مجوزها</a>
+                        <a href="/admin/directory-settings">تنظیمات Active Directory</a>
+                        <a href="/admin/organization">مشخصات سازمان</a>
+                        <a href="/admin/sms-templates">قالب‌های پیامک</a>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Policy="Permission:reports.view">
+                    <Authorized Context="reportsPermissionContext">
+                        <a href="/reports/missions">گزارش عملکرد</a>
+                        <a href="/reports/mileage">سوابق کیلومترشمار</a>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Roles="SystemAdministrator">
+                    <Authorized Context="missionTemplateAdminContext">
+                        <a href="/admin/mission-template">الگوی دستور مأموریت</a>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Roles="SystemAdministrator">
+                    <Authorized Context="missionSettingsAdminContext">
+                        <a href="/admin/mission-settings">تنظیمات مأموریت</a>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Roles="SystemAdministrator">
+                    <Authorized Context="usersAdminContext">
+                        <a href="/admin/users">مدیریت کاربران</a>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Policy="Permission:security.audit.view">
+                    <Authorized Context="auditPermissionContext">
+                        <a href="/admin/audit">گزارش ممیزی</a>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Policy="Permission:notifications.sms.view">
+                    <Authorized Context="smsPermissionContext">
+                        <a href="/admin/sms">گزارش پیامک‌ها</a>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Policy="Permission:security.sessions.view">
+                    <Authorized Context="sessionPermissionContext">
+                        <a href="/admin/sessions">سوابق ورود</a>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Policy="Permission:settings.sessions">
+                    <Authorized Context="sessionSettingsPermissionContext">
+                        <a href="/admin/session-settings">تنظیمات نشست</a>
+                    </Authorized>
+                </AuthorizeView>
+                <a href="/logout">خروج</a>
+            </nav>
+        </Authorized>
+    </AuthorizeView>
 
     <main class="main-content">
         @Body
     </main>
 
     <footer class="app-footer">
-        نسخه اولیه در حال توسعه
+        سامانه مدیریت ناوگان سازمانی
     </footer>
 </div>
+
+@code {
+    private FleetManagement.Infrastructure.Configuration.OrganizationProfileConfiguration? _organizationProfile;
+    private bool _organizationLoaded;
+    private bool _appearanceLoaded;
+    private string _theme = "Light";
+    private string _username = string.Empty;
+    private string _appearanceUsername = string.Empty;
+
+    /// <summary>تغییر حالت روشن یا تاریک و ذخیره آن برای کاربر جاری.</summary>
+    private async Task ToggleThemeAsync()
+    {
+        var previousTheme = _theme;
+        _theme = _theme == "Dark" ? "Light" : "Dark";
+
+        if (string.IsNullOrWhiteSpace(_username))
+        {
+            return;
+        }
+
+        try
+        {
+            await AppearanceSettings.SaveAsync(_username, _theme);
+        }
+        catch (Exception exception)
+        {
+            _theme = previousTheme;
+            Logger.LogWarning(exception, "ذخیره حالت ظاهری کاربر انجام نشد.");
+        }
+    }
+
+    /// <summary>ساخت نشانی داده‌ای نشان سازمان برای نمایش در سربرگ.</summary>
+    private string? GetLogoDataUri()
+    {
+        if (string.IsNullOrWhiteSpace(_organizationProfile?.LogoBase64)
+            || string.IsNullOrWhiteSpace(_organizationProfile.LogoContentType))
+        {
+            return null;
+        }
+
+        return $"data:{_organizationProfile.LogoContentType};base64,{_organizationProfile.LogoBase64}";
+    }
+
+    /// <summary>
+    /// در صورت ناتمام بودن راه‌اندازی یا قطعی SQL، فقط صفحه مجاز نمایش داده می‌شود.
+    /// </summary>
+    protected override async Task OnParametersSetAsync()
+    {
+        var currentPath = Navigation.ToBaseRelativePath(Navigation.Uri)
+            .Split('?', 2)[0]
+            .Trim('/')
+            .ToLowerInvariant();
+
+        var state = await BootstrapStateStore.ReadAsync();
+
+        if (!state.SetupCompleted)
+        {
+            if (currentPath != "setup")
+            {
+                Navigation.NavigateTo("/setup", replace: true);
+            }
+
+            return;
+        }
+
+        var sqlIsAvailable = await SqlAvailability.IsAvailableAsync();
+
+        if (sqlIsAvailable)
+        {
+            var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var principal = authenticationState.User;
+            if (principal.Identity?.IsAuthenticated == true)
+            {
+                var currentUsername = principal.FindFirst("fleet:username")?.Value
+                    ?? principal.Identity.Name
+                    ?? string.Empty;
+
+                if (!string.Equals(currentUsername, _appearanceUsername, StringComparison.OrdinalIgnoreCase))
+                {
+                    _appearanceUsername = currentUsername;
+                    _appearanceLoaded = false;
+                    _theme = "Light";
+                }
+
+                _username = currentUsername;
+
+                if (!_appearanceLoaded && !string.IsNullOrWhiteSpace(_username))
+                {
+                    try
+                    {
+                        var appearance = await AppearanceSettings.GetAsync(_username);
+                        _theme = appearance.Theme;
+                    }
+                    catch (Exception exception)
+                    {
+                        Logger.LogWarning(exception, "خواندن حالت ظاهری کاربر انجام نشد.");
+                    }
+                    finally
+                    {
+                        _appearanceLoaded = true;
+                    }
+                }
+            }
+        }
+
+        if (sqlIsAvailable && !_organizationLoaded)
+        {
+            try
+            {
+                _organizationProfile = await OrganizationSettings.GetAsync();
+            }
+            catch (Exception exception)
+            {
+                Logger.LogWarning(exception, "خواندن نام و نشان سازمان انجام نشد.");
+            }
+            finally
+            {
+                _organizationLoaded = true;
+            }
+        }
+
+        if (!sqlIsAvailable && currentPath != "recovery")
+        {
+            Navigation.NavigateTo("/recovery", replace: true);
+            return;
+        }
+
+        if (sqlIsAvailable && currentPath is "setup" or "recovery")
+        {
+            Navigation.NavigateTo("/", replace: true);
+        }
+    }
+}

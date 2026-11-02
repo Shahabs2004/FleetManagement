@@ -1,0 +1,272 @@
+@page "/notifications"
+@using FleetManagement.Application.Authorization
+@using FleetManagement.Web.Security
+@rendermode InteractiveServer
+@attribute [FleetPermission(PermissionCatalog.Notifications.View)]
+@using System.Globalization
+@using FleetManagement.Domain.Notifications
+@using FleetManagement.Infrastructure.Configuration
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<NotificationsPage> Logger
+
+<PageTitle>صندوق اعلان‌ها</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">ارتباطات سامانه</div>
+    <h1>صندوق اعلان‌ها</h1>
+    <p>سوابق اعلان‌های حساب کاربری شما در این صفحه نگهداری می‌شود. وضعیت خوانده‌شدن فقط برای حساب جاری تغییر می‌کند.</p>
+
+    <div class="driver-actions">
+        <button type="button" class="@(!_unreadOnly ? "primary-button" : "secondary-button")"
+                @onclick="() => ChangeFilterAsync(false)" disabled="@_busy">همه اعلان‌ها</button>
+        <button type="button" class="@(_unreadOnly ? "primary-button" : "secondary-button")"
+                @onclick="() => ChangeFilterAsync(true)" disabled="@_busy">فقط خوانده‌نشده‌ها (@ToPersian(_unreadCount))</button>
+        <button type="button" class="secondary-button" @onclick="MarkAllReadAsync"
+                disabled="@(_busy || _unreadCount == 0)">خواندن همه اعلان‌ها</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="setup-info">@_message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="setup-error">@_error</div>
+    }
+
+    @if (_loading)
+    {
+        <p>در حال دریافت اعلان‌ها...</p>
+    }
+    else if (_notifications.Count == 0)
+    {
+        <div class="setup-info">@(_unreadOnly ? "اعلان خوانده‌نشده‌ای وجود ندارد." : "هنوز اعلانی برای حساب شما ثبت نشده است.")</div>
+    }
+    else
+    {
+        <div class="report-summary">
+            <div class="report-summary-item">
+                <strong>@ToPersian(_totalCount)</strong>
+                <span>@(_unreadOnly ? "اعلان خوانده‌نشده" : "تعداد اعلان‌ها")</span>
+            </div>
+            <div class="report-summary-item">
+                <strong>@ToPersian(_unreadCount)</strong>
+                <span>خوانده‌نشده در مجموع</span>
+            </div>
+            <div class="report-summary-item">
+                <strong>@ToPersian(_pageIndex + 1)</strong>
+                <span>صفحه جاری</span>
+            </div>
+        </div>
+
+        <div class="session-table-wrap">
+            <table class="session-table">
+                <thead>
+                    <tr>
+                        <th>وضعیت</th>
+                        <th>عنوان</th>
+                        <th>متن اعلان</th>
+                        <th>زمان ثبت</th>
+                        <th>زمان خواندن</th>
+                        <th>عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var notification in _notifications)
+                    {
+                        <tr @key="notification.Id">
+                            <td>@(notification.IsRead ? "خوانده‌شده" : "جدید")</td>
+                            <td>@notification.Title</td>
+                            <td>@notification.Message</td>
+                            <td>@FormatTime(notification.CreatedAtUtc)</td>
+                            <td>@(notification.ReadAtUtc.HasValue ? FormatTime(notification.ReadAtUtc.Value) : "—")</td>
+                            <td>
+                                @if (!notification.IsRead)
+                                {
+                                    <button type="button" class="secondary-button"
+                                            @onclick="() => MarkReadAsync(notification.Id)" disabled="@_busy">علامت‌گذاری به‌عنوان خوانده‌شده</button>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(notification.ReferenceType)
+                                    || !string.IsNullOrWhiteSpace(notification.ReferenceId))
+                                {
+                                    <small>مرجع: @notification.ReferenceType / @notification.ReferenceId</small>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <div class="driver-actions">
+        <button type="button" class="secondary-button" @onclick="PreviousPageAsync"
+                disabled="@(_busy || _pageIndex == 0)">صفحه قبل</button>
+        <span>صفحه @ToPersian(_pageIndex + 1) از @ToPersian(Math.Max(1, PageCount))</span>
+        <button type="button" class="secondary-button" @onclick="NextPageAsync"
+                disabled="@(_busy || _pageIndex + 1 >= PageCount)">صفحه بعد</button>
+    </div>
+</section>
+
+@code {
+    private const int PageSize = 25;
+    private string _username = string.Empty;
+    private bool _loading = true;
+    private bool _busy;
+    private bool _unreadOnly;
+    private int _pageIndex;
+    private int _totalCount;
+    private int _unreadCount;
+    private string _message = string.Empty;
+    private string _error = string.Empty;
+    private IReadOnlyList<UserNotification> _notifications = [];
+
+    private int PageCount => (int)Math.Ceiling(_totalCount / (double)PageSize);
+
+    /// <summary>شناسایی کاربر جاری و بارگذاری صندوق اعلان اختصاصی او.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _username = state.User.FindFirst("fleet:username")?.Value
+            ?? state.User.Identity?.Name
+            ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(_username))
+        {
+            _error = "شناسه کاربر جاری قابل تشخیص نیست.";
+            _loading = false;
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    /// <summary>بارگذاری صفحه جاری و شمارنده‌های اعلان فقط برای گیرنده جاری.</summary>
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = string.Empty;
+        try
+        {
+            _totalCount = await NotificationService.GetCountAsync(_username, _unreadOnly);
+            _unreadCount = await NotificationService.GetUnreadCountAsync(_username);
+            var skip = _pageIndex * PageSize;
+            if (skip >= _totalCount && _pageIndex > 0)
+            {
+                _pageIndex = Math.Max(0, PageCount - 1);
+                skip = _pageIndex * PageSize;
+            }
+
+            _notifications = await NotificationService.GetRecentAsync(
+                _username, _unreadOnly, PageSize, skip: skip);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception);
+            _notifications = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>تغییر فیلتر صندوق و بازگشت به صفحه اول.</summary>
+    private async Task ChangeFilterAsync(bool unreadOnly)
+    {
+        if (_unreadOnly == unreadOnly) return;
+        _busy = true;
+        _unreadOnly = unreadOnly;
+        _pageIndex = 0;
+        _message = string.Empty;
+        try { await LoadAsync(); }
+        finally { _busy = false; }
+    }
+
+    /// <summary>علامت‌گذاری یک اعلان متعلق به حساب جاری.</summary>
+    private async Task MarkReadAsync(Guid id)
+    {
+        _busy = true;
+        _message = string.Empty;
+        try
+        {
+            await NotificationService.MarkAsReadAsync(id, _username);
+            _message = "وضعیت اعلان به‌روزرسانی شد.";
+            await LoadAsync();
+        }
+        catch (Exception exception) { ReportError(exception); }
+        finally { _busy = false; }
+    }
+
+    /// <summary>علامت‌گذاری همه اعلان‌های خوانده‌نشده حساب جاری.</summary>
+    private async Task MarkAllReadAsync()
+    {
+        _busy = true;
+        _message = string.Empty;
+        try
+        {
+            await NotificationService.MarkAllAsReadAsync(_username);
+            _message = "همه اعلان‌های حساب شما خوانده‌شده شدند.";
+            _pageIndex = 0;
+            await LoadAsync();
+        }
+        catch (Exception exception) { ReportError(exception); }
+        finally { _busy = false; }
+    }
+
+    /// <summary>رفتن به صفحه قبلی اعلان‌ها.</summary>
+    private async Task PreviousPageAsync()
+    {
+        if (_pageIndex == 0) return;
+        _pageIndex--;
+        await LoadAsync();
+    }
+
+    /// <summary>رفتن به صفحه بعدی اعلان‌ها.</summary>
+    private async Task NextPageAsync()
+    {
+        if (_pageIndex + 1 >= PageCount) return;
+        _pageIndex++;
+        await LoadAsync();
+    }
+
+    /// <summary>نمایش زمان ثبت و خواندن در منطقه زمانی تهران و تقویم جلالی.</summary>
+    private static string FormatTime(DateTimeOffset value)
+    {
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+        var local = TimeZoneInfo.ConvertTime(value, zone);
+        var calendar = new PersianCalendar();
+        return ToPersian($"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} - {local.Hour:00}:00");
+    }
+
+    /// <summary>تبدیل عدد به رقم‌های فارسی.</summary>
+    private static string ToPersian(int value)
+        => ToPersian(value.ToString(CultureInfo.InvariantCulture));
+
+    /// <summary>تبدیل رقم‌های لاتین در متن به رقم‌های فارسی.</summary>
+    private static string ToPersian(string value)
+    {
+        const string latin = "0123456789";
+        const string persian = "۰۱۲۳۴۵۶۷۸۹";
+        return string.Create(value.Length, value, (destination, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                var digit = latin.IndexOf(source[index]);
+                destination[index] = digit >= 0 ? persian[digit] : source[index];
+            }
+        });
+    }
+
+    /// <summary>ثبت خطای فنی با شناسه پیگیری بدون نمایش جزئیات داخلی.</summary>
+    private void ReportError(Exception exception)
+    {
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "دریافت یا به‌روزرسانی صندوق اعلان ناموفق بود. شناسه پیگیری: {TrackingId}", trackingId);
+        _error = $"عملیات صندوق اعلان انجام نشد. شناسه پیگیری: {trackingId}";
+    }
+}

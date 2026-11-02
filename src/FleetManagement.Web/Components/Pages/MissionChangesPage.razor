@@ -1,0 +1,424 @@
+@page "/missions/changes"
+@using FleetManagement.Application.Authorization
+@rendermode InteractiveServer
+@attribute [FleetPermission(PermissionCatalog.Missions.ViewOwn)]
+@using System.Globalization
+@using System.Security.Claims
+@using FleetManagement.Domain.Missions
+@using FleetManagement.Application.Missions
+@using FleetManagement.Web.Components.Shared
+@using FleetManagement.Domain.Locations
+@using FleetManagement.Domain.Drivers
+@using FleetManagement.Domain.Vehicles
+@using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Web.Security
+@using Microsoft.AspNetCore.Components.Authorization
+@inject MissionManagementService MissionService
+@inject LocationManagementService LocationService
+@inject DriverManagementService DriverService
+@inject VehicleManagementService VehicleService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<MissionChangesPage> Logger
+
+<PageTitle>درخواست تغییر مأموریت</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">درخواست‌های تغییر</div>
+    <h1>درخواست اصلاح مأموریت تأییدشده</h1>
+    <p>مقادیر فعلی مأموریت تا زمان تأیید مسئول ناوگان بدون تغییر می‌مانند. درخواست تغییر پس از شروع بررسی برای درخواست‌کننده قفل می‌شود.</p>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="setup-info">@_message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="setup-error">@_error</div>
+    }
+
+    <section class="driver-editor">
+        <h2>ثبت درخواست تغییر</h2>
+        <div class="driver-form-grid">
+            <div>
+                <label for="change-mission">مأموریت</label>
+                <select id="change-mission" value="@_missionId" @onchange="OnMissionSelected">
+                    <option value="">انتخاب مأموریت تأییدشده یا در حال اجرا</option>
+                    @foreach (var mission in _missions.Where(item => item.Status is MissionStatus.Confirmed or MissionStatus.Running))
+                    {
+                        <option value="@mission.Id">@mission.MissionNumber — @mission.Title</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="change-title">عنوان</label>
+                <input id="change-title" @bind="_title" maxlength="200" />
+            </div>
+            <div>
+                <label for="change-type">نوع مأموریت</label>
+                <select id="change-type" @bind="_type">
+                    <option value="@MissionType.Passenger">حمل مسافر</option>
+                    <option value="@MissionType.Freight">حمل بار</option>
+                </select>
+            </div>
+            <div>
+                <label for="change-purpose">هدف یا علت</label>
+                <input id="change-purpose" @bind="_purpose" maxlength="500" />
+            </div>
+            <div>
+                <label for="change-origin">مبدأ</label>
+                <select id="change-origin" @bind="_origin">
+                    <option value="">انتخاب مبدأ</option>
+                    @foreach (var location in _locations)
+                    {
+                        <option value="@location.Name">@location.Name</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="change-destination">مقصد</label>
+                <select id="change-destination" @bind="_destination">
+                    <option value="">انتخاب مقصد</option>
+                    @foreach (var location in _locations)
+                    {
+                        <option value="@location.Name">@location.Name</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="change-start">زمان شروع (تهران)</label>
+                <input id="change-start" type="datetime-local" step="3600" value="@_startLocal" @onchange="OnStartChanged" />
+            </div>
+            <div>
+                <label for="change-end">زمان پایان (تهران)</label>
+                <input id="change-end" type="datetime-local" step="3600" value="@_endLocal" @onchange="OnEndChanged" />
+            </div>
+            <div>
+                <label for="change-driver">راننده پیشنهادی</label>
+                <select id="change-driver" @bind="_driverId">
+                    <option value="">انتخاب راننده</option>
+                    @foreach (var driver in _drivers)
+                    {
+                        <option value="@driver.Id">@driver.FirstName @driver.LastName</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="change-vehicle">خودروی پیشنهادی</label>
+                <select id="change-vehicle" @bind="_vehicleId">
+                    <option value="">انتخاب خودرو</option>
+                    @foreach (var vehicle in _vehicles)
+                    {
+                        <option value="@vehicle.Id">@vehicle.Brand @vehicle.Model — @vehicle.LicensePlate</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="change-requester-name">نام درخواست‌کننده</label>
+                <input id="change-requester-name" @bind="_requesterName" maxlength="200" />
+            </div>
+            <div>
+                <label for="change-requester-phone">تلفن درخواست‌کننده</label>
+                <input id="change-requester-phone" @bind="_requesterPhone" maxlength="20" dir="ltr" />
+            </div>
+            <div>
+                <label for="change-org">واحد سازمانی</label>
+                <input id="change-org" @bind="_organizationalUnit" maxlength="200" />
+            </div>
+            <div>
+                <label for="change-group">گروه درخواست‌کننده</label>
+                <select id="change-group" @bind="_group">
+                    <option value="">انتخاب گروه</option>
+                    @foreach (var group in _groups)
+                    {
+                        <option value="@group">@group</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="change-passengers">تعداد مسافر</label>
+                <input id="change-passengers" type="text" inputmode="numeric" @bind="_passengers" />
+            </div>
+            <div>
+                <label for="change-odo">کیلومترشمار شروع خودرو (در صورت تغییر خودرو)</label>
+                <input id="change-odo" type="text" inputmode="numeric" dir="ltr" @bind="_odometerStart" />
+            </div>
+            <div>
+                <label for="change-order-number">شماره دستور مأموریت</label>
+                <input id="change-order-number" @bind="_orderNumber" maxlength="50" />
+            </div>
+            <div>
+                <label for="change-order-date">تاریخ دستور مأموریت</label>
+                <input id="change-order-date" @bind="_orderDate" placeholder="yyyy-MM-dd" />
+            </div>
+        </div>
+        <div class="mission-route-editor">
+            <label for="change-stops">توقف‌های میانی (هر مکان در یک خط)</label>
+            <textarea id="change-stops" @bind="_stops" rows="3"></textarea>
+            <label for="change-description">توضیحات</label>
+            <textarea id="change-description" @bind="_description" rows="3" maxlength="2000"></textarea>
+            <label for="change-reason">علت درخواست تغییر (الزامی)</label>
+            <textarea id="change-reason" @bind="_reason" rows="2" maxlength="1000"></textarea>
+        </div>
+        <div class="driver-actions">
+            <button type="button" class="primary-button" @onclick="SubmitChangeAsync" disabled="@_busy || !_selectedMission.HasValue">ثبت درخواست تغییر</button>
+        </div>
+    </section>
+
+    <h2>سوابق درخواست تغییر من</h2>
+    @if (_changeRequests.Count == 0)
+    {
+        <div class="setup-info">درخواست تغییری ثبت نشده است.</div>
+    }
+    else
+    {
+        <div class="session-table-wrap">
+            <table class="session-table">
+                <thead><tr><th>شناسه</th><th>مأموریت</th><th>علت</th><th>وضعیت</th><th>علت تصمیم</th></tr></thead>
+                <tbody>
+                    @foreach (var request in _changeRequests)
+                    {
+                        <tr @key="request.Id">
+                            <td dir="ltr">@request.Id</td>
+                            <td dir="ltr">@request.MissionId</td>
+                            <td>@request.Reason</td>
+                            <td>@GetChangeStatus(request.Status)</td>
+                            <td>@request.DecisionReason</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private bool _busy;
+    private string _username = string.Empty;
+    private string _missionId = string.Empty;
+    private Guid? _selectedMission;
+    private string _title = string.Empty;
+    private MissionType _type = MissionType.Passenger;
+    private string _purpose = string.Empty;
+    private string _origin = string.Empty;
+    private string _destination = string.Empty;
+    private string _startLocal = string.Empty;
+    private string _endLocal = string.Empty;
+    private string _driverId = string.Empty;
+    private string _vehicleId = string.Empty;
+    private string _requesterName = string.Empty;
+    private string _requesterPhone = string.Empty;
+    private string _organizationalUnit = string.Empty;
+    private string _group = string.Empty;
+    private string _passengers = string.Empty;
+    private string _odometerStart = string.Empty;
+    private string _orderNumber = string.Empty;
+    private string _orderDate = string.Empty;
+    private string _stops = string.Empty;
+    private string _description = string.Empty;
+    private string _reason = string.Empty;
+    private string _message = string.Empty;
+    private string _error = string.Empty;
+    private IReadOnlyList<string> _groups = [];
+    private IReadOnlyList<Mission> _missions = [];
+    private IReadOnlyList<Location> _locations = [];
+    private IReadOnlyList<Driver> _drivers = [];
+    private IReadOnlyList<Vehicle> _vehicles = [];
+    private IReadOnlyList<MissionChangeRequest> _changeRequests = [];
+
+    /// <summary>بارگذاری داده‌های لازم برای ثبت درخواست تغییر.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = auth.User;
+            _username = user.FindFirst("fleet:username")?.Value ?? user.Identity?.Name ?? string.Empty;
+            _requesterName = user.Identity?.Name ?? _username;
+            _organizationalUnit = user.FindFirst("fleet:organizational-unit")?.Value ?? string.Empty;
+            _groups = user.FindAll("fleet:ad-group-name").Select(claim => claim.Value)
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+            _missions = await MissionService.SearchAsync(requesterUsername: _username);
+            _locations = await LocationService.GetApprovedAsync();
+            _drivers = await DriverService.SearchAsync();
+            _vehicles = await VehicleService.SearchAsync();
+            _changeRequests = await MissionService.GetChangeRequestsAsync(requesterUsername: _username);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "بارگذاری فرم درخواست تغییر");
+        }
+    }
+
+    /// <summary>بارگذاری مقادیر فعلی مأموریت انتخاب‌شده در فرم پیشنهاد تغییر.</summary>
+    private void OnMissionSelected(ChangeEventArgs args)
+    {
+        _missionId = args.Value?.ToString() ?? string.Empty;
+        if (!Guid.TryParse(_missionId, out var id))
+        {
+            _selectedMission = null;
+            return;
+        }
+
+        var mission = _missions.SingleOrDefault(item => item.Id == id);
+        if (mission is null) return;
+
+        _selectedMission = id;
+        _title = mission.Title;
+        _type = mission.Type;
+        _purpose = mission.Purpose;
+        _origin = mission.Origin;
+        _destination = mission.Destination;
+        _startLocal = ToTehranInput(mission.PlannedStartAtUtc);
+        _endLocal = ToTehranInput(mission.PlannedEndAtUtc);
+        _driverId = mission.DriverId?.ToString() ?? string.Empty;
+        _vehicleId = mission.VehicleId?.ToString() ?? string.Empty;
+        _requesterName = mission.RequesterName;
+        _requesterPhone = mission.RequesterPhoneSnapshot;
+        _organizationalUnit = mission.RequesterOrganizationalUnit;
+        _group = mission.RequestingGroup;
+        _passengers = mission.PassengerCount?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+        _odometerStart = mission.OdometerStartKm?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+        _orderNumber = mission.MissionOrderNumber ?? string.Empty;
+        _orderDate = mission.MissionOrderDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+        _stops = string.Join(Environment.NewLine, mission.GetIntermediateStops());
+        _description = mission.Description ?? string.Empty;
+    }
+
+    /// <summary>دریافت زمان شروع پیشنهادی.</summary>
+    private void OnStartChanged(ChangeEventArgs args) => _startLocal = args.Value?.ToString() ?? string.Empty;
+
+    /// <summary>دریافت زمان پایان پیشنهادی.</summary>
+    private void OnEndChanged(ChangeEventArgs args) => _endLocal = args.Value?.ToString() ?? string.Empty;
+
+    /// <summary>ثبت درخواست تغییر بدون دست‌زدن به رکورد اصلی.</summary>
+    private async Task SubmitChangeAsync()
+    {
+        _busy = true;
+        _error = string.Empty;
+        try
+        {
+            if (!_selectedMission.HasValue
+                || !Guid.TryParse(_driverId, out var driverId)
+                || !Guid.TryParse(_vehicleId, out var vehicleId)
+                || string.IsNullOrWhiteSpace(_reason))
+            {
+                throw new InvalidOperationException("مأموریت، راننده، خودرو و علت درخواست را کامل کنید.");
+            }
+
+            var stops = _stops.Split(new[] { '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+            if (!_locations.Any(item => item.Name == _origin)
+                || !_locations.Any(item => item.Name == _destination)
+                || stops.Any(stop => !_locations.Any(item => item.Name == stop)))
+            {
+                throw new InvalidOperationException("مبدأ، مقصد و توقف‌ها باید از فهرست مکان‌های تأییدشده باشند.");
+            }
+
+            if (!_groups.Contains(_group, StringComparer.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("گروه انتخاب‌شده در گروه‌های مجاز حساب شما نیست.");
+            }
+
+            int? passengerCount = string.IsNullOrWhiteSpace(_passengers)
+                ? null
+                : int.TryParse(_passengers, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedPassengers)
+                    ? parsedPassengers
+                    : throw new InvalidOperationException("تعداد مسافران معتبر نیست.");
+
+            long? odometer = string.IsNullOrWhiteSpace(_odometerStart)
+                ? null
+                : long.TryParse(_odometerStart, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedOdometer)
+                    ? parsedOdometer
+                    : throw new InvalidOperationException("کیلومترشمار شروع معتبر نیست.");
+
+            DateOnly? orderDate = string.IsNullOrWhiteSpace(_orderDate)
+                ? null
+                : DateOnly.ParseExact(_orderDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+            var proposal = new MissionChangeProposal(
+                _title,
+                _type,
+                _purpose,
+                _origin,
+                _destination,
+                stops,
+                ParseTehranTime(_startLocal),
+                ParseTehranTime(_endLocal),
+                driverId,
+                vehicleId,
+                _requesterName,
+                _requesterPhone,
+                _organizationalUnit,
+                _group,
+                _description,
+                passengerCount,
+                _orderNumber,
+                orderDate,
+                odometer);
+
+            await MissionService.RequestChangeAsync(
+                _selectedMission.Value,
+                _username,
+                _reason,
+                proposal);
+
+            _message = "درخواست تغییر ثبت شد؛ اطلاعات اصلی تا زمان تأیید بدون تغییر باقی می‌ماند.";
+            _reason = string.Empty;
+            _changeRequests = await MissionService.GetChangeRequestsAsync(requesterUsername: _username);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "ثبت درخواست تغییر مأموریت");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>تبدیل زمان محلی تهران به UTC.</summary>
+    private static DateTimeOffset ParseTehranTime(string value)
+    {
+        if (!DateTime.TryParseExact(value, "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out var local) || local.Minute != 0)
+        {
+            throw new InvalidOperationException("زمان شروع و پایان باید با دقت ساعت کامل وارد شوند.");
+        }
+
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+
+        var utc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), zone);
+        return new DateTimeOffset(utc, TimeSpan.Zero);
+    }
+
+    /// <summary>تبدیل زمان UTC به ورودی تاریخ و ساعت تهران.</summary>
+    private static string ToTehranInput(DateTimeOffset value)
+    {
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+        return TimeZoneInfo.ConvertTime(value, zone).ToString("yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>عنوان فارسی وضعیت درخواست تغییر.</summary>
+    private static string GetChangeStatus(MissionChangeRequestStatus status) => status switch
+    {
+        MissionChangeRequestStatus.Pending => "در انتظار بررسی",
+        MissionChangeRequestStatus.UnderReview => "در حال بررسی",
+        MissionChangeRequestStatus.Approved => "تأیید شده",
+        MissionChangeRequestStatus.Rejected => "رد شده",
+        _ => "نامشخص"
+    };
+
+    /// <summary>ثبت خطا با شناسه پیگیری.</summary>
+    private void ReportError(Exception exception, string operation)
+    {
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "{Operation} ناموفق بود. شناسه پیگیری: {TrackingId}", operation, trackingId);
+        _error = $"عملیات انجام نشد. شناسه پیگیری: {trackingId}";
+    }
+}

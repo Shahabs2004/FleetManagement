@@ -1,0 +1,242 @@
+@page "/admin/sessions"
+@using FleetManagement.Application.Authorization
+@rendermode InteractiveServer
+@attribute [FleetPermission(PermissionCatalog.Security.SessionsView)]
+@using System.Globalization
+@using FleetManagement.Domain.Sessions
+@using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Web.Security
+@inject UserSessionService SessionService
+@inject ILogger<SessionHistoryPage> Logger
+
+<PageTitle>سوابق ورود کاربران</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">امنیت و پایش</div>
+    <h1>سوابق ورود و نشست کاربران</h1>
+    <p>سوابق ورود موفق، خروج، انقضای خودکار و تلاش‌های ناموفق به‌صورت دائمی نگهداری می‌شوند. این صفحه فقط خواندنی است و خروجی فایل ندارد.</p>
+
+    <div class="session-filters">
+        <div>
+            <label for="session-username">نام کاربری</label>
+            <input id="session-username" @bind="_usernameFilter" placeholder="جست‌وجو بر اساس نام کاربری" />
+        </div>
+        <div>
+            <label for="session-status">وضعیت</label>
+            <select id="session-status" @bind="_statusFilter">
+                <option value="">همه وضعیت‌ها</option>
+                <option value="Active">فعال</option>
+                <option value="LoggedOut">خروج دستی</option>
+                <option value="IdleExpired">انقضای عدم فعالیت</option>
+                <option value="AbsoluteExpired">پایان عمر مطلق نشست</option>
+                <option value="Failed">ورود ناموفق</option>
+            </select>
+        </div>
+        <button type="button" class="primary-button" @onclick="LoadAsync" disabled="@_isBusy">
+            جست‌وجو
+        </button>
+    </div>
+
+    @if (_isLoading)
+    {
+        <p>در حال دریافت سوابق...</p>
+    }
+    else if (_sessions.Count == 0)
+    {
+        <div class="setup-info">موردی برای نمایش پیدا نشد.</div>
+    }
+    else
+    {
+        <div class="session-table-wrap">
+            <table class="session-table">
+                <thead>
+                    <tr>
+                        <th>نام کاربری</th>
+                        <th>زمان ورود</th>
+                        <th>روش ورود</th>
+                        <th>وضعیت</th>
+                        <th>آخرین فعالیت</th>
+                        <th>زمان پایان</th>
+                        <th>نشانی IP</th>
+                        <th>علت</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var session in _sessions)
+                    {
+                        <tr @key="session.Id">
+                            <td>@session.Username</td>
+                            <td>@FormatTehranTime(session.LoginAtUtc)</td>
+                            <td>@GetLoginMethodName(session.LoginMethod)</td>
+                            <td>@GetStatusName(session.Status)</td>
+                            <td>@FormatTehranTime(session.LastActivityAtUtc)</td>
+                            <td>@FormatTehranTime(session.EndedAtUtc)</td>
+                            <td dir="ltr">@session.ClientIpAddress</td>
+                            <td>@GetReasonName(session.Reason)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="session-count">نمایش @_sessions.Count رکورد اخیر (حداکثر ۵۰۰ رکورد در هر جست‌وجو).</p>
+    }
+</section>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private string _usernameFilter = string.Empty;
+    private string _statusFilter = string.Empty;
+    private IReadOnlyList<UserSession> _sessions = [];
+
+    /// <summary>
+    /// دریافت آخرین سوابق نشست‌ها با فیلترهای انتخاب‌شده.
+    /// </summary>
+    protected override Task OnInitializedAsync()
+    {
+        return LoadAsync();
+    }
+
+    /// <summary>
+    /// بارگذاری سوابق بدون امکان تغییر یا حذف آن‌ها.
+    /// </summary>
+    private async Task LoadAsync()
+    {
+        _isBusy = true;
+        _isLoading = true;
+
+        try
+        {
+            UserSessionStatus? status = Enum.TryParse<UserSessionStatus>(
+                _statusFilter,
+                ignoreCase: true,
+                out var parsedStatus)
+                ? parsedStatus
+                : null;
+
+            _sessions = await SessionService.GetRecentAsync(
+                _usernameFilter,
+                status,
+                500);
+        }
+        catch (Exception exception)
+        {
+            var trackingId = Guid.NewGuid().ToString("N");
+            Logger.LogError(exception, "خطا در خواندن سوابق نشست. شناسه پیگیری: {TrackingId}", trackingId);
+            _sessions = [];
+        }
+        finally
+        {
+            _isLoading = false;
+            _isBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// نمایش زمان UTC در منطقه زمانی تهران و تقویم جلالی با دقت ساعت.
+    /// </summary>
+    private static string FormatTehranTime(DateTimeOffset? utcValue)
+    {
+        if (!utcValue.HasValue)
+        {
+            return "—";
+        }
+
+        var timeZone = GetTehranTimeZone();
+        var localTime = TimeZoneInfo.ConvertTime(utcValue.Value, timeZone);
+        var calendar = new PersianCalendar();
+
+        var formatted = $"{calendar.GetYear(localTime.DateTime):0000}/"
+            + $"{calendar.GetMonth(localTime.DateTime):00}/"
+            + $"{calendar.GetDayOfMonth(localTime.DateTime):00} "
+            + $"{localTime.Hour:00}:00";
+
+        return ToPersianDigits(formatted);
+    }
+
+    /// <summary>
+    /// دریافت شناسه منطقه زمانی تهران در Windows یا Linux.
+    /// </summary>
+    private static TimeZoneInfo GetTehranTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran");
+        }
+    }
+
+    /// <summary>
+    /// تبدیل رقم‌های لاتین به رقم‌های فارسی برای نمایش.
+    /// </summary>
+    private static string ToPersianDigits(string value)
+    {
+        const string latin = "0123456789";
+        const string persian = "۰۱۲۳۴۵۶۷۸۹";
+
+        return string.Create(value.Length, value, (destination, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                var digitIndex = latin.IndexOf(source[index]);
+                destination[index] = digitIndex >= 0 ? persian[digitIndex] : source[index];
+            }
+        });
+    }
+
+    /// <summary>
+    /// تبدیل کدهای داخلی علت ورود ناموفق به توضیح فارسی.
+    /// </summary>
+    private static string GetReasonName(string? reason)
+    {
+        return reason switch
+        {
+            "InvalidCredentials" => "نام کاربری یا رمز عبور نامعتبر",
+            "AccountDisabled" => "حساب در دایرکتوری غیرفعال است",
+            "AccountLocked" => "حساب در دایرکتوری قفل شده است",
+            "AccountExpired" => "اعتبار حساب پایان یافته است",
+            "NotInAllowedGroup" => "عضویت در گروه مجاز وجود ندارد",
+            "DirectoryUnavailable" => "ارتباط با دایرکتوری برقرار نشده است",
+            "NotConfigured" => "دایرکتوری تنظیم نشده است",
+            "AuthenticationMethodDisabled" => "روش ورود غیرفعال است",
+            "ApplicationDisabled" => "حساب در سامانه غیرفعال است",
+            "InvalidLocalAdministratorCredentials" => "اطلاعات مدیر محلی نامعتبر است",
+            null or "" => "—",
+            _ => "سایر خطاها"
+        };
+    }
+
+    /// <summary>
+    /// عنوان فارسی روش احراز هویت.
+    /// </summary>
+    private static string GetLoginMethodName(UserSessionLoginMethod method)
+    {
+        return method switch
+        {
+            UserSessionLoginMethod.DirectoryPassword => "نام کاربری و رمز AD",
+            UserSessionLoginMethod.WindowsIntegrated => "ورود یکپارچه ویندوز",
+            UserSessionLoginMethod.LocalEmergencyAdministrator => "مدیر محلی اضطراری",
+            _ => "نامشخص"
+        };
+    }
+
+    /// <summary>
+    /// عنوان فارسی وضعیت نشست یا تلاش ورود.
+    /// </summary>
+    private static string GetStatusName(UserSessionStatus status)
+    {
+        return status switch
+        {
+            UserSessionStatus.Active => "فعال",
+            UserSessionStatus.LoggedOut => "خروج دستی",
+            UserSessionStatus.IdleExpired => "انقضای عدم فعالیت",
+            UserSessionStatus.AbsoluteExpired => "پایان عمر مطلق نشست",
+            UserSessionStatus.Failed => "ورود ناموفق",
+            UserSessionStatus.DirectoryRevoked => "لغو دسترسی در AD",
+            _ => "نامشخص"
+        };
+    }
+}

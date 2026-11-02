@@ -173,7 +173,7 @@
 
 ## ۱۷. وضعیت فعلی پیاده‌سازی (شاخه develop، بررسی‌شده از روی کد)
 
-> منبع: خواندن کد و مستندات مخزن (حدود ۱۵۸ فایل و ۲۱ هزار خط). «پیاده‌سازی‌شده» یعنی کد وجود دارد؛ **نه** اینکه روی محیط واقعی تست شده است. وضعیت CI را همیشه از GitHub Actions (`build.yml`: Build + Test روی Ubuntu و Windows) بررسی کنید.
+> منبع: کد و مستندات شاخه `develop`. «پیاده‌سازی‌شده» یعنی کد وجود دارد؛ **نه** اینکه روی محیط واقعی تست شده است. آخرین CI روی HEAD برابر `ebce312`، run شماره ۷۹۶ است؛ هر دو job `build (windows-latest)` و `آزمون یکپارچه SQL Server` موفق بوده‌اند.
 
 ### پیاده‌سازی‌شده در کد
 - ویزارد راه‌اندازی، Administrator محلی، بازیابی، تنظیمات AD/سازمان/پیامک.
@@ -181,23 +181,32 @@
 - رانندگان، خودروها (پلاک ایرانی، وضعیت دستی/مؤثر)، مکان‌ها (پیشنهاد و بررسی)، کاربران.
 - چرخه کامل درخواست و مأموریت در `Mission.cs`: بررسی، تأیید، رد، شروع/پایان خودکار، تمدید، خاتمه زودهنگام، کیلومتر، انصراف، لغو، تقسیم، اعمال تغییرات.
 - درخواست تغییر پس از تأیید (`MissionChangeRequest`).
-- تایم‌لاین، چاپ حکم، داشبورد و ۸ گزارش با خروجی (`MissionReportExportService`).
-- اعلان داخلی با SignalR، صف پیامک، قالب‌ها، کلاینت SOAP ADP، ارسال پس‌زمینه، استعلام تحویل.
+- تایم‌لاین، چاپ حکم، داشبورد و ۸ گزارش با خروجی (`MissionReportExportService`). گزارش هشتم در وضعیت فعلی شمارش درخواست‌های تأیید/رد را ارائه می‌کند و فهرست ردیفی ندارد.
+- اعلان داخلی با SignalR، صف پیامک، قالب‌ها، کلاینت SOAP ADP، ارسال پس‌زمینه و استعلام تحویل؛ نگاشت وضعیت ADP فقط با تنظیم صریح انجام می‌شود و پیش‌فرض خالی است.
 - ممیزی، سوابق نشست، محدودیت نرخ ورود (HTTP 429).
-- ۱۱ جدول در `FleetDbContext`؛ مستندات استقرار و چک‌لیست پذیرش در `docs/`.
+- ۱۱ جدول در `FleetDbContext`؛ مستندات استقرار و ماتریس پذیرش در `docs/`.
 
 ### هنوز فقط در محیط واقعی قابل تأیید است (تأییدنشده)
-IIS + Windows Auth + LDAPS واقعی، ارسال واقعی پیامک و نگاشت وضعیت‌های تحویل ADP (نیاز به نمونه واقعی ارائه‌دهنده)، تست بار/امنیت، مسئولیت پشتیبان‌گیری. README صراحتاً می‌گوید هنوز برای استفاده عملیاتی تأیید نشده است.
+IIS + Windows Authentication + LDAPS واقعی، ارسال واقعی پیامک و معنای وضعیت‌های تحویل ADP، تست بار/امنیت و اجرای عملی Backup/Restore. مسئولیت Backup/Restore با مدیر پایگاه داده سازمان است و برنامه ماژول Backup مستقل ندارد. README نیز استفاده عملیاتی را تا پذیرش محیط سازمان تأییدشده نمی‌داند.
 
-### مغایرت‌های مشاهده‌شده بین مشخصات و کد
-1. **لایه Application تقریباً خالی است** (فقط `ISystemSettingsStore` و `INotificationPublisher`)؛ منطق کسب‌وکار در Infrastructure (`MissionManagementService.cs` ≈ ۱۵۸۰ خط) و Web است. این با تصمیم Clean Architecture و `ARCHITECTURE.md` نمی‌خواند.
-2. فایل‌های بسیار بزرگ (`MissionManagementService` ≈ ۱۵۸۰، `Mission.cs` ≈ ۶۵۰، `FleetAuthenticationEndpoints` ≈ ۴۶۰ خط) با قاعده «کد کوچک و خوانا» مغایرند.
-3. آزمون‌ها فقط در یک پروژه (`FleetManagement.Domain.Tests`، ≈ ۱۱۰۰ خط) هستند و نام آن با محتوا (آزمون‌های Infrastructure و SMS هم در آن است) نمی‌خواند؛ آزمون یکپارچه (SQL، تداخل هم‌زمان، تراکنش) دیده نشد.
-4. SignalR فقط برای اعلان‌ها است؛ به‌روزرسانی زنده تایم‌لاین/فهرست‌ها تأیید نشد.
-5. کتابخانه PDF در کد نیست؛ «ذخیره PDF حکم» به چاپ مرورگر متکی است (باید تأیید شود).
-6. کد مجوزها پراکنده در رشته‌های داخل صفحات/تنظیمات است و کاتالوگ مرکزی ندارد (نگاه کنید به پیوست ب). بعضی کدها (`settings.sessions`، `security.sessions.view`) هم‌پوشان به‌نظر می‌رسند.
-7. تقسیم مأموریت: وجود `RelatedMissionId` برای نمایش «ادامه مأموریت» مطابق مشخصات است؛ ولی قاعده «بدون مأموریت مادر» و رعایت ساعت‌گرد بودن باید با تست تأیید شود.
-8. تأیید/رد توسط «مدیر ناوگان یا اپراتور دارای مجوز» پیاده شده است (نقش Operator پیش‌فرض `missions.approve` دارد)؛ بخش ۲۰-۲ را ببینید.
+### مغایرت‌ها و وضعیت‌های تطبیق‌یافته
+1. **انتقال منطق مأموریت به Application انجام شده است**: طبق PRهای ۲۲ تا ۲۹، ثبت/ویرایش/بررسی، تغییر، کیلومتر، تقسیم، انصراف، چرخه‌عمر و تمدید در سرویس‌های Application قرار دارند؛ EF Core و تراکنش‌ها در آداپتورهای Infrastructure باقی مانده‌اند.
+2. `Mission.cs` و برخی صفحات همچنان بزرگ‌اند. تفکیک `FleetAuthenticationEndpoints` در PR شماره ۳۱ ادغام شده است؛ CI شماره ۷۴۹ در زمان ادغام موفق بود.
+3. آزمون‌های واحد در پروژه `FleetManagement.UnitTests` و آزمون‌های یکپارچه SQL Server در پروژه مستقل `FleetManagement.Infrastructure.IntegrationTests` قرار دارند؛ تغییر نام در PR شماره ۳۲ ادغام و CI شماره ۷۶۹ پس از اصلاح مسیر Solution موفق شد.
+4. اعلان‌ها و تغییرات اطلاعات پایه از SignalR استفاده می‌کنند؛ تغییر راننده، خودرو و مکان فهرست‌های باز را تازه می‌کند، تایم‌لاین تغییر راننده/خودرو را می‌گیرد و پس از اتصال مجدد مدار Blazor همگام‌سازی دوباره انجام می‌شود. پیام تغییر داده فاقد محتوای رکورد است.
+5. حکم مأموریت از صفحه چاپ A4 عمودی و RTL، با گزینه چاپ/ذخیره PDF مرورگر ارائه می‌شود؛ تولید PDF سمت سرور در این نسخه وجود ندارد. سربرگ، لوگو، متن‌ها و چیدمان یک/دو ستونه محل امضا قابل تنظیم است.
+6. کاتالوگ مرکزی مجوزها در PR شماره ۳۳ ادغام شده است؛ CI run شماره ۷۷۳ موفق بود. `settings.sessions` برای مدیریت سیاست نشست و `security.sessions.view` برای مشاهده سوابق ورود دو مجوز مستقل‌اند.
+7. تقسیم مأموریت: وجود `RelatedMissionId` برای نمایش «ادامه مأموریت» مطابق مشخصات است؛ ولی قاعده «بدون مأموریت مادر» و رعایت ساعت‌گرد بودن باید با آزمون تأیید شود. مجوز مستقل `missions.split.schedule.edit` در کاتالوگ تعریف شده است، اما وضعیت اتصال فیلد زمان فرم به این مجوز و صفحه مدیریت دلایل تقسیم باید جداگانه بازبینی شود؛ تا آن زمان این موارد را حل‌شده فرض نکنید.
+8. تأیید/رد مأموریت توسط مدیر ناوگان یا اپراتور دارای مجوز پیاده شده است (بخش ۲۰-۲).
+9. PR شماره ۳۹ بازبینی ۸ گزارش را انجام داد و دو مغایرت روشن را اصلاح کرد: دکمه چاپ/ذخیره PDF اکنون زیر مجوز `reports.export` است و تاریخ Excel به جلالی/ساعت تهران/ارقام فارسی تبدیل می‌شود. آزمون تبدیل تاریخ نیز اضافه شده است.
+10. **گزارش تأیید/رد درخواست‌ها** هنوز فقط شمارش تأیید و رد را نمایش می‌دهد؛ ستون‌های فهرست ردیفی در بخش ۱۱ مشخص نشده‌اند. تغییر این رفتار منوط به تصمیم مالک است؛ هیچ فیلدی از مدل داده نباید حدس زده شود.
+11. PR شماره ۴۰ زیرساخت نگاشت fail-closed وضعیت تحویل ADP را اضافه کرد: `DeliveryStatusMappings` پیش‌فرض خالی است و فقط نگاشت صریح به `Delivered` وضعیت تحویل‌شده می‌سازد؛ وضعیت ناشناخته/خالی «نامشخص» می‌ماند. **P2-11 تکمیل نشده است** و برای نگاشت عملیاتی، نمونه واقعیِ ناشناس‌سازی‌شده ارائه‌دهنده لازم است.
+
+### وضعیت اقلام P2 و شواهد CI
+- **P2-11 — باز:** زیرساخت fail-closed در PR #40 ادغام شد؛ نگاشت واقعی تا دریافت نمونه ADP خالی می‌ماند.
+- **P2-12 — بازبینی انجام شد:** هر ۸ گزارش در PR #39 بررسی شد و دو اصلاح بالا ادغام شدند؛ فقط تصمیم درباره فهرست ردیفی گزارش تأیید/رد در انتظار مالک است. در BACKLOG، بازبینی ۸ گزارش تیک خورده اما تصمیم این گزارش همچنان باز ثبت شده است.
+- CI مربوط به PRها: #38 run 783، #39 run 792، #40 run 793 و #41 run 791؛ هر دو job Windows و SQL Server در هر چهار اجرا موفق بودند.
+- آخرین CI شاخه `develop`: run 796 روی `ebce312`؛ هر دو job Windows و SQL Server 2022 موفق‌اند.
 
 ### نقشه کار باقی‌مانده
 به `docs/BACKLOG.md` بروید.
@@ -222,6 +231,9 @@ Administrator محلی: دسترسی کامل، مستقل از AD، همیشه 
 8. گزارش ممیزی/پیامک بدون خروجی فایل؛ گزارش مستقل تقسیم نداریم.
 9. نمای تایم‌لاین: فقط رانندگان (ثابت). طراحی دسکتاپ‌محور. SQL Authentication و رمز‌های بدون رمزنگاری در SQL (پذیرش ریسک).
 10. فاصله اجباری و بازه آینده و مدت نشست: قابل تنظیم توسط مدیر سیستم.
+11. کاتالوگ مرکزی مجوزها: کلیدهای مجوز در `PermissionCatalog` لایه Application ثبت و تخصیص کلید ناشناخته رد می‌شود. مجوزهای مستقل کیلومتر، ویرایش زمان تقسیم، بررسی انصراف/درخواست تغییر، مدیریت کاربران/سامانه/مکان‌ها، قالب حکم و دلایل تقسیم تعریف می‌شوند. پیش‌فرض‌ها مطابق پیوست ب است؛ `settings.sessions` (مدیریت مدت نشست) و `security.sessions.view` (مشاهده سوابق) دو مجوز مستقل‌اند. مجوزهای مدیریتی قالب حکم و دلایل تقسیم در فضای نام `settings.*` قرار می‌گیرند تا با wildcard `missions.*` اعطا نشوند.
+12. حکم مأموریت: تولید PDF سمت سرور انجام نمی‌شود؛ خروجی PDF از قابلیت چاپ مرورگر و گزینه Save as PDF تهیه می‌شود.
+13. چیدمان محل امضا در قالب چاپ قابل تنظیم است و فقط دو حالت یک‌ستونه یا دوستونه پشتیبانی می‌شود.
 
 ---
 
@@ -246,27 +258,43 @@ Administrator محلی: دسترسی کامل، مستقل از AD، همیشه 
 **روابط**: Mission→Driver و Mission→Vehicle (اختیاری تا تأیید)؛ Mission↔Mission از طریق `RelatedMissionId` (تقسیم، بدون والد)؛ MissionChangeRequest→Mission؛ SmsQueueItem→Mission؛ بقیه با Username.
 **ایندکس/محدودیت‌های لازم (باید در Migration بررسی شود)**: یکتایی MissionNumber؛ RowVersion روی Mission/Driver/Vehicle؛ جلوگیری هم‌زمان از تداخل راننده/خودرو در تراکنش Serializable یا قفل؛ شمارنده سالانه جدا.
 
-## پیوست ب. کاتالوگ مجوزها (استخراج‌شده از کد؛ قاعده: `*` همه، Deny بر Grant غالب است)
+## پیوست ب. کاتالوگ مجوزها (مرجع مرکزی: `FleetManagement.Application.Authorization.PermissionCatalog`)
+
+قاعده: `*` همه مجوزها، الگوهای `module.*` تمام مجوزهای همان ماژول، و Deny بر Grant غالب است. کلیدهای تخصیص‌یافته باید در کاتالوگ ثبت شده باشند.
 
 | کد | معنی | پیش‌فرض نقش‌ها |
 |---|---|---|
-| `*` | همه | SystemAdministrator |
+| `*` | همه عملیات | SystemAdministrator و Administrator محلی |
 | `dashboard.view` | داشبورد | همه نقش‌ها |
-| `drivers.view` / `drivers.*` / `drivers.default-vehicle.manage` | رانندگان | Viewer/Operator: view؛ FleetManager: همه |
-| `vehicles.view` / `vehicles.*` | خودروها | همانند بالا |
+| `drivers.view` / `drivers.manage` / `drivers.*` | مشاهده/مدیریت رانندگان | Viewer/Operator: view؛ FleetManager: همه |
+| `drivers.default-vehicle.manage` | تغییر خودروی پیش‌فرض راننده | FleetManager |
+| `vehicles.view` / `vehicles.manage` / `vehicles.*` | مشاهده/مدیریت خودروها | Viewer/Operator: view؛ FleetManager: همه |
 | `missions.view` / `missions.view.own` | مشاهده همه / مأموریت‌های خود | Viewer: view؛ Requester: own؛ Operator: هر دو |
-| `missions.create` / `.edit` | ثبت / ویرایش | Requester: create؛ Operator |
-| `missions.review` / `.approve` / `.reject` | بررسی/تأیید/رد | Operator و FleetManager |
-| `missions.cancel` / `.extend` / `.split` | لغو / تمدید / تقسیم | Operator و FleetManager |
-| `missions.print` | چاپ حکم | Requester، Operator |
-| `missions.timeline.view` | تایم‌لاین | Operator، FleetManager |
-| `reports.view` / `reports.export` | گزارش‌ها / خروجی | FleetManager |
-| `notifications.view` / `notifications.sms.view` | اعلان / صف پیامک | notifications.view: Requester, Operator, FleetManager |
-| `security.audit.view` / `security.sessions.view` | ممیزی / سوابق نشست | مدیر سامانه |
-| `settings.authorization` / `settings.sessions` | مدیریت نقش‌ها / تنظیم نشست | مدیر سامانه |
+| `missions.create` / `missions.edit` | ثبت / ویرایش | Requester: create؛ Operator |
+| `missions.review` / `missions.approve` / `missions.reject` | شروع بررسی / تأیید / رد درخواست | Operator و FleetManager |
+| `missions.cancel` / `missions.extend` / `missions.split` | لغو / تمدید / تقسیم | Operator و FleetManager |
+| `missions.print` / `missions.timeline.view` | چاپ حکم / مشاهده تایم‌لاین | چاپ: Requester و Operator؛ تایم‌لاین: Operator و FleetManager |
+| `missions.*` | همه عملیات مأموریت | FleetManager |
+| `missions.odometer.manage` | ثبت و اصلاح کیلومتر | Operator و FleetManager |
+| `missions.split.schedule.edit` | ویرایش زمان تقسیم | فقط FleetManager |
+| `missions.withdrawal.review` / `missions.change.review` | بررسی انصراف / درخواست تغییر | انصراف: FleetManager؛ Operator فقط با تخصیص صریح. درخواست تغییر: Operator و FleetManager |
+| `reports.view` / `reports.export` | مشاهده / خروجی گزارش‌ها | FleetManager |
+| `notifications.view` | اعلان‌های داخلی | Requester، Operator، FleetManager |
+| `notifications.sms.view` / `notifications.sms.retry` | مشاهده پیامک / ارسال مجدد | مستقل و قابل تخصیص؛ بدون اعطای پیش‌فرض به نقش‌های عملیاتی |
+| `notifications.sms.templates.manage` | مدیریت قالب پیامک | SystemAdministrator |
+| `security.audit.view` / `security.sessions.view` | مشاهده ممیزی / سوابق نشست | SystemAdministrator |
+| `settings.authorization` / `settings.sessions` | مدیریت مجوزها / سیاست نشست | SystemAdministrator |
+| `settings.system.manage` | تنظیمات سامانه | SystemAdministrator |
+| `users.manage` / `locations.manage` | مدیریت کاربران / مکان‌ها | SystemAdministrator |
+| `settings.mission-template.manage` / `settings.mission-split-reasons.manage` | قالب حکم / دلایل تقسیم | SystemAdministrator |
 
-**ناقص یا نیازمند تصمیم**: مجوز مستقل برای ویرایش کیلومتر، ویرایش زمان تقسیم (مشخصات: فقط مدیر ناوگان)، مدیریت کاربران، تنظیمات سیستم/فاصله اجباری، مدیریت مکان‌ها، قالب چاپ، مدیریت دلایل تقسیم، پاسخ به انصراف و درخواست تغییر. این‌ها یا زیر `missions.*` جمع شده‌اند یا کد جداگانه ندارند؛ باید صریح شوند.
-نقش‌های پیش‌فرض: SystemAdministrator، FleetManager، Operator، Viewer، Requester. Administrator محلی خارج از این سازوکار است.
+نکات:
+- `missions.split.schedule.edit` عمداً مستقل است؛ ویرایش زمان تقسیم فقط برای مدیر ناوگان مجاز است. این مجوز خارج از دسترسی عمومی اپراتور به تقسیم باقی می‌ماند.
+- برای `missions.withdrawal.review` چون نقش پیش‌فرض اپراتور در مشخصات به‌صراحت تعیین نشده، اعطای آن به Operator خودکار نیست و مدیر سامانه باید آن را صریحاً تخصیص دهد.
+- مجوزهای پیامک مستقل‌اند؛ مشاهده گزارش پیامک و ارسال مجدد باید جداگانه قابل اعطا/رد باشند.
+- کلیدهای تنظیمات قالب حکم و دلایل تقسیم در فضای نام `settings.*` قرار دارند تا مجوز فراگیر `missions.*` مدیر ناوگان، اختیار مدیریتی مدیر سامانه را ناخواسته گسترش ندهد.
+- `settings.sessions` برای تغییر مدت نشست/عدم فعالیت است؛ `security.sessions.view` صرفاً مشاهده سوابق ورود و نشست‌هاست.
+- نقش‌های پایه: SystemAdministrator، FleetManager، Operator، Viewer، Requester. Administrator محلی خارج از سازوکار نقش‌های عادی و دارای `*` است.
 
 ## پیوست پ. جدول انتقال وضعیت‌ها (از روی `Mission.cs`)
 
@@ -283,12 +311,14 @@ Administrator محلی: دسترسی کامل، مستقل از AD، همیشه 
 | Running | CloseFirstSegmentForSplit | Completed (بخش اول) | زمان تقسیم بین شروع و پایان؛ کیلومتر پایان خودروی اول؛ بخش دوم = مأموریت جدید با شماره مستقل |
 | Confirmed/Running | Extend | همان | زمان جدید > پایان فعلی؛ کنترل تداخل |
 | Confirmed/Running | ApplyApprovedChanges | همان | اتمی؛ کنترل مجدد؛ Running نمی‌تواند شروع را به آینده ببرد |
-| هر وضعیت غیر نهایی | RequestWithdrawal | WithdrawalPending | علت؛ وضعیت قبلی ذخیره؛ منابع همچنان رزرو |
+| Confirmed/Running | RequestWithdrawal (درخواست‌کننده) | WithdrawalPending | فقط مأموریت خود؛ علت؛ وضعیت قبلی ذخیره؛ منابع همچنان رزرو |
+| Pending/UnderReview | CancelPendingRequest (درخواست‌کننده) | Cancelled | فقط درخواست‌کننده خود؛ علت؛ بدون رزرو منابع |
+| هر وضعیت غیرنهایی | Cancel (مدیر ناوگان/اپراتور مجاز) | Cancelled | علت؛ آزادسازی فوری منابع؛ اگر Running یا انصراف از Running باشد زمان لغو ثبت می‌شود |
 | WithdrawalPending | ApproveWithdrawal | Cancelled | آزادسازی منابع |
 | WithdrawalPending | RejectWithdrawal | StatusBeforeWithdrawal | علت |
 | WithdrawalPending | AutoCloseExpiredWithdrawal | Cancelled | پایان برنامه‌ریزی‌شده رسیده |
 | غیر از Completed/Cancelled/Rejected | Cancel | Cancelled | علت؛ اگر Running زمان لغو ثبت می‌شود |
-نهایی: Completed، Cancelled، Rejected. انصراف از وضعیت‌های Completed/Cancelled/Rejected ممنوع است.
+نهایی: Completed، Cancelled، Rejected. انصراف فقط از Confirmed/Running درخواست می‌شود؛ Pending/UnderReview با لغو مستقیم درخواست‌کننده بسته می‌شود. مدیر ناوگان/اپراتور مجاز می‌تواند هر وضعیت غیرنهایی، از جمله WithdrawalPending، را مستقیماً لغو کند.
 
 ### MissionChangeRequest
 Pending → (StartReview: بازبین اول) → UnderReview → Approved (اعمال اتمی) یا Rejected (علت). فقط بازبین آغازکننده می‌تواند تصمیم بگیرد؛ رد، مأموریت را دست‌نخورده می‌گذارد و درخواست جدید ممکن است.
@@ -297,7 +327,5 @@ Pending → (StartReview: بازبین اول) → UnderReview → Approved (ا�
 Queued → Sending → Accepted → Delivered؛ خطای موقت → RetryScheduled (تا MaximumRetryCount) → Sending؛ پایان تلاش‌ها → Failed؛ خطای دائمی → PermanentFailure؛ لغو یادآوری قبل از ارسال → Cancelled. استعلام تحویل تا MaximumStatusPollingAttempts؛ **نگاشت وضعیت‌های ADP هنوز نیازمند نمونه واقعی است.**
 رویدادهای پیامک (۹): MissionApproved، MissionRejected، MissionChanged، DriverOrVehicleChanged، MissionCancelled، WithdrawalApproved، WithdrawalRejected، MissionStartReminder، MissionCompleted.
 
-### چیزهایی که باید با تست تأیید شوند (ابهام)
-- آیا `RequestWithdrawal` برای Pending/UnderReview هم مجاز است (کد فقط وضعیت‌های نهایی را رد می‌کند)؟
-- آیا WithdrawalPending قابل `Cancel` مستقیم است (کد اجازه می‌دهد)؟
+### موارد باز برای تأیید با تست
 - چه کسی `StartReview` را می‌تواند بزند و آیا ساعات غیرکاری (بخش ۲۰) محدودیتی دارد؟

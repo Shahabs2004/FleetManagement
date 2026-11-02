@@ -1,0 +1,864 @@
+@page "/admin/missions"
+@using FleetManagement.Application.Authorization
+@rendermode InteractiveServer
+@implements IDisposable
+@attribute [FleetPermission(PermissionCatalog.Missions.Review)]
+@using System.Globalization
+@using FleetManagement.Domain.Missions
+@using FleetManagement.Domain.Drivers
+@using FleetManagement.Domain.Vehicles
+@using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Web.Security
+@using FleetManagement.Web.Notifications
+@using FleetManagement.Web.Components.Shared
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Authorization
+@inject MissionManagementService MissionService
+@inject DriverManagementService DriverService
+@inject VehicleManagementService VehicleService
+@inject DriverVehiclePreferenceService DriverVehiclePreferences
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IAuthorizationService AuthorizationService
+@inject NotificationEventBus NotificationEvents
+@inject ILogger<MissionReviewPage> Logger
+
+<PageTitle>بررسی درخواست‌های مأموریت</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">عملیات ناوگان</div>
+    <h1>بررسی و تخصیص مأموریت</h1>
+    <p>فقط درخواست‌های تأییدشده یا در حال اجرا منابع را در تعارض زمانی رزرو می‌کنند. تأیید هر درخواست، وضعیت راننده، خودرو و فاصله بین مأموریت‌ها را کنترل می‌کند.</p>
+
+    <div class="session-filters">
+        <div>
+            <label for="mission-filter">وضعیت درخواست</label>
+            <select id="mission-filter" @bind="_statusFilter">
+                <option value="">همه وضعیت‌ها</option>
+                <option value="@((int)MissionStatus.Pending)">در انتظار بررسی</option>
+                <option value="@((int)MissionStatus.UnderReview)">در حال بررسی</option>
+                <option value="@((int)MissionStatus.Confirmed)">تأیید شده</option>
+                <option value="@((int)MissionStatus.Running)">در حال اجرا</option>
+                <option value="@((int)MissionStatus.WithdrawalPending)">در انتظار تصمیم انصراف</option>
+                <option value="@((int)MissionStatus.Completed)">پایان‌یافته</option>
+                <option value="@((int)MissionStatus.Rejected)">ردشده</option>
+                <option value="@((int)MissionStatus.Cancelled)">لغوشده</option>
+            </select>
+        </div>
+        <div>
+            <label for="mission-decision-reason">علت تصمیم / لغو</label>
+            <input id="mission-decision-reason" @bind="_reason" maxlength="1000" placeholder="برای رد یا لغو الزامی است" />
+        </div>
+        <button type="button" class="primary-button" @onclick="LoadAsync" disabled="@_busy">جست‌وجو</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="setup-info">@_message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="setup-error">@_error</div>
+    }
+
+    @if (_loading)
+    {
+        <p>در حال دریافت درخواست‌ها...</p>
+    }
+    else if (_missions.Count == 0)
+    {
+        <div class="setup-info">درخواستی با وضعیت انتخاب‌شده وجود ندارد.</div>
+    }
+    else
+    {
+        @foreach (var mission in _missions)
+        {
+            <article class="mission-review-card" @key="mission.Id">
+                <div class="mission-review-heading">
+                    <strong>@mission.MissionNumber — @mission.Title</strong>
+                    <span>@GetStatusName(mission.Status)</span>
+                    @if (mission.Status is MissionStatus.Confirmed or MissionStatus.Running or MissionStatus.Completed or MissionStatus.Cancelled)
+                    {
+                        <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Missions.Print)"><Authorized Context="printContext"><a class="secondary-button" href="@("/missions/" + mission.Id + "/print")">چاپ دستور</a></Authorized></AuthorizeView>
+                    }
+                </div>
+                <div class="mission-review-grid">
+                    <div><b>درخواست‌کننده:</b> @mission.RequesterName (@mission.RequesterUsername)</div>
+                    <div><b>گروه:</b> @mission.RequestingGroup</div>
+                    <div><b>تلفن:</b> <span dir="ltr">@mission.RequesterPhoneSnapshot</span></div>
+                    <div><b>مسیر:</b> @mission.Origin ← @mission.Destination</div>
+                    <div><b>شروع:</b> @FormatTime(mission.PlannedStartAtUtc)</div>
+                    <div><b>پایان:</b> @FormatTime(mission.PlannedEndAtUtc)</div>
+                    <div><b>نوع:</b> @(mission.Type == MissionType.Freight ? "بار" : "مسافر")</div>
+                    <div><b>هدف:</b> @mission.Purpose</div>
+                </div>
+
+                @if (mission.VehicleId.HasValue
+                    && mission.Status != MissionStatus.Pending
+                    && mission.Status != MissionStatus.UnderReview
+                    && mission.Status != MissionStatus.Rejected)
+                {
+                    <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Missions.OdometerManage)">
+                        <Authorized Context="odometerEditContext">
+                            <section class="audit-detail">
+                                <h3>ثبت کیلومترشمار</h3>
+                                <div class="mission-assignment-grid">
+                                    <div>
+                                        <label>کیلومترشمار شروع</label>
+                                        <input type="text" inputmode="numeric" dir="ltr" maxlength="15"
+                                               value="@_odometerStart[mission.Id]"
+                                               @onchange="args => _odometerStart[mission.Id] = args.Value?.ToString() ?? string.Empty" />
+                                    </div>
+                                    <div>
+                                        <label>کیلومترشمار پایان</label>
+                                        <input type="text" inputmode="numeric" dir="ltr" maxlength="15"
+                                               value="@_odometerEnd[mission.Id]"
+                                               @onchange="args => _odometerEnd[mission.Id] = args.Value?.ToString() ?? string.Empty" />
+                                    </div>
+                                </div>
+                                <p>@(mission.DistanceKm.HasValue ? $"مسافت ثبت‌شده: {mission.DistanceKm.Value:N0} کیلومتر" : "برای محاسبه مسافت، هر دو مقدار شروع و پایان را ثبت کنید.")</p>
+                                <button type="button" class="primary-button" @onclick="() => SaveOdometerAsync(mission.Id)" disabled="@_busy">ذخیره کیلومترشمار</button>
+                            </section>
+                        </Authorized>
+                    </AuthorizeView>
+                }
+
+                @if (mission.Status is MissionStatus.Pending or MissionStatus.UnderReview)
+                {
+                    <div class="mission-assignment-grid">
+                        <div>
+                            <label>راننده</label>
+                            <select value="@_driverSelection[mission.Id]" @onchange="args => OnDriverChangedAsync(mission.Id, args)">
+                                <option value="">انتخاب راننده</option>
+                                @foreach (var driver in _drivers)
+                                {
+                                    <option value="@driver.Id">@driver.FirstName @driver.LastName — @driver.MobilePhone</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label>خودرو</label>
+                            <select @bind="_vehicleSelection[mission.Id]">
+                                <option value="">انتخاب خودرو</option>
+                                @foreach (var vehicle in _vehicles)
+                                {
+                                    <option value="@vehicle.Id">@vehicle.Brand @vehicle.Model — @vehicle.LicensePlate</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="driver-actions">
+                        @if (mission.Status == MissionStatus.Pending)
+                        {
+                            <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Missions.Review)"><Authorized Context="startReviewContext"><button type="button" class="secondary-button" @onclick="() => StartReviewAsync(mission.Id)" disabled="@_busy">شروع بررسی</button></Authorized></AuthorizeView>
+                        }
+                        <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Missions.Approve)"><Authorized Context="approveContext"><button type="button" class="primary-button" @onclick="() => ApproveAsync(mission.Id)" disabled="@_busy">تأیید و تخصیص</button></Authorized></AuthorizeView>
+                        <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Missions.Reject)"><Authorized Context="rejectContext"><button type="button" class="secondary-button" @onclick="() => RejectAsync(mission.Id)" disabled="@_busy">رد درخواست</button></Authorized></AuthorizeView>
+                    </div>
+                }
+                else if (mission.Status == MissionStatus.WithdrawalPending)
+                {
+                    <div class="driver-actions">
+                        <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Missions.WithdrawalReview)"><Authorized Context="approveWithdrawalContext"><button type="button" class="primary-button" @onclick="() => ApproveWithdrawalAsync(mission.Id)" disabled="@_busy">تأیید انصراف</button></Authorized></AuthorizeView>
+                        <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Missions.WithdrawalReview)"><Authorized Context="rejectWithdrawalContext"><button type="button" class="secondary-button" @onclick="() => RejectWithdrawalAsync(mission.Id)" disabled="@_busy">رد انصراف</button></Authorized></AuthorizeView>
+                    </div>
+                }
+                else if (mission.Status is MissionStatus.Confirmed or MissionStatus.Running)
+                {
+                    <div class="driver-actions">
+                        <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Missions.Cancel)"><Authorized Context="cancelContext"><button type="button" class="secondary-button" @onclick="() => CancelAsync(mission.Id)" disabled="@_busy">لغو مأموریت</button></Authorized></AuthorizeView>
+                        @if (mission.Status == MissionStatus.Running)
+                        {
+                            <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Missions.Extend)"><Authorized Context="extendContext"><button type="button" class="secondary-button" @onclick='() => OpenTimeAction(mission.Id, "extend", mission.PlannedEndAtUtc)'>تمدید زمان</button>
+                            <button type="button" class="secondary-button" @onclick='() => OpenTimeAction(mission.Id, "early", mission.PlannedEndAtUtc)'>خاتمه زودهنگام</button></Authorized></AuthorizeView>
+                        }
+                    </div>
+                }
+
+                @if (mission.Status == MissionStatus.Running)
+                {
+                    <div class="driver-actions">
+                        <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Missions.Split)"><Authorized Context="splitContext"><button type="button" class="secondary-button" @onclick="() => OpenSplit(mission)">تقسیم مأموریت</button></Authorized></AuthorizeView>
+                    </div>
+                }
+
+                @if (_timeActionMissionId == mission.Id)
+                {
+                    <section class="audit-detail">
+                        <h3>@(_timeActionKind == "extend" ? "تمدید مأموریت" : "خاتمه زودهنگام")</h3>
+                        <JalaliDateTimeInput Id="mission-time-action"
+                                              Label="زمان جدید (به وقت تهران)"
+                                              @bind-Value="_timeActionLocal" />
+                        <div class="driver-actions">
+                            <button type="button" class="primary-button" @onclick="SaveTimeActionAsync" disabled="@_busy">ثبت</button>
+                            <button type="button" class="secondary-button" @onclick="() => _timeActionMissionId = null">انصراف</button>
+                        </div>
+                        <small>ثبت علت در کادر «علت تصمیم / لغو» بالای صفحه الزامی است.</small>
+                    </section>
+                }
+
+
+
+                @if (_splitMissionId == mission.Id)
+                {
+                    <section class="audit-detail">
+                        <h3>تقسیم به دو مأموریت مستقل</h3>
+                        <div class="mission-assignment-grid">
+                            <div>
+                                <label>راننده بخش دوم</label>
+                                <select @bind="_splitDriver">
+                                    <option value="">انتخاب راننده</option>
+                                    @foreach (var driver in _drivers)
+                                    {
+                                        <option value="@driver.Id">@driver.FirstName @driver.LastName</option>
+                                    }
+                                </select>
+                            </div>
+                            <div>
+                                <label>خودروی بخش دوم</label>
+                                <select @bind="_splitVehicle">
+                                    <option value="">انتخاب خودرو</option>
+                                    @foreach (var vehicle in _vehicles)
+                                    {
+                                        <option value="@vehicle.Id">@vehicle.Brand @vehicle.Model — @vehicle.LicensePlate</option>
+                                    }
+                                </select>
+                            </div>
+                            <div>
+                                <JalaliDateTimeInput Id="mission-split-time"
+                                                      Label="زمان تقسیم (به وقت تهران)"
+                                                      @bind-Value="_splitAtLocal" />
+                            </div>
+                            <div>
+                                <label>کیلومترشمار پایان بخش اول</label>
+                                <input type="text" inputmode="numeric" dir="ltr" @bind="_splitEndOdometer" />
+                            </div>
+                            <div>
+                                <label>کیلومترشمار شروع خودروی جدید (در صورت تغییر خودرو)</label>
+                                <input type="text" inputmode="numeric" dir="ltr" @bind="_splitStartOdometer" />
+                            </div>
+                            <div>
+                                <label>دلیل تقسیم</label>
+                                <select @bind="_splitReason">
+                                    <option value="@MissionSplitReason.VehicleBreakdown">خرابی خودرو</option>
+                                    <option value="@MissionSplitReason.DriverChange">تعویض راننده</option>
+                                    <option value="@MissionSplitReason.DriverAndVehicleChange">تعویض هم‌زمان راننده و خودرو</option>
+                                    <option value="@MissionSplitReason.Other">سایر موارد</option>
+                                </select>
+                            </div>
+                        </div>
+                        @if (_splitReason == MissionSplitReason.Other)
+                        {
+                            <label>توضیح دلیل</label>
+                            <input @bind="_splitExplanation" maxlength="900" />
+                        }
+                        <div class="driver-actions">
+                            <button type="button" class="primary-button" @onclick="SplitAsync" disabled="@_busy">ثبت تقسیم</button>
+                            <button type="button" class="secondary-button" @onclick="CloseSplit">انصراف</button>
+                        </div>
+                    </section>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(mission.SplitReason))
+                {
+                    <p class="mission-reason"><b>تقسیم‌شده:</b> @mission.SplitReason — زمان @FormatTime(mission.SplitAtUtc ?? mission.PlannedEndAtUtc) — مأموریت مرتبط: @mission.RelatedMissionId</p>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(mission.DecisionReason))
+                {
+                    <p class="mission-reason"><b>آخرین علت ثبت‌شده:</b> @mission.DecisionReason</p>
+                }
+            </article>
+        }
+    }
+
+    <h2>درخواست‌های تغییر مأموریت</h2>
+    @if (_changeRequests.Count == 0)
+    {
+        <div class="setup-info">درخواست تغییر در انتظار بررسی وجود ندارد.</div>
+    }
+    else
+    {
+        @foreach (var change in _changeRequests)
+        {
+            <article class="mission-review-card" @key="change.Id">
+                <div class="mission-review-heading">
+                    <strong>درخواست تغییر برای مأموریت <span dir="ltr">@change.MissionId</span></strong>
+                    <span>@GetChangeStatus(change.Status)</span>
+                </div>
+                <p><b>درخواست‌کننده:</b> @change.RequesterUsername</p>
+                <p><b>علت:</b> @change.Reason</p>
+                <details>
+                    <summary>مشاهده مقادیر پیشنهادی</summary>
+                    <pre dir="ltr">@change.ProposedValuesJson</pre>
+                </details>
+                @if (change.Status == MissionChangeRequestStatus.Pending)
+                {
+                    <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Missions.ChangeReview)"><Authorized Context="startChangeContext"><button type="button" class="primary-button" @onclick="() => StartChangeReviewAsync(change.Id)" disabled="@_busy">شروع بررسی و قفل درخواست</button></Authorized></AuthorizeView>
+                }
+                else if (change.Status == MissionChangeRequestStatus.UnderReview
+                    && string.Equals(change.ReviewerUsername, _actor, StringComparison.OrdinalIgnoreCase))
+                {
+                    <div class="driver-actions">
+                        <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Missions.ChangeReview)"><Authorized Context="approveChangeContext"><button type="button" class="primary-button" @onclick="() => ApproveChangeAsync(change.Id)" disabled="@_busy">تأیید و اعمال یکپارچه</button></Authorized></AuthorizeView>
+                        <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Missions.ChangeReview)"><Authorized Context="rejectChangeContext"><button type="button" class="secondary-button" @onclick="() => RejectChangeAsync(change.Id)" disabled="@_busy">رد درخواست تغییر</button></Authorized></AuthorizeView>
+                    </div>
+                }
+                else if (change.Status == MissionChangeRequestStatus.UnderReview)
+                {
+                    <p>این درخواست توسط @change.ReviewerUsername در حال بررسی است.</p>
+                }
+            </article>
+        }
+    }
+</section>
+
+@code {
+    private bool _loading = true;
+    private bool _busy;
+    private string _statusFilter = string.Empty;
+    private string _reason = string.Empty;
+    private string _message = string.Empty;
+    private string _error = string.Empty;
+    private string _actor = string.Empty;
+    private IReadOnlyList<Mission> _missions = [];
+    private IReadOnlyList<MissionChangeRequest> _changeRequests = [];
+    private IReadOnlyList<Driver> _drivers = [];
+    private IReadOnlyList<Vehicle> _vehicles = [];
+    private readonly Dictionary<Guid, string> _driverSelection = [];
+    private readonly Dictionary<Guid, string> _vehicleSelection = [];
+    private readonly Dictionary<Guid, string> _odometerStart = [];
+    private readonly Dictionary<Guid, string> _odometerEnd = [];
+    private Guid? _splitMissionId;
+    private string _splitDriver = string.Empty;
+    private string _splitVehicle = string.Empty;
+    private string _splitAtLocal = string.Empty;
+    private string _splitEndOdometer = string.Empty;
+    private string _splitStartOdometer = string.Empty;
+    private string _splitExplanation = string.Empty;
+    private MissionSplitReason _splitReason = MissionSplitReason.VehicleBreakdown;
+    private Guid? _timeActionMissionId;
+    private string _timeActionKind = string.Empty;
+    private string _timeActionLocal = string.Empty;
+
+    /// <summary>بارگذاری مأموریت‌ها و اتصال به رویدادهای زنده.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        _actor = await GetActorAsync();
+        NotificationEvents.Published += OnNotificationPublished;
+        await LoadAsync();
+    }
+
+    /// <summary>به‌روزرسانی فهرست پس از اعلان مرتبط با مأموریت.</summary>
+    private void OnNotificationPublished(
+        string username,
+        FleetManagement.Application.Notifications.NotificationPush notification)
+    {
+        if (string.Equals(username, _actor, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(notification.ReferenceType, "Mission", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = InvokeAsync(LoadAsync);
+        }
+    }
+
+    /// <summary>قطع اشتراک از رویدادهای زنده هنگام خروج از صفحه.</summary>
+    public void Dispose()
+    {
+        NotificationEvents.Published -= OnNotificationPublished;
+    }
+
+    /// <summary>دریافت فهرست درخواست‌ها با فیلتر وضعیت.</summary>
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            MissionStatus? status = int.TryParse(_statusFilter, out var raw)
+                && Enum.IsDefined((MissionStatus)raw)
+                ? (MissionStatus)raw
+                : null;
+
+            _actor = await GetActorAsync();
+            _missions = await MissionService.SearchAsync(status: status, take: 500);
+            _changeRequests = (await MissionService.GetChangeRequestsAsync(take: 500))
+                .Where(item => item.Status is MissionChangeRequestStatus.Pending or MissionChangeRequestStatus.UnderReview)
+                .ToList();
+            _drivers = (await DriverService.SearchAsync())
+                .Where(driver => driver.CanBeAssignedToMission())
+                .ToList();
+            _vehicles = (await VehicleService.SearchAsync())
+                .Where(vehicle => vehicle.ManualStatus == ManualVehicleStatus.Ready)
+                .ToList();
+
+            foreach (var mission in _missions)
+            {
+                _driverSelection.TryAdd(mission.Id, string.Empty);
+                _vehicleSelection.TryAdd(mission.Id, string.Empty);
+                _odometerStart[mission.Id] = mission.OdometerStartKm?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+                _odometerEnd[mission.Id] = mission.OdometerEndKm?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+            }
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "دریافت درخواست‌های مأموریت");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>
+    /// با انتخاب راننده، خودروی پیش‌فرض او فقط به‌عنوان پیشنهاد اولیه انتخاب می‌شود.
+    /// </summary>
+    private async Task OnDriverChangedAsync(Guid missionId, ChangeEventArgs args)
+    {
+        var selectedDriver = args.Value?.ToString() ?? string.Empty;
+        _driverSelection[missionId] = selectedDriver;
+        _vehicleSelection[missionId] = string.Empty;
+
+        if (!Guid.TryParse(selectedDriver, out var driverId))
+        {
+            return;
+        }
+
+        try
+        {
+            var defaultVehicleId = await DriverVehiclePreferences.GetDefaultVehicleIdAsync(driverId);
+            if (defaultVehicleId.HasValue
+                && _vehicles.Any(vehicle => vehicle.Id == defaultVehicleId.Value
+                    && !vehicle.IsArchived
+                    && vehicle.ManualStatus == ManualVehicleStatus.Ready))
+            {
+                _vehicleSelection[missionId] = defaultVehicleId.Value.ToString();
+                _message = "خودروی پیش‌فرض راننده به‌عنوان پیشنهاد انتخاب شد؛ می‌توانید برای این مأموریت خودروی دیگری تعیین کنید.";
+            }
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "دریافت خودروی پیش‌فرض راننده");
+        }
+    }
+
+    /// <summary>بازکردن فرم تمدید یا خاتمه زودهنگام.</summary>
+    private void OpenTimeAction(Guid missionId, string kind, DateTimeOffset initialValue)
+    {
+        _timeActionMissionId = missionId;
+        _timeActionKind = kind;
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+        var local = TimeZoneInfo.ConvertTime(initialValue, zone);
+        _timeActionLocal = local.ToString("yyyy-MM-dd'T'HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>دریافت زمان جدید از ورودی.</summary>
+    private void OnTimeActionChanged(ChangeEventArgs args)
+        => _timeActionLocal = args.Value?.ToString() ?? string.Empty;
+
+    /// <summary>ذخیره تمدید یا خاتمه زودهنگام.</summary>
+    private async Task SaveTimeActionAsync()
+    {
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Missions.Extend))) return;
+        if (!_timeActionMissionId.HasValue || string.IsNullOrWhiteSpace(_reason))
+        {
+            _error = "علت تصمیم و زمان جدید را وارد کنید.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var newTime = ParseTehranLocalTime(_timeActionLocal);
+            var actor = await GetActorAsync();
+            if (_timeActionKind == "extend")
+            {
+                await MissionService.ExtendAsync(_timeActionMissionId.Value, newTime, _reason, actor);
+                _message = "زمان پایان مأموریت تمدید شد.";
+            }
+            else
+            {
+                await MissionService.EndEarlyAsync(_timeActionMissionId.Value, newTime, _reason, actor);
+                _message = "مأموریت زودتر از موعد خاتمه یافت و منابع آزاد شدند.";
+            }
+
+            _reason = string.Empty;
+            _timeActionMissionId = null;
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "ثبت تغییر زمان مأموریت");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>ثبت یکپارچه کیلومترشمار شروع و پایان با کنترل پیوستگی خودرو.</summary>
+    private async Task SaveOdometerAsync(Guid missionId)
+    {
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Missions.OdometerManage)))
+        {
+            return;
+        }
+
+        var startText = _odometerStart.GetValueOrDefault(missionId, string.Empty);
+        var endText = _odometerEnd.GetValueOrDefault(missionId, string.Empty);
+
+        long? startKm = null;
+        long? endKm = null;
+
+        if (!string.IsNullOrWhiteSpace(startText))
+        {
+            if (!TryParseOdometer(startText, out var parsedStart))
+            {
+                _error = "مقدار کیلومترشمار شروع معتبر نیست.";
+                return;
+            }
+
+            startKm = parsedStart;
+        }
+
+        if (!string.IsNullOrWhiteSpace(endText))
+        {
+            if (!TryParseOdometer(endText, out var parsedEnd))
+            {
+                _error = "مقدار کیلومترشمار پایان معتبر نیست.";
+                return;
+            }
+
+            endKm = parsedEnd;
+        }
+
+        if (!startKm.HasValue && !endKm.HasValue)
+        {
+            _error = "حداقل یکی از مقادیر کیلومترشمار را وارد کنید.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await MissionService.SetOdometerAsync(
+                missionId,
+                startKm,
+                endKm,
+                await GetActorAsync());
+
+            _message = "کیلومترشمار مأموریت ثبت شد.";
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "ثبت کیلومترشمار مأموریت");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>بازکردن فرم تقسیم برای مأموریت در حال اجرا.</summary>
+    private void OpenSplit(Mission mission)
+    {
+        _splitMissionId = mission.Id;
+        _splitDriver = mission.DriverId?.ToString() ?? string.Empty;
+        _splitVehicle = mission.VehicleId?.ToString() ?? string.Empty;
+        _splitAtLocal = string.Empty;
+        _splitEndOdometer = string.Empty;
+        _splitStartOdometer = string.Empty;
+        _splitExplanation = string.Empty;
+        _splitReason = MissionSplitReason.VehicleBreakdown;
+    }
+
+    /// <summary>دریافت زمان تقسیم از ورودی تاریخ و ساعت.</summary>
+    private void OnSplitTimeChanged(ChangeEventArgs args)
+        => _splitAtLocal = args.Value?.ToString() ?? string.Empty;
+
+    /// <summary>بستن فرم تقسیم.</summary>
+    private void CloseSplit() => _splitMissionId = null;
+
+    /// <summary>اعتبارسنجی و ثبت تقسیم مأموریت.</summary>
+    private async Task SplitAsync()
+    {
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Missions.Split))) return;
+        if (!_splitMissionId.HasValue
+            || !Guid.TryParse(_splitDriver, out var driverId)
+            || !Guid.TryParse(_splitVehicle, out var vehicleId)
+            || !TryParseOdometer(_splitEndOdometer, out var endOdometer))
+        {
+            _error = "راننده، خودرو، زمان تقسیم و کیلومترشمار پایان بخش اول را کامل کنید.";
+            return;
+        }
+
+        long? secondStart = null;
+        if (!string.IsNullOrWhiteSpace(_splitStartOdometer))
+        {
+            if (!TryParseOdometer(_splitStartOdometer, out var parsedStart))
+            {
+                _error = "کیلومترشمار شروع خودروی جدید معتبر نیست.";
+                return;
+            }
+
+            secondStart = parsedStart;
+        }
+
+        _busy = true;
+        try
+        {
+            var splitAt = ParseTehranLocalTime(_splitAtLocal);
+            await MissionService.SplitAsync(
+                _splitMissionId.Value,
+                driverId,
+                vehicleId,
+                splitAt,
+                endOdometer,
+                secondStart,
+                _splitReason,
+                _splitExplanation,
+                await GetActorAsync());
+
+            _message = "مأموریت به دو رکورد مستقل تقسیم شد.";
+            _splitMissionId = null;
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "تقسیم مأموریت");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>خواندن کیلومترشمار با پشتیبانی از ارقام فارسی و عربی و جداکننده هزارگان.</summary>
+    private static bool TryParseOdometer(string? value, out long result)
+    {
+        result = 0;
+        if (string.IsNullOrWhiteSpace(value)) return false;
+
+        var normalized = string.Create(value.Length, value, (destination, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                destination[index] = source[index] switch
+                {
+                    >= '۰' and <= '۹' => (char)('0' + source[index] - '۰'),
+                    >= '٠' and <= '٩' => (char)('0' + source[index] - '٠'),
+                    _ => source[index]
+                };
+            }
+        }).Replace(",", string.Empty, StringComparison.Ordinal)
+          .Replace("٬", string.Empty, StringComparison.Ordinal)
+          .Trim();
+
+        return long.TryParse(normalized, NumberStyles.None, CultureInfo.InvariantCulture, out result);
+    }
+
+    /// <summary>تبدیل زمان محلی تهران به UTC.</summary>
+    private static DateTimeOffset ParseTehranLocalTime(string value)
+    {
+        if (!DateTime.TryParseExact(value, "yyyy-MM-ddTHH:mm", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var local) || local.Minute != 0)
+        {
+            throw new InvalidOperationException("زمان تقسیم باید با دقت ساعت کامل وارد شود.");
+        }
+
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+
+        var utc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), zone);
+        return new DateTimeOffset(utc, TimeSpan.Zero);
+    }
+
+    /// <summary>شروع بررسی درخواست تغییر و قفل‌کردن آن برای بازبین جاری.</summary>
+    private Task StartChangeReviewAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        await MissionService.StartChangeReviewAsync(id, actor);
+        _message = "بررسی درخواست تغییر آغاز شد و برای بازبین جاری قفل شد.";
+    }, "شروع بررسی تغییر مأموریت", PermissionCatalog.Policy(PermissionCatalog.Missions.ChangeReview));
+
+    /// <summary>تأیید و اعمال یکپارچه مقادیر پیشنهادی.</summary>
+    private Task ApproveChangeAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        await MissionService.ApproveChangeAsync(id, actor);
+        _message = "تغییرات مأموریت به‌صورت یکپارچه اعمال شد.";
+    }, "تأیید تغییر مأموریت", PermissionCatalog.Policy(PermissionCatalog.Missions.ChangeReview));
+
+    /// <summary>رد درخواست تغییر با علت اجباری.</summary>
+    private Task RejectChangeAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        EnsureReason();
+        await MissionService.RejectChangeAsync(id, actor, _reason);
+        _reason = string.Empty;
+        _message = "درخواست تغییر رد شد و اطلاعات قبلی مأموریت حفظ شد.";
+    }, "رد تغییر مأموریت", PermissionCatalog.Policy(PermissionCatalog.Missions.ChangeReview));
+
+    /// <summary>عنوان فارسی وضعیت درخواست تغییر.</summary>
+    private static string GetChangeStatus(MissionChangeRequestStatus status) => status switch
+    {
+        MissionChangeRequestStatus.Pending => "در انتظار بررسی",
+        MissionChangeRequestStatus.UnderReview => "در حال بررسی",
+        MissionChangeRequestStatus.Approved => "تأیید شده",
+        MissionChangeRequestStatus.Rejected => "رد شده",
+        _ => "نامشخص"
+    };
+
+    /// <summary>شروع بررسی درخواست.</summary>
+    private Task StartReviewAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        await MissionService.StartReviewAsync(id, actor);
+        _message = "بررسی درخواست آغاز شد.";
+    }, "شروع بررسی مأموریت", PermissionCatalog.Policy(PermissionCatalog.Missions.Review));
+
+    /// <summary>تأیید درخواست و تخصیص راننده و خودرو.</summary>
+    private Task ApproveAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        if (!Guid.TryParse(_driverSelection.GetValueOrDefault(id), out var driverId)
+            || !Guid.TryParse(_vehicleSelection.GetValueOrDefault(id), out var vehicleId))
+        {
+            throw new InvalidOperationException("راننده و خودرو را انتخاب کنید.");
+        }
+
+        await MissionService.ApproveAsync(id, driverId, vehicleId, actor);
+        _message = "مأموریت تأیید و منابع تخصیص داده شد.";
+    }, "تأیید مأموریت", PermissionCatalog.Policy(PermissionCatalog.Missions.Approve));
+
+    /// <summary>رد درخواست با علت اجباری.</summary>
+    private Task RejectAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        EnsureReason();
+        await MissionService.RejectAsync(id, _reason, actor);
+        _message = "درخواست رد شد.";
+    }, "رد درخواست مأموریت", PermissionCatalog.Policy(PermissionCatalog.Missions.Reject));
+
+    /// <summary>لغو مأموریت تأییدشده یا در حال اجرا.</summary>
+    private Task CancelAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        EnsureReason();
+        await MissionService.CancelAsync(id, _reason, actor);
+        _message = "مأموریت لغو شد و منابع آزاد شدند.";
+    }, "لغو مأموریت", PermissionCatalog.Policy(PermissionCatalog.Missions.Cancel));
+
+    /// <summary>تأیید درخواست انصراف.</summary>
+    private Task ApproveWithdrawalAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        await MissionService.ApproveWithdrawalAsync(id, actor);
+        _message = "درخواست انصراف تأیید شد.";
+    }, "تأیید انصراف", PermissionCatalog.Policy(PermissionCatalog.Missions.WithdrawalReview));
+
+    /// <summary>رد درخواست انصراف با علت.</summary>
+    private Task RejectWithdrawalAsync(Guid id) => ExecuteAsync(async actor =>
+    {
+        EnsureReason();
+        await MissionService.RejectWithdrawalAsync(id, _reason, actor);
+        _message = "درخواست انصراف رد شد.";
+    }, "رد انصراف", PermissionCatalog.Policy(PermissionCatalog.Missions.WithdrawalReview));
+
+    /// <summary>بررسی مجوز عملیاتی در سمت سرور.</summary>
+    private async Task<bool> HasPermissionAsync(string policy)
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var authorization = await AuthorizationService.AuthorizeAsync(state.User, policy);
+        if (authorization.Succeeded) return true;
+        _error = "شما مجوز لازم برای انجام این عملیات را ندارید.";
+        return false;
+    }
+
+    /// <summary>اجرای امن عملیات و بارگذاری مجدد فهرست.</summary>
+    private async Task ExecuteAsync(Func<string, Task> action, string operation, string requiredPermission)
+    {
+        if (!await HasPermissionAsync(requiredPermission)) return;
+        _busy = true;
+        _error = string.Empty;
+        try
+        {
+            await action(await GetActorAsync());
+            _reason = string.Empty;
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, operation);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>الزام ثبت علت تصمیم.</summary>
+    private void EnsureReason()
+    {
+        if (string.IsNullOrWhiteSpace(_reason))
+        {
+            throw new InvalidOperationException("ثبت علت برای این عملیات الزامی است.");
+        }
+    }
+
+    /// <summary>استخراج عامل از هویت جاری.</summary>
+    private async Task<string> GetActorAsync()
+    {
+        var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        return auth.User.FindFirst("fleet:username")?.Value ?? auth.User.Identity?.Name ?? "unknown";
+    }
+
+    /// <summary>نمایش زمان جلالی تهران.</summary>
+    /// <summary>محاسبه نزدیک‌ترین ساعت آینده تهران برای انتخاب زمان عملیات.</summary>
+    private static string GetMinimumDateTimeInput()
+    {
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+
+        var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone);
+        var local = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0);
+        if (now.Minute > 0 || now.Second > 0 || now.Millisecond > 0)
+        {
+            local = local.AddHours(1);
+        }
+
+        return local.ToString("yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture);
+    }
+
+    private static string FormatTime(DateTimeOffset value)
+    {
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+        var local = TimeZoneInfo.ConvertTime(value, zone);
+        var calendar = new System.Globalization.PersianCalendar();
+        return $"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} ساعت {local.Hour:00}";
+    }
+
+    /// <summary>عنوان فارسی وضعیت مأموریت.</summary>
+    private static string GetStatusName(MissionStatus status) => status switch
+    {
+        MissionStatus.Pending => "در انتظار بررسی",
+        MissionStatus.UnderReview => "در حال بررسی",
+        MissionStatus.Confirmed => "تأیید شده",
+        MissionStatus.Running => "در حال اجرا",
+        MissionStatus.Completed => "پایان‌یافته",
+        MissionStatus.Cancelled => "لغوشده",
+        MissionStatus.Rejected => "ردشده",
+        MissionStatus.WithdrawalPending => "در انتظار انصراف",
+        _ => "نامشخص"
+    };
+
+    /// <summary>ثبت خطا در لاگ و نمایش شناسه پیگیری.</summary>
+    private void ReportError(Exception exception, string operation)
+    {
+        if (exception is InvalidOperationException or ArgumentException or KeyNotFoundException)
+        {
+            _error = exception.Message;
+            return;
+        }
+
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "{Operation} ناموفق بود. شناسه پیگیری: {TrackingId}", operation, trackingId);
+        _error = $"عملیات انجام نشد. شناسه پیگیری: {trackingId}";
+    }
+}

@@ -1,0 +1,144 @@
+@page "/login"
+@using Microsoft.AspNetCore.Antiforgery
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Http
+@inject IHttpContextAccessor HttpContextAccessor
+@inject IAntiforgery Antiforgery
+@inject FleetManagement.Infrastructure.Configuration.OrganizationSettingsService OrganizationSettings
+
+<PageTitle>ورود به سامانه</PageTitle>
+
+<section class="login-panel">
+    <div class="login-brand">
+        @if (!string.IsNullOrWhiteSpace(_logoDataUri))
+        {
+            <img class="organization-logo" src="@_logoDataUri" alt="نشان سازمان" />
+        }
+        else
+        {
+            <div class="brand-mark" aria-hidden="true">ن</div>
+        }
+        <div>
+            <span class="eyebrow">سامانه مدیریت ناوگان</span>
+            <h1>@_organizationName</h1>
+            <p>برای ادامه، با حساب کاربری سازمانی وارد شوید.</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="setup-error" role="alert">
+            @_errorMessage
+            @if (!string.IsNullOrWhiteSpace(Tracking))
+            {
+                <p>شناسه پیگیری: @Tracking</p>
+            }
+        </div>
+    }
+
+    <form method="post" action="/auth/windows" class="login-form">
+        <input type="hidden" name="__RequestVerificationToken" value="@_requestToken" />
+        <button type="submit" class="primary-button">ورود یکپارچه با حساب ویندوز</button>
+    </form>
+
+    <div class="login-divider"><span>ورود جایگزین</span></div>
+
+    <form method="post" action="/auth/ad" class="login-form">
+        <input type="hidden" name="__RequestVerificationToken" value="@_requestToken" />
+
+        <label for="username">نام کاربری دامنه</label>
+        <input id="username" name="username" autocomplete="username" required />
+
+        <label for="password">رمز عبور دامنه</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+        <button type="submit" class="secondary-button">ورود با نام کاربری و رمز دامنه</button>
+    </form>
+
+    <div class="login-divider"><span>ورود اضطراری مدیر محلی</span></div>
+
+    <div class="setup-info">
+        این روش فقط برای مدیر محلی اضطراری و هنگام اختلال Active Directory است.
+        حساب محلی مستقل از دامنه بوده و دسترسی مدیریتی کامل دارد.
+    </div>
+
+    <form method="post" action="/auth/local-admin" class="login-form">
+        <input type="hidden" name="__RequestVerificationToken" value="@_requestToken" />
+
+        <label for="local-admin-username">نام کاربری مدیر محلی</label>
+        <input id="local-admin-username" name="username" autocomplete="username" required />
+
+        <label for="local-admin-password">رمز عبور مدیر محلی</label>
+        <input id="local-admin-password" name="password" type="password" autocomplete="current-password" required />
+
+        <button type="submit" class="secondary-button">ورود اضطراری</button>
+    </form>
+
+    <p class="login-footnote">
+        فقط کاربران فعال عضو گروه‌های مجاز سازمان امکان ورود عادی دارند.
+    </p>
+</section>
+
+@code {
+    private string? _requestToken;
+    private string _organizationName = "سامانه مدیریت ناوگان";
+    private string? _logoDataUri;
+    private string? _errorMessage;
+
+    /// <summary>
+    /// شناسه پیگیری خطاهای غیرمنتظره از Query String خوانده می‌شود.
+    /// </summary>
+    [SupplyParameterFromQuery(Name = "tracking")]
+    public string? Tracking { get; set; }
+
+    /// <summary>
+    /// کد خطای ورود از Query String خوانده می‌شود.
+    /// </summary>
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
+    /// <summary>
+    /// ایجاد توکن ضد جعل و بارگذاری نام سازمان برای صفحه ورود.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        var httpContext = HttpContextAccessor.HttpContext;
+
+        if (httpContext is not null)
+        {
+            _requestToken = Antiforgery.GetAndStoreTokens(httpContext).RequestToken;
+        }
+
+        var organization = await OrganizationSettings.GetAsync();
+
+        if (!string.IsNullOrWhiteSpace(organization?.OrganizationName))
+        {
+            _organizationName = organization.OrganizationName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(organization?.LogoBase64)
+            && !string.IsNullOrWhiteSpace(organization.LogoContentType))
+        {
+            _logoDataUri = $"data:{organization.LogoContentType};base64,{organization.LogoBase64}";
+        }
+
+        _errorMessage = Error switch
+        {
+            "ad-not-configured" => "اتصال Active Directory هنوز تنظیم یا تأیید نشده است.",
+            "invalid-credentials" => "نام کاربری یا رمز عبور صحیح نیست.",
+            "account-disabled" => "حساب کاربری شما در دایرکتوری غیرفعال است.",
+            "account-locked" => "حساب کاربری شما در دایرکتوری قفل شده است.",
+            "account-expired" => "اعتبار زمانی حساب کاربری شما پایان یافته است.",
+            "app-disabled" => "حساب شما توسط مدیر سامانه غیرفعال شده است. برای فعال‌سازی با مدیر سامانه تماس بگیرید.",
+            "directory-revoked" => "وضعیت حساب یا عضویت شما در گروه‌های مجاز دامنه تغییر کرده است؛ برای ادامه با مدیر سامانه تماس بگیرید.",
+            "local-admin-invalid" => "اطلاعات مدیر محلی صحیح نیست یا حساب موقتاً قفل شده است.",
+            "not-allowed" => "حساب شما عضو هیچ‌یک از گروه‌های مجاز سامانه نیست.",
+            "directory-unavailable" => "ارتباط با Active Directory برقرار نشد. بعداً دوباره تلاش کنید.",
+            "method-disabled" => "این روش ورود توسط مدیر سامانه غیرفعال شده است.",
+            "windows-not-configured" => "ورود یکپارچه ویندوز در IIS فعال نیست. با روش جایگزین وارد شوید.",
+            "unexpected" => "در ورود خطایی رخ داد. در صورت نیاز شناسه پیگیری را به مدیر فنی بدهید.",
+            "denied" => "مجوز لازم برای مشاهده این بخش را ندارید.",
+            _ => null
+        };
+    }
+}

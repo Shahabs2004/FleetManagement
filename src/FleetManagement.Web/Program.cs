@@ -1,5 +1,11 @@
 using FleetManagement.Infrastructure;
+using FleetManagement.Infrastructure.Bootstrap;
 using FleetManagement.Web.Components;
+using FleetManagement.Web.Security;
+using FleetManagement.Web.Notifications;
+using FleetManagement.Web;
+using Microsoft.AspNetCore.Components.Server.Circuits;
+using FleetManagement.Application.Notifications;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,10 +14,23 @@ builder.Services
     .AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// ثبت وابستگی‌های زیرساختی؛ اتصال پایگاه داده پس از تکمیل ویزارد راه‌اندازی فعال می‌شود.
+// ثبت سرویس‌های زیرساختی؛ اتصال SQL پس از تکمیل ویزارد از فایل محافظت‌شده خوانده می‌شود.
 builder.Services.AddFleetInfrastructure(builder.Configuration);
+builder.Services.AddFleetAuthentication();
+builder.Services.AddSignalR();
+builder.Services.AddScoped<CircuitHandler, FleetRealtimeCircuitHandler>();
+builder.Services.AddSingleton<NotificationEventBus>();
+builder.Services.AddScoped<INotificationPublisher, SignalRNotificationPublisher>();
+builder.Services.AddScoped<IFleetDataChangePublisher, SignalRFleetDataChangePublisher>();
 
 var app = builder.Build();
+
+// آماده‌سازی کد اولیه فقط در اولین اجرا؛ کد خام در فایل محلی محدودشده قرار می‌گیرد.
+using (var scope = app.Services.CreateScope())
+{
+    var bootstrapSetup = scope.ServiceProvider.GetRequiredService<BootstrapSetupService>();
+    await bootstrapSetup.EnsureSetupCodeAsync();
+}
 
 // پیکربندی خطاها متناسب با محیط اجرا
 if (!app.Environment.IsDevelopment())
@@ -22,7 +41,19 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+// Endpoint routing باید پیش از middleware محدودسازی نرخ اجرا شود.
+app.UseRouting();
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseMiddleware<DirectorySessionValidationMiddleware>();
+app.UseMiddleware<FleetSessionTrackingMiddleware>();
+app.UseAuthorization();
 app.UseAntiforgery();
+
+// مسیرهای ورود و خروج با کنترل توکن ضد جعل ثبت می‌شوند.
+app.MapFleetAuthentication();
+app.MapMissionReportExport();
+app.MapHub<NotificationHub>("/hubs/notifications").RequireAuthorization();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

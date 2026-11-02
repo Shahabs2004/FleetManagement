@@ -1,0 +1,418 @@
+@page "/admin/security"
+@rendermode InteractiveServer
+@attribute [FleetPermission(PermissionCatalog.Administration.AuthorizationManage)]
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Authorization
+@using FleetManagement.Application.Authorization
+@using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Web.Security
+@inject AuthorizationSettingsService AuthorizationSettings
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<AuthorizationSettingsPage> Logger
+
+<PageTitle>مدیریت نقش‌ها و مجوزها</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">امنیت و دسترسی</div>
+    <h1>مدیریت نقش‌ها و مجوزها</h1>
+    <p>
+        نقش‌های کاربران از ترکیب گروه‌های امنیتی AD و تخصیص دستی مدیر سامانه تعیین می‌شوند.
+        مجوز رد صریح، حتی در صورت وجود مجوز اعطاشده از نقش دیگر، اولویت دارد.
+    </p>
+
+    @if (_isLoading)
+    {
+        <p>در حال دریافت تنظیمات...</p>
+    }
+    else
+    {
+        <div class="admin-section">
+            <h2>نقش‌های تعریف‌شده</h2>
+            <div class="role-list">
+                @foreach (var role in _configuration.Roles)
+                {
+                    <div class="role-row" @key="role.Key">
+                        <div>
+                            <label>نام نمایشی نقش</label>
+                            <InputText @bind-Value="role.Name" />
+                            <span class="role-key">@role.Key</span>
+                            <label>شرح نقش</label>
+                            <InputText @bind-Value="role.Description" />
+                        </div>
+                        @if (role.IsSystemRole)
+                        {
+                            <span class="role-system">نقش پایه</span>
+                        }
+                        else
+                        {
+                            <button type="button" class="secondary-button compact-button" @onclick="() => RemoveRole(role.Key)">
+                                حذف نقش
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <EditForm Model="_newRole" OnValidSubmit="AddRole">
+                <DataAnnotationsValidator />
+                <h3>افزودن نقش جدید</h3>
+                <label for="role-key">کلید فنی نقش (انگلیسی)</label>
+                <InputText id="role-key" @bind-Value="_newRole.Key" />
+                <label for="role-name">نام فارسی نقش</label>
+                <InputText id="role-name" @bind-Value="_newRole.Name" />
+                <label for="role-description">شرح نقش</label>
+                <InputText id="role-description" @bind-Value="_newRole.Description" />
+                <button type="submit" class="secondary-button">افزودن نقش</button>
+            </EditForm>
+        </div>
+
+        <div class="admin-section">
+            <h2>نگاشت گروه‌های AD به نقش‌ها</h2>
+            <p>هر خط به شکل Distinguished Name گروه، سپس علامت | و کلید نقش باشد. برای یک گروه می‌توان چند خط با نقش‌های متفاوت ثبت کرد.</p>
+            <InputTextArea @bind-Value="_groupMappingsText" />
+        </div>
+
+        <div class="admin-section">
+            <h2>تخصیص دستی نقش به کاربران</h2>
+            <p>هر خط به شکل نام کاربری دامنه|نقش۱,نقش۲ نوشته شود. این تخصیص‌ها با نقش‌های گروهی جمع می‌شوند.</p>
+            <InputTextArea @bind-Value="_manualRolesText" />
+        </div>
+
+        <div class="admin-section">
+            <h2>مجوزهای مستقیم کاربران</h2>
+            <p>هر خط به شکل نام کاربری دامنه|کلید مجوز|Grant یا Deny باشد. این مجوز مستقل از نقش‌های کاربر است و Deny بر تمام اعطاها اولویت دارد.</p>
+            <InputTextArea @bind-Value="_manualPermissionsText" />
+        </div>
+
+        <div class="admin-section">
+            <h2>کاتالوگ مجوزهای معتبر</h2>
+            <p>فقط کلیدهای ثبت‌شده در این فهرست قابل تخصیص به نقش یا کاربر هستند. مجوزهای مستقل را می‌توانید جداگانه اعطا یا رد کنید.</p>
+            <div class="session-table-wrap">
+                <table class="session-table">
+                    <thead>
+                        <tr>
+                            <th>کلید مجوز</th>
+                            <th>عنوان</th>
+                            <th>شرح</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var permission in PermissionCatalog.Definitions)
+                        {
+                            <tr @key="permission.Code">
+                                <td><code>@permission.Code</code></td>
+                                <td>@permission.Title</td>
+                                <td>@permission.Description</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="admin-section">
+            <h2>ماتریس مجوز نقش‌ها</h2>
+            <p>هر خط به شکل کلید نقش|کلید مجوز|Grant یا Deny باشد. نمونه: FleetManager|missions.delete|Deny. مجوز * همه عملیات را پوشش می‌دهد و الگوی missions.* تمام عملیات ماژول مأموریت را شامل می‌شود.</p>
+            <InputTextArea @bind-Value="_permissionsText" />
+        </div>
+
+        <button type="button" class="primary-button" @onclick="SaveAsync" disabled="@_isBusy">
+            @(_isBusy ? "در حال ذخیره..." : "ذخیره تنظیمات دسترسی")
+        </button>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="@(_isError ? "setup-error" : "setup-info")" role="status">@_message</div>
+    }
+</section>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private bool _isError;
+    private string? _message;
+    private AuthorizationConfiguration _configuration = AuthorizationConfiguration.CreateDefault();
+    private readonly NewRoleModel _newRole = new();
+    private string _groupMappingsText = string.Empty;
+    private string _manualRolesText = string.Empty;
+    private string _manualPermissionsText = string.Empty;
+    private string _permissionsText = string.Empty;
+
+    /// <summary>
+    /// دریافت تنظیمات جاری و تبدیل نگاشت‌ها به قالب قابل ویرایش.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _configuration = await AuthorizationSettings.GetAsync();
+            LoadTextEditors();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "بارگذاری تنظیمات دسترسی");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// آماده‌سازی ویرایشگرهای متنی از مدل تنظیمات.
+    /// </summary>
+    private void LoadTextEditors()
+    {
+        _groupMappingsText = string.Join(
+            Environment.NewLine,
+            _configuration.GroupMappings.Select(mapping =>
+                $"{mapping.GroupDistinguishedName}|{mapping.RoleKey}"));
+
+        _manualRolesText = string.Join(
+            Environment.NewLine,
+            _configuration.ManualUserRoles.Select(mapping =>
+                $"{mapping.Username}|{string.Join(",", mapping.RoleKeys)}"));
+
+        _manualPermissionsText = string.Join(
+            Environment.NewLine,
+            _configuration.ManualUserPermissions.SelectMany(mapping => mapping.Permissions.Select(permission =>
+                $"{mapping.Username}|{permission.Permission}|{permission.Effect}")));
+
+        _permissionsText = string.Join(
+            Environment.NewLine,
+            _configuration.Roles.SelectMany(role => role.Permissions.Select(permission =>
+                $"{role.Key}|{permission.Permission}|{permission.Effect}")));
+    }
+
+    /// <summary>
+    /// افزودن نقش جدید به پیکربندی جاری.
+    /// </summary>
+    private void AddRole()
+    {
+        var key = _newRole.Key.Trim();
+
+        if (string.IsNullOrWhiteSpace(key)
+            || string.IsNullOrWhiteSpace(_newRole.Name)
+            || _configuration.Roles.Any(role =>
+                string.Equals(role.Key, key, StringComparison.OrdinalIgnoreCase)))
+        {
+            _message = "کلید نقش باید یکتا باشد و نام فارسی آن تکمیل شود.";
+            _isError = true;
+            return;
+        }
+
+        if (key.Any(character => !char.IsAsciiLetterOrDigit(character) && character != '_'))
+        {
+            _message = "کلید نقش فقط می‌تواند شامل حروف انگلیسی، عدد و زیرخط باشد.";
+            _isError = true;
+            return;
+        }
+
+        _configuration.Roles.Add(new RoleDefinitionConfiguration
+        {
+            Key = key,
+            Name = _newRole.Name.Trim(),
+            Description = _newRole.Description.Trim(),
+            IsSystemRole = false
+        });
+
+        _newRole.Key = string.Empty;
+        _newRole.Name = string.Empty;
+        _newRole.Description = string.Empty;
+        _message = "نقش جدید به فهرست اضافه شد. برای ثبت نهایی، تنظیمات را ذخیره کنید.";
+        _isError = false;
+    }
+
+    /// <summary>
+    /// حذف نقش غیرپایه از ویرایش جاری؛ اعتبار نگاشت‌ها هنگام ذخیره کنترل می‌شود.
+    /// </summary>
+    private void RemoveRole(string roleKey)
+    {
+        _configuration.Roles.RemoveAll(role =>
+            !role.IsSystemRole
+            && string.Equals(role.Key, roleKey, StringComparison.OrdinalIgnoreCase));
+
+        _message = "نقش از ویرایش جاری حذف شد. نگاشت‌های وابسته را نیز اصلاح کنید.";
+        _isError = false;
+    }
+
+    /// <summary>
+    /// تجزیه نگاشت‌ها، اعتبارسنجی و ذخیره یکپارچه تنظیمات دسترسی.
+    /// </summary>
+    private async Task SaveAsync()
+    {
+        _isBusy = true;
+        try
+        {
+            var roleKeys = _configuration.Roles
+                .Select(role => role.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            // ابتدا همه ورودی‌ها در متغیرهای موقت تجزیه می‌شوند تا خطای ورودی مدل جاری را ناقص نکند.
+            var groupMappings = ParseLines(_groupMappingsText)
+                .Select(line =>
+                {
+                    var parts = line.Split('|', 2, StringSplitOptions.TrimEntries);
+                    if (parts.Length != 2 || string.IsNullOrWhiteSpace(parts[0]) || !roleKeys.Contains(parts[1]))
+                    {
+                        throw new InvalidOperationException($"نگاشت گروه AD نامعتبر است: {line}");
+                    }
+
+                    return new AdGroupRoleMapping
+                    {
+                        GroupDistinguishedName = parts[0],
+                        RoleKey = parts[1]
+                    };
+                })
+                .ToList();
+
+            var manualRoles = ParseLines(_manualRolesText)
+                .Select(line =>
+                {
+                    var parts = line.Split('|', 2, StringSplitOptions.TrimEntries);
+                    if (parts.Length != 2 || string.IsNullOrWhiteSpace(parts[0]))
+                    {
+                        throw new InvalidOperationException($"تخصیص دستی نقش نامعتبر است: {line}");
+                    }
+
+                    var roles = parts[1].Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                    if (roles.Length == 0 || roles.Any(role => !roleKeys.Contains(role)))
+                    {
+                        throw new InvalidOperationException($"نقش کاربر {parts[0]} معتبر نیست.");
+                    }
+
+                    return new ManualUserRoleMapping
+                    {
+                        Username = parts[0],
+                        RoleKeys = roles.Distinct(StringComparer.OrdinalIgnoreCase).ToList()
+                    };
+                })
+                .ToList();
+
+            var manualPermissions = ParseLines(_manualPermissionsText)
+                .Select(line =>
+                {
+                    var parts = line.Split('|', StringSplitOptions.TrimEntries);
+                    if (parts.Length != 3
+                        || string.IsNullOrWhiteSpace(parts[0])
+                        || string.IsNullOrWhiteSpace(parts[1])
+                        || !Enum.TryParse<PermissionEffect>(parts[2], true, out var effect)
+                        || !Enum.IsDefined(effect))
+                    {
+                        throw new InvalidOperationException($"مجوز مستقیم کاربر نامعتبر است: {line}");
+                    }
+
+                    return new
+                    {
+                        Username = parts[0],
+                        Permission = new RolePermissionConfiguration
+                        {
+                            Permission = parts[1],
+                            Effect = effect
+                        }
+                    };
+                })
+                .GroupBy(item => item.Username, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new ManualUserPermissionMapping
+                {
+                    Username = group.Key,
+                    Permissions = group.Select(item => item.Permission).ToList()
+                })
+                .ToList();
+
+            var permissionsByRole = _configuration.Roles.ToDictionary(
+                role => role.Key,
+                _ => new List<RolePermissionConfiguration>(),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var line in ParseLines(_permissionsText))
+            {
+                var parts = line.Split('|', StringSplitOptions.TrimEntries);
+                if (parts.Length != 3 || string.IsNullOrWhiteSpace(parts[1]))
+                {
+                    throw new InvalidOperationException($"قاعده مجوز نامعتبر است: {line}");
+                }
+
+                if (!permissionsByRole.TryGetValue(parts[0], out var rolePermissions))
+                {
+                    throw new InvalidOperationException($"نقش {parts[0]} پیدا نشد.");
+                }
+
+                if (!Enum.TryParse<PermissionEffect>(parts[2], true, out var effect)
+                    || !Enum.IsDefined(effect))
+                {
+                    throw new InvalidOperationException($"اثر مجوز باید Grant یا Deny باشد: {line}");
+                }
+
+                rolePermissions.Add(new RolePermissionConfiguration
+                {
+                    Permission = parts[1],
+                    Effect = effect
+                });
+            }
+
+            _configuration.GroupMappings = groupMappings;
+            _configuration.ManualUserRoles = manualRoles;
+            _configuration.ManualUserPermissions = manualPermissions;
+
+            foreach (var role in _configuration.Roles)
+            {
+                role.Permissions = permissionsByRole[role.Key];
+            }
+
+            var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var actorUsername = authenticationState.User.Identity?.Name
+                ?? authenticationState.User.FindFirst("fleet:username")?.Value
+                ?? "Unknown";
+
+            await AuthorizationSettings.SaveAsync(_configuration, actorUsername);
+            _message = "تنظیمات نقش‌ها و مجوزها با موفقیت ذخیره شد. کاربران در ورود بعدی تغییرات را دریافت می‌کنند.";
+            _isError = false;
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "ذخیره تنظیمات دسترسی");
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// حذف خطوط خالی و پاک‌سازی فاصله ابتدا و انتهای هر خط.
+    /// </summary>
+    private static IEnumerable<string> ParseLines(string text)
+    {
+        return text.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Trim())
+            .Where(line => !string.IsNullOrWhiteSpace(line) && !line.StartsWith("#", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// ثبت خطای فنی در گزارش سرور و نمایش شناسه پیگیری.
+    /// </summary>
+    private void ReportError(Exception exception, string operation)
+    {
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "خطا در {Operation}. شناسه پیگیری: {TrackingId}", operation, trackingId);
+        _message = $"عملیات انجام نشد. علت ورودی را بررسی کنید. شناسه پیگیری: {trackingId}";
+        _isError = true;
+    }
+
+    /// <summary>
+    /// مدل فرم افزودن نقش جدید.
+    /// </summary>
+    private sealed class NewRoleModel
+    {
+        [Required(ErrorMessage = "کلید نقش الزامی است.")]
+        public string Key { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "نام نقش الزامی است.")]
+        public string Name { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+    }
+}

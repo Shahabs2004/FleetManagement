@@ -1,0 +1,209 @@
+@page "/missions/{MissionId:guid}/print"
+@rendermode InteractiveServer
+@attribute [FleetPermission("missions.print")]
+@using System.Globalization
+@using FleetManagement.Domain.Missions
+@using FleetManagement.Domain.Drivers
+@using FleetManagement.Domain.Vehicles
+@using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Web.Security
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.JSInterop
+@inject MissionManagementService MissionService
+@inject MissionOrderTemplateService TemplateService
+@inject OrganizationSettingsService OrganizationService
+@inject DriverManagementService DriverService
+@inject VehicleManagementService VehicleService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JS
+@inject ILogger<MissionOrderPrintPage> Logger
+
+<PageTitle>چاپ دستور مأموریت</PageTitle>
+
+@if (_loading)
+{
+    <p>در حال آماده‌سازی دستور مأموریت...</p>
+}
+else if (_mission is null)
+{
+    <div class="setup-error">دستور مأموریت در دسترس نیست.</div>
+}
+else
+{
+    <div class="mission-print-toolbar">
+        <button type="button" class="primary-button" @onclick="PrintAsync">چاپ / ذخیره PDF</button>
+    </div>
+
+    <article class="mission-order-paper" dir="rtl">
+        <header class="mission-order-header">
+            @if (!string.IsNullOrWhiteSpace(_logoDataUri))
+            {
+                <img class="mission-order-logo" src="@_logoDataUri" alt="نشان سازمان" />
+            }
+            <div>
+                <h1>@_template.HeaderTitle</h1>
+                <h2>@(_template.OrganizationName.Length > 0 ? _template.OrganizationName : _organizationName)</h2>
+                <p>@_template.IntroText</p>
+            </div>
+            <div class="mission-order-number">
+                <strong>شماره مأموریت</strong>
+                <span>@_mission.MissionNumber</span>
+                @if (!string.IsNullOrWhiteSpace(_mission.MissionOrderNumber))
+                {
+                    <small>شماره دستور: @_mission.MissionOrderNumber</small>
+                }
+                @if (_mission.MissionOrderDate.HasValue)
+                {
+                    <small>تاریخ دستور: @FormatDate(_mission.MissionOrderDate.Value)</small>
+                }
+            </div>
+        </header>
+
+        <div class="mission-order-divider"></div>
+        <h3>مشخصات مأموریت</h3>
+        <table class="mission-order-table">
+            <tbody>
+                <tr><th>عنوان</th><td>@_mission.Title</td><th>نوع</th><td>@(_mission.Type == MissionType.Freight ? "حمل بار" : "حمل مسافر")</td></tr>
+                <tr><th>درخواست‌کننده</th><td>@_mission.RequesterName</td><th>واحد سازمانی</th><td>@_mission.RequesterOrganizationalUnit</td></tr>
+                <tr><th>گروه درخواست‌کننده</th><td>@_mission.RequestingGroup</td><th>تلفن تماس</th><td dir="ltr">@_mission.RequesterPhoneSnapshot</td></tr>
+                <tr><th>راننده</th><td>@(_driver is null ? "—" : $"{_driver.FirstName} {_driver.LastName}")</td><th>تلفن راننده</th><td dir="ltr">@(_driver?.MobilePhone ?? "—")</td></tr>
+                <tr><th>خودرو</th><td>@(_vehicle is null ? "—" : $"{_vehicle.Brand} {_vehicle.Model}")</td><th>پلاک</th><td dir="ltr">@(_vehicle?.LicensePlate ?? "—")</td></tr>
+                <tr><th>شروع برنامه‌ریزی</th><td>@FormatTime(_mission.PlannedStartAtUtc)</td><th>پایان برنامه‌ریزی</th><td>@FormatTime(_mission.PlannedEndAtUtc)</td></tr>
+                <tr><th>تعداد همراهان</th><td>@(_mission.PassengerCount?.ToString() ?? "—")</td><th>وضعیت</th><td>@GetStatusName(_mission.Status)</td></tr>
+            </tbody>
+        </table>
+
+        <h3>مسیر مأموریت</h3>
+        <ol class="mission-order-route">
+            <li><strong>مبدأ:</strong> @_mission.Origin</li>
+            @foreach (var stop in _mission.GetIntermediateStops())
+            {
+                <li><strong>توقف میانی:</strong> @stop</li>
+            }
+            <li><strong>مقصد نهایی:</strong> @_mission.Destination</li>
+        </ol>
+
+        <h3>هدف و توضیحات</h3>
+        <p class="mission-order-purpose">@_mission.Purpose</p>
+        @if (!string.IsNullOrWhiteSpace(_mission.Description))
+        {
+            <p class="mission-order-description">@_mission.Description</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(_template.FooterText))
+        {
+            <p class="mission-order-footer-text">@_template.FooterText</p>
+        }
+
+        <section class="mission-order-signatures" style="@($"--signature-columns:{_template.SignatureColumns};")">
+            <div><strong>@_template.RequesterSignatureLabel</strong><span>نام و امضا</span></div>
+            <div><strong>@_template.OperatorSignatureLabel</strong><span>نام و امضا</span></div>
+            <div><strong>@_template.ApproverSignatureLabel</strong><span>نام و امضا</span></div>
+            <div><strong>@_template.DriverSignatureLabel</strong><span>نام و امضا</span></div>
+        </section>
+
+        <footer class="mission-order-footer">
+            <span>سامانه مدیریت ناوگان</span>
+            <span>شماره مأموریت: @_mission.MissionNumber</span>
+        </footer>
+    </article>
+}
+
+@code {
+    [Parameter] public Guid MissionId { get; set; }
+
+    private bool _loading = true;
+    private Mission? _mission;
+    private Driver? _driver;
+    private Vehicle? _vehicle;
+    private MissionOrderTemplateConfiguration _template = MissionOrderTemplateConfiguration.CreateDefault();
+    private string _organizationName = string.Empty;
+    private string? _logoDataUri;
+
+    /// <summary>بارگذاری مأموریت و قالب چاپ پس از بررسی مالکیت یا نقش مدیریتی.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var username = auth.User.FindFirst("fleet:username")?.Value ?? auth.User.Identity?.Name ?? string.Empty;
+            var canViewAll = auth.User.IsInRole("SystemAdministrator")
+                || auth.User.IsInRole("FleetManager")
+                || auth.User.IsInRole("Operator");
+
+            var mission = await MissionService.GetByIdAsync(MissionId);
+            if (!canViewAll && !string.Equals(mission.RequesterUsername, username, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new UnauthorizedAccessException("اجازه مشاهده دستور این مأموریت را ندارید.");
+            }
+
+            if (mission.Status is MissionStatus.Pending or MissionStatus.UnderReview or MissionStatus.Rejected)
+            {
+                throw new InvalidOperationException("دستور چاپ فقط برای مأموریت تأییدشده یا دارای سابقه اجرا در دسترس است.");
+            }
+
+            _mission = mission;
+            _template = await TemplateService.GetAsync();
+            var organization = await OrganizationService.GetAsync();
+            _organizationName = organization?.OrganizationName ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(organization?.LogoBase64)
+                && !string.IsNullOrWhiteSpace(organization.LogoContentType))
+            {
+                _logoDataUri = $"data:{organization.LogoContentType};base64,{organization.LogoBase64}";
+            }
+
+            if (mission.DriverId.HasValue)
+            {
+                _driver = (await DriverService.SearchAsync(includeArchived: true))
+                    .SingleOrDefault(driver => driver.Id == mission.DriverId.Value);
+            }
+
+            if (mission.VehicleId.HasValue)
+            {
+                _vehicle = (await VehicleService.SearchAsync(includeArchived: true))
+                    .SingleOrDefault(vehicle => vehicle.Id == mission.VehicleId.Value);
+            }
+        }
+        catch (Exception exception)
+        {
+            var trackingId = Guid.NewGuid().ToString("N");
+            Logger.LogError(exception, "آماده‌سازی دستور مأموریت ناموفق بود. شناسه پیگیری: {TrackingId}", trackingId);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>چاپ نسخه A4 یا ذخیره PDF از طریق مرورگر.</summary>
+    private async Task PrintAsync() => await JS.InvokeVoidAsync("window.print");
+
+    /// <summary>نمایش تاریخ و ساعت جلالی تهران.</summary>
+    private static string FormatTime(DateTimeOffset value)
+    {
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+        var local = TimeZoneInfo.ConvertTime(value, zone);
+        var calendar = new PersianCalendar();
+        return $"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} ساعت {local.Hour:00}";
+    }
+
+    /// <summary>نمایش تاریخ جلالی نامه.</summary>
+    private static string FormatDate(DateOnly value)
+    {
+        var calendar = new PersianCalendar();
+        var date = value.ToDateTime(TimeOnly.MinValue);
+        return $"{calendar.GetYear(date):0000}/{calendar.GetMonth(date):00}/{calendar.GetDayOfMonth(date):00}";
+    }
+
+    /// <summary>عنوان فارسی وضعیت مأموریت.</summary>
+    private static string GetStatusName(MissionStatus status) => status switch
+    {
+        MissionStatus.Confirmed => "تأیید شده",
+        MissionStatus.Running => "در حال اجرا",
+        MissionStatus.Completed => "پایان‌یافته",
+        MissionStatus.Cancelled => "لغوشده",
+        MissionStatus.WithdrawalPending => "در انتظار تصمیم انصراف",
+        _ => "نامشخص"
+    };
+}

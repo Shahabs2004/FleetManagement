@@ -1,0 +1,105 @@
+@page "/admin/session-settings"
+@using FleetManagement.Application.Authorization
+@rendermode InteractiveServer
+@attribute [FleetPermission(PermissionCatalog.Administration.SessionsManage)]
+@using Microsoft.AspNetCore.Components.Authorization
+@using FleetManagement.Infrastructure.Configuration
+@inject SessionPolicySettingsService PolicySettings
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<SessionSettingsPage> Logger
+
+<PageTitle>تنظیمات نشست کاربران</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">امنیت و مدیریت نشست</div>
+    <h1>تنظیمات نشست کاربران</h1>
+    <p>مدیر سامانه می‌تواند مهلت بیکاری و حداکثر عمر هر نشست را تنظیم کند. تغییرات برای نشست‌های فعال نیز در بررسی بعدی اعمال می‌شوند.</p>
+
+    @if (_isLoading)
+    {
+        <p>در حال دریافت تنظیمات...</p>
+    }
+    else
+    {
+        <div class="admin-section">
+            <label for="idle-timeout">مهلت بیکاری (دقیقه)</label>
+            <input id="idle-timeout" type="number" min="5" max="120" step="1" @bind="_configuration.IdleTimeoutMinutes" />
+            <small>محدوده مجاز: ۵ تا ۱۲۰ دقیقه. مقدار پیش‌فرض: ۳۰ دقیقه.</small>
+
+            <label for="absolute-timeout">حداکثر عمر نشست (ساعت)</label>
+            <input id="absolute-timeout" type="number" min="1" max="24" step="1" @bind="_configuration.AbsoluteTimeoutHours" />
+            <small>محدوده مجاز: ۱ تا ۲۴ ساعت. مقدار پیش‌فرض: ۸ ساعت.</small>
+
+            @if (_error is not null)
+            {
+                <div class="setup-error">@_error</div>
+            }
+            @if (_message is not null)
+            {
+                <div class="setup-info">@_message</div>
+            }
+
+            <button type="button" class="primary-button" @onclick="SaveAsync" disabled="@_isBusy">
+                ذخیره تنظیمات
+            </button>
+        </div>
+    }
+</section>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private string? _error;
+    private string? _message;
+    private SessionPolicyConfiguration _configuration = SessionPolicyConfiguration.CreateDefault();
+
+    /// <summary>بارگذاری سیاست نشست از پایگاه داده.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _configuration = await PolicySettings.GetAsync();
+        }
+        catch (Exception exception)
+        {
+            var trackingId = Guid.NewGuid().ToString("N");
+            Logger.LogError(exception, "خواندن سیاست نشست ناموفق بود. شناسه پیگیری: {TrackingId}", trackingId);
+            _error = $"خواندن تنظیمات انجام نشد. شناسه پیگیری: {trackingId}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    /// <summary>ذخیره سیاست جدید با ثبت هویت مدیر در ممیزی.</summary>
+    private async Task SaveAsync()
+    {
+        _isBusy = true;
+        _error = null;
+        _message = null;
+
+        try
+        {
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var actor = state.User.Identity?.Name
+                ?? state.User.FindFirst("fleet:username")?.Value
+                ?? "Unknown";
+
+            await PolicySettings.SaveAsync(_configuration, actor);
+            _message = "تنظیمات نشست ذخیره شد و در بررسی بعدی نشست‌ها اعمال می‌شود.";
+        }
+        catch (Exception exception)
+        {
+            var trackingId = Guid.NewGuid().ToString("N");
+            Logger.LogError(exception, "ذخیره سیاست نشست ناموفق بود. شناسه پیگیری: {TrackingId}", trackingId);
+            _error = exception is ArgumentException or ArgumentOutOfRangeException
+                ? exception.Message
+                : $"ذخیره تنظیمات انجام نشد. شناسه پیگیری: {trackingId}";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+}

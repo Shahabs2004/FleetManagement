@@ -1,0 +1,99 @@
+using FleetManagement.Application.Auditing;
+using FleetManagement.Application.Configuration;
+using FleetManagement.Application.Missions;
+using FleetManagement.Application.Notifications;
+using FleetManagement.Infrastructure.Configuration;
+using FleetManagement.Infrastructure.Persistence;
+using FleetManagement.Infrastructure.Reporting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace FleetManagement.Infrastructure.Bootstrap;
+
+/// <summary>
+/// ثبت سرویس‌های مربوط به راه‌اندازی اولیه و بازیابی اضطراری.
+/// </summary>
+public static class BootstrapServiceCollectionExtensions
+{
+    /// <summary>
+    /// سرویس‌های bootstrap و کارخانه اتصال پایگاه داده را ثبت می‌کند.
+    /// </summary>
+    public static IServiceCollection AddFleetBootstrap(this IServiceCollection services)
+    {
+        services.AddSingleton<IBootstrapStateStore, DpapiBootstrapStateStore>();
+        services.AddSingleton<BootstrapSetupService>();
+        services.AddSingleton<SqlConnectionSetupService>();
+        services.AddSingleton<SqlDatabaseInitializer>();
+        services.AddSingleton<SqlAvailabilityService>();
+        services.AddSingleton<BootstrapDbContextFactory>();
+
+        // اتصال از فایل محلی محافظت‌شده خوانده می‌شود تا پس از تکمیل ویزارد نیاز به Restart نباشد.
+        services.AddSingleton<IDbContextFactory<FleetDbContext>>(
+            provider => provider.GetRequiredService<BootstrapDbContextFactory>());
+
+        // تنظیمات عملیاتی و دایرکتوری در جدول SQL نگهداری می‌شوند.
+        services.AddScoped<ISystemSettingsStore, SqlSystemSettingsStore>();
+        services.AddScoped<ActiveDirectorySettingsService>();
+        services.AddScoped<ActiveDirectoryAuthenticator>();
+        services.AddScoped<DirectoryUserProvisioningService>();
+        services.AddScoped<AuthorizationSettingsService>();
+        services.AddScoped<AuthorizationResolutionService>();
+        services.AddScoped<UserSessionService>();
+        services.AddScoped<SessionPolicySettingsService>();
+        services.AddScoped<AuditLogService>();
+        services.AddScoped<IAuditLogWriter>(provider => provider.GetRequiredService<AuditLogService>());
+        services.AddScoped<DriverManagementService>();
+        services.AddScoped<DriverVehiclePreferenceService>();
+        services.AddScoped<VehicleManagementService>();
+        services.AddScoped<IMissionChangeRequestStore, EfMissionChangeRequestStore>();
+        services.AddScoped<MissionChangeRequestService>();
+        services.AddScoped<MissionChangeApprovalService>();
+        services.AddScoped<MissionChangeWorkflowService>();
+        services.AddScoped<IMissionChangeManagementService, MissionChangeWorkflowService>();
+        services.AddScoped<IMissionOdometerStore, EfMissionOdometerStore>();
+        services.AddScoped<IMissionOdometerService, FleetManagement.Application.Missions.MissionOdometerService>();
+        services.AddScoped<IMissionSplitStore, EfMissionSplitStore>();
+        services.AddScoped<IMissionSplitService, FleetManagement.Application.Missions.MissionSplitService>();
+        services.AddScoped<IMissionWithdrawalStore, EfMissionWithdrawalStore>();
+        services.AddScoped<IMissionWithdrawalService, FleetManagement.Application.Missions.MissionWithdrawalService>();
+        services.AddScoped<IMissionRequestStore, EfMissionRequestStore>();
+        services.AddScoped<IMissionReviewStore, EfMissionReviewStore>();
+        services.AddScoped<FleetManagement.Application.Missions.MissionRequestService>();
+        services.AddScoped<MissionReviewService>();
+        services.AddScoped<IMissionPendingRequestStore, EfMissionPendingRequestStore>();
+        services.AddScoped<MissionPendingRequestService>();
+        services.AddScoped<MissionRequestWorkflowService>();
+        services.AddScoped<IMissionRequestService, MissionRequestWorkflowService>();
+        services.AddScoped<IMissionLifecycleProcessorStore, EfMissionLifecycleProcessorStore>();
+        services.AddScoped<IMissionLifecycleProcessorService, FleetManagement.Application.Missions.MissionLifecycleProcessorService>();
+        services.AddScoped<IMissionQueryService, MissionQueryService>();
+        services.AddScoped<IMissionExtensionStore, EfMissionExtensionStore>();
+        services.AddScoped<IMissionExtensionService, FleetManagement.Application.Missions.MissionExtensionService>();
+        services.AddScoped<IMissionRulesService, MissionRulesService>();
+        services.AddScoped<MissionManagementService>();
+        services.AddScoped<MissionOrderTemplateService>();
+        services.AddHostedService<MissionLifecycleHostedService>();
+        services.AddScoped<LocationManagementService>();
+        services.AddScoped<NotificationService>();
+        services.AddScoped<IMissionNotificationSender>(provider => provider.GetRequiredService<NotificationService>());
+        services.AddScoped<IMissionSmsScheduler, MissionSmsScheduler>();
+        services.AddScoped<UserNotificationRecipientResolver>();
+        services.AddScoped<MissionReportService>();
+        services.AddScoped<FleetDashboardService>();
+        services.AddScoped<DashboardLayoutSettingsService>();
+        services.AddScoped<MissionAvailabilityService>();
+        services.AddScoped<MissionReportExportService>();
+        services.AddScoped<UserManagementService>();
+        services.AddHostedService<SessionExpiryHostedService>();
+        services.AddScoped<OrganizationSettingsService>();
+        services.AddScoped<UserAppearanceSettingsService>();
+        services.AddScoped<SmsSettingsService>();
+        services.AddScoped<SmsQueueService>();
+        services.AddSingleton<AdpSmsSoapClient>(_ =>
+            new AdpSmsSoapClient(new HttpClient { Timeout = TimeSpan.FromSeconds(30) }));
+        services.AddHostedService<SmsDispatchHostedService>();
+        services.AddSingleton<ActiveDirectoryConnectionTester>();
+
+        return services;
+    }
+}

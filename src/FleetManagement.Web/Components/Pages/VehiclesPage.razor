@@ -1,0 +1,357 @@
+@page "/vehicles"
+@using FleetManagement.Application.Authorization
+@rendermode InteractiveServer
+@attribute [FleetPermission(PermissionCatalog.Vehicles.View)]
+@using FleetManagement.Domain.Vehicles
+@using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Web.Security
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Authorization
+@inject VehicleManagementService VehicleService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IAuthorizationService AuthorizationService
+@inject ILogger<VehiclesPage> Logger
+
+<PageTitle>مدیریت خودروها</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">مدیریت ناوگان</div>
+    <h1>خودروها</h1>
+    <p>ثبت مشخصات، وضعیت دستی و بایگانی خودروها. وضعیت «در مأموریت» از روی مأموریت فعال محاسبه می‌شود و منابع درگیر قابل بایگانی یا غیرفعال‌سازی نیستند.</p>
+
+    <div class="session-filters">
+        <div>
+            <label for="vehicle-search">جست‌وجوی برند، مدل یا پلاک</label>
+            <input id="vehicle-search" @bind="_search" @bind:event="oninput" placeholder="عبارت جست‌وجو" />
+        </div>
+        <div>
+            <label for="vehicle-archived">نمایش بایگانی</label>
+            <select id="vehicle-archived" @bind="_includeArchived">
+                <option value="false">فقط فعال‌ها</option>
+                <option value="true">همه، شامل بایگانی</option>
+            </select>
+        </div>
+        <button type="button" class="primary-button" @onclick="LoadAsync" disabled="@_busy">جست‌وجو</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="setup-info">@_message</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="setup-error">@_error</div>
+    }
+
+    <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Vehicles.Manage)">
+        <Authorized Context="vehicleManageContext">
+    <section class="driver-editor">
+        <h2>@(_editingId.HasValue ? "ویرایش خودرو" : "ثبت خودروی جدید")</h2>
+        <div class="driver-form-grid">
+            <div>
+                <label for="vehicle-brand">برند</label>
+                <input id="vehicle-brand" @bind="_brand" maxlength="100" />
+            </div>
+            <div>
+                <label for="vehicle-model">مدل</label>
+                <input id="vehicle-model" @bind="_model" maxlength="100" />
+            </div>
+            <div>
+                <label for="vehicle-plate">پلاک ملی</label>
+                <input id="vehicle-plate" @bind="_plate" maxlength="30" placeholder="۱۲ ب ۳۴۵ ۶۷" />
+                <small>پلاک پس از ثبت نرمال‌سازی و اعتبارسنجی می‌شود.</small>
+            </div>
+            @if (_editingId.HasValue)
+            {
+                <div>
+                    <label for="vehicle-manual-status">وضعیت دستی خودرو</label>
+                    <select id="vehicle-manual-status" @bind="_manualStatus">
+                        <option value="@ManualVehicleStatus.Ready">آماده به کار</option>
+                        <option value="@ManualVehicleStatus.RepairShop">تعمیرگاه</option>
+                        <option value="@ManualVehicleStatus.OutOfService">خارج از سرویس</option>
+                    </select>
+                    <small>در صورت وجود مأموریت فعال، تغییر وضعیت به تعمیرگاه یا خارج از سرویس مجاز نیست.</small>
+                </div>
+            }
+        </div>
+        <div class="driver-actions">
+            <button type="button" class="primary-button" @onclick="SaveAsync" disabled="@_busy">
+                @(_editingId.HasValue ? "ذخیره تغییرات" : "ثبت خودرو")
+            </button>
+            @if (_editingId.HasValue)
+            {
+                <button type="button" class="secondary-button" @onclick="ResetEditor">انصراف</button>
+            }
+        </div>
+    </section>
+        </Authorized>
+    </AuthorizeView>
+
+    @if (_loading)
+    {
+        <p>در حال دریافت اطلاعات...</p>
+    }
+    else if (_vehicles.Count == 0)
+    {
+        <div class="setup-info">خودرویی یافت نشد.</div>
+    }
+    else
+    {
+        <div class="session-table-wrap">
+            <table class="session-table">
+                <thead>
+                    <tr>
+                        <th>برند</th>
+                        <th>مدل</th>
+                        <th>پلاک</th>
+                        <th>وضعیت جاری</th>
+                        <th>وضعیت دستی</th>
+                        <th>بایگانی</th>
+                        <th>عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var vehicle in _vehicles)
+                    {
+                        <tr @key="vehicle.Id">
+                            <td>@vehicle.Brand</td>
+                            <td>@vehicle.Model</td>
+                            <td dir="ltr">@vehicle.LicensePlate</td>
+                            <td>@GetEffectiveStatusName(vehicle)</td>
+                            <td>@GetStatusName(vehicle.ManualStatus)</td>
+                            <td>@(vehicle.IsArchived ? "بایگانی‌شده" : "فعال")</td>
+                            <td>
+                                <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Vehicles.Manage)">
+                                    <Authorized Context="vehicleActionsContext">
+                                        <button type="button" class="secondary-button" @onclick="() => Edit(vehicle)">ویرایش</button>
+                                        @if (!vehicle.IsArchived)
+                                        {
+                                            <button type="button" class="secondary-button" @onclick="() => ArchiveAsync(vehicle.Id)" disabled="@_busy">بایگانی</button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="secondary-button" @onclick="() => ReactivateAsync(vehicle.Id)" disabled="@_busy">بازگردانی</button>
+                                        }
+                                    </Authorized>
+                                </AuthorizeView>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private bool _loading = true;
+    private bool _busy;
+    private bool _includeArchived;
+    private string _search = string.Empty;
+    private string _brand = string.Empty;
+    private string _model = string.Empty;
+    private string _plate = string.Empty;
+    private string _message = string.Empty;
+    private string _error = string.Empty;
+    private Guid? _editingId;
+    private ManualVehicleStatus _manualStatus = ManualVehicleStatus.Ready;
+    private IReadOnlyList<Vehicle> _vehicles = [];
+    private HashSet<Guid> _activeMissionVehicleIds = [];
+
+    /// <summary>بارگذاری اولیه خودروها.</summary>
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    /// <summary>جست‌وجوی خودروها.</summary>
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _vehicles = await VehicleService.SearchAsync(_search, _includeArchived);
+            _activeMissionVehicleIds = (await VehicleService.GetActiveMissionVehicleIdsAsync()).ToHashSet();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "دریافت فهرست خودروها");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>انتقال اطلاعات خودرو به فرم ویرایش.</summary>
+    private void Edit(Vehicle vehicle)
+    {
+        _editingId = vehicle.Id;
+        _brand = vehicle.Brand;
+        _model = vehicle.Model;
+        _plate = vehicle.LicensePlate;
+        _manualStatus = vehicle.ManualStatus;
+        _message = string.Empty;
+        _error = string.Empty;
+    }
+
+    /// <summary>ثبت یا اصلاح مشخصات خودرو.</summary>
+    private async Task SaveAsync()
+    {
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Vehicles.Manage)))
+        {
+            return;
+        }
+
+        _busy = true;
+        _message = string.Empty;
+        _error = string.Empty;
+
+        try
+        {
+            var actor = await GetActorAsync();
+            if (_editingId.HasValue)
+            {
+                await VehicleService.UpdateAsync(
+                    _editingId.Value,
+                    _brand,
+                    _model,
+                    _plate,
+                    _manualStatus,
+                    actor);
+                _message = "مشخصات و وضعیت خودرو اصلاح شد.";
+            }
+            else
+            {
+                await VehicleService.CreateAsync(_brand, _model, _plate, actor);
+                _message = "خودرو ثبت شد.";
+            }
+
+            ResetEditor();
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "ذخیره اطلاعات خودرو");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>بایگانی خودرو بدون حذف سوابق آن.</summary>
+    private async Task ArchiveAsync(Guid vehicleId)
+    {
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Vehicles.Manage)))
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await VehicleService.ArchiveAsync(vehicleId, await GetActorAsync());
+            _message = "خودرو بایگانی شد.";
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "بایگانی خودرو");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>بازگرداندن خودروی بایگانی‌شده در صورت آماده‌به‌کار بودن.</summary>
+    private async Task ReactivateAsync(Guid vehicleId)
+    {
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Vehicles.Manage)))
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await VehicleService.ReactivateAsync(vehicleId, await GetActorAsync());
+            _message = "خودرو بازگردانی شد.";
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "بازگردانی خودرو");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>پاک‌سازی فرم ثبت یا ویرایش.</summary>
+    private void ResetEditor()
+    {
+        _editingId = null;
+        _brand = string.Empty;
+        _model = string.Empty;
+        _plate = string.Empty;
+        _manualStatus = ManualVehicleStatus.Ready;
+    }
+
+    /// <summary>بررسی مجوز عملیاتی در سمت سرور، مستقل از مخفی‌سازی کنترل‌های رابط.</summary>
+    private async Task<bool> HasPermissionAsync(string policy)
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var authorization = await AuthorizationService.AuthorizeAsync(state.User, policy);
+        if (authorization.Succeeded)
+        {
+            return true;
+        }
+
+        _error = "شما مجوز لازم برای انجام این عملیات را ندارید.";
+        return false;
+    }
+
+    /// <summary>دریافت شناسه عامل از هویت احرازشده.</summary>
+    private async Task<string> GetActorAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        return state.User.FindFirst("fleet:username")?.Value
+            ?? state.User.Identity?.Name
+            ?? "unknown";
+    }
+
+    /// <summary>ثبت خطای فنی و نمایش شناسه پیگیری.</summary>
+    private void ReportError(Exception exception, string operation)
+    {
+        if (exception is InvalidOperationException or ArgumentException or KeyNotFoundException)
+        {
+            _error = exception.Message;
+            return;
+        }
+
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "{Operation} ناموفق بود. شناسه پیگیری: {TrackingId}", operation, trackingId);
+        _error = $"عملیات انجام نشد. شناسه پیگیری: {trackingId}";
+    }
+
+    /// <summary>عنوان فارسی وضعیت دستی خودرو.</summary>
+    private string GetEffectiveStatusName(Vehicle vehicle)
+    {
+        return vehicle.GetEffectiveStatus(_activeMissionVehicleIds.Contains(vehicle.Id)) switch
+        {
+            VehicleEffectiveStatus.InMission => "در مأموریت",
+            VehicleEffectiveStatus.Ready => "آماده به کار",
+            VehicleEffectiveStatus.RepairShop => "تعمیرگاه",
+            VehicleEffectiveStatus.OutOfService => "خارج از سرویس",
+            _ => "نامشخص"
+        };
+    }
+
+    private static string GetStatusName(ManualVehicleStatus status) => status switch
+    {
+        ManualVehicleStatus.Ready => "آماده به کار",
+        ManualVehicleStatus.RepairShop => "تعمیرگاه",
+        ManualVehicleStatus.OutOfService => "خارج از سرویس",
+        _ => "نامشخص"
+    };
+}

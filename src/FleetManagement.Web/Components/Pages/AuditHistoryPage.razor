@@ -1,0 +1,196 @@
+@page "/admin/audit"
+@using FleetManagement.Application.Authorization
+@rendermode InteractiveServer
+@attribute [FleetPermission(PermissionCatalog.Security.AuditView)]
+@using System.Globalization
+@using FleetManagement.Domain.Auditing
+@using FleetManagement.Infrastructure.Configuration
+@inject AuditLogService AuditService
+@inject ILogger<AuditHistoryPage> Logger
+
+<PageTitle>گزارش ممیزی</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">امنیت و کنترل داخلی</div>
+    <h1>گزارش ممیزی عملیات</h1>
+    <p>این سوابق فقط خواندنی هستند. برای حفاظت از اطلاعات محرمانه، رمزها، توکن‌ها و اطلاعات اتصال نباید در تصویر قبل و بعد ذخیره شوند.</p>
+
+    <div class="session-filters">
+        <div>
+            <label for="audit-actor">کاربر</label>
+            <input id="audit-actor" @bind="_actor" placeholder="نام کاربری انجام‌دهنده" />
+        </div>
+        <div>
+            <label for="audit-entity">نوع موجودیت</label>
+            <input id="audit-entity" @bind="_entityType" placeholder="مثلاً Mission یا Driver" />
+        </div>
+        <div>
+            <label for="audit-action">عملیات</label>
+            <input id="audit-action" @bind="_action" placeholder="مثلاً Create یا Approve" />
+        </div>
+        <div>
+            <label for="audit-outcome">نتیجه</label>
+            <select id="audit-outcome" @bind="_outcome">
+                <option value="">همه</option>
+                <option value="Success">موفق</option>
+                <option value="Rejected">ردشده</option>
+                <option value="Failed">ناموفق</option>
+            </select>
+        </div>
+        <button type="button" class="primary-button" @onclick="LoadAsync" disabled="@_isBusy">جست‌وجو</button>
+    </div>
+
+    @if (_error is not null)
+    {
+        <div class="setup-error">@_error</div>
+    }
+    else if (_isLoading)
+    {
+        <p>در حال دریافت سوابق...</p>
+    }
+    else if (_entries.Count == 0)
+    {
+        <div class="setup-info">رکوردی برای نمایش وجود ندارد.</div>
+    }
+    else
+    {
+        <div class="session-table-wrap">
+            <table class="session-table">
+                <thead>
+                    <tr>
+                        <th>زمان</th>
+                        <th>کاربر</th>
+                        <th>عملیات</th>
+                        <th>نوع رکورد</th>
+                        <th>شناسه رکورد</th>
+                        <th>نتیجه</th>
+                        <th>علت</th>
+                        <th>جزئیات تغییر</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in _entries)
+                    {
+                        <tr @key="entry.Id">
+                            <td>@FormatTehranTime(entry.OccurredAtUtc)</td>
+                            <td>@entry.ActorUsername</td>
+                            <td>@entry.Action</td>
+                            <td>@entry.EntityType</td>
+                            <td dir="ltr">@entry.EntityId</td>
+                            <td>@GetOutcomeName(entry.Outcome)</td>
+                            <td>@entry.Reason</td>
+                            <td>
+                                <button type="button" class="secondary-button" @onclick="() => SelectEntry(entry)">
+                                    مشاهده
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="session-count">نمایش @_entries.Count رکورد اخیر؛ حداکثر ۵۰۰ رکورد در هر جست‌وجو.</p>
+    }
+
+    @if (_selected is not null)
+    {
+        <section class="audit-detail">
+            <div class="audit-detail-heading">
+                <h2>جزئیات رویداد</h2>
+                <button type="button" class="secondary-button" @onclick="() => _selected = null">بستن</button>
+            </div>
+            <p><strong>شناسه رویداد:</strong> <span dir="ltr">@_selected.Id</span></p>
+            <p><strong>نشانی IP:</strong> <span dir="ltr">@(_selected.ClientIpAddress ?? "—")</span></p>
+            <h3>مقادیر پیش از تغییر</h3>
+            <pre dir="ltr">@(_selected.BeforeJson ?? "—")</pre>
+            <h3>مقادیر پس از تغییر</h3>
+            <pre dir="ltr">@(_selected.AfterJson ?? "—")</pre>
+        </section>
+    }
+</section>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private string _actor = string.Empty;
+    private string _entityType = string.Empty;
+    private string _action = string.Empty;
+    private string _outcome = string.Empty;
+    private string? _error;
+    private IReadOnlyList<AuditEntry> _entries = [];
+    private AuditEntry? _selected;
+
+    /// <summary>بارگذاری اولیه گزارش ممیزی.</summary>
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    /// <summary>اعمال فیلترها و دریافت آخرین سوابق.</summary>
+    private async Task LoadAsync()
+    {
+        _isBusy = true;
+        _isLoading = true;
+        _error = null;
+
+        try
+        {
+            _entries = await AuditService.SearchAsync(
+                actorUsername: _actor,
+                entityType: _entityType,
+                action: _action,
+                outcome: _outcome,
+                take: 500);
+        }
+        catch (Exception exception)
+        {
+            var trackingId = Guid.NewGuid().ToString("N");
+            Logger.LogError(exception, "خطا در خواندن گزارش ممیزی. شناسه پیگیری: {TrackingId}", trackingId);
+            _error = $"دریافت گزارش انجام نشد. شناسه پیگیری: {trackingId}";
+            _entries = [];
+        }
+        finally
+        {
+            _isLoading = false;
+            _isBusy = false;
+        }
+    }
+
+    /// <summary>نمایش جزئیات یک رویداد انتخاب‌شده.</summary>
+    private void SelectEntry(AuditEntry entry) => _selected = entry;
+
+    /// <summary>نمایش زمان در منطقه تهران و تقویم جلالی با دقت ساعت.</summary>
+    private static string FormatTehranTime(DateTimeOffset value)
+    {
+        TimeZoneInfo zone;
+        try
+        {
+            zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran");
+        }
+
+        var local = TimeZoneInfo.ConvertTime(value, zone);
+        var calendar = new PersianCalendar();
+        var result = $"{calendar.GetYear(local.DateTime):0000}/{calendar.GetMonth(local.DateTime):00}/{calendar.GetDayOfMonth(local.DateTime):00} {local.Hour:00}:00";
+        const string latin = "0123456789";
+        const string persian = "۰۱۲۳۴۵۶۷۸۹";
+
+        return string.Create(result.Length, result, (destination, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                var digit = latin.IndexOf(source[index]);
+                destination[index] = digit >= 0 ? persian[digit] : source[index];
+            }
+        });
+    }
+
+    /// <summary>تبدیل نتیجه ممیزی به عنوان فارسی.</summary>
+    private static string GetOutcomeName(string outcome) => outcome switch
+    {
+        "Success" => "موفق",
+        "Rejected" => "ردشده",
+        "Failed" => "ناموفق",
+        _ => "سایر"
+    };
+}

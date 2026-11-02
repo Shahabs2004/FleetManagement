@@ -1,0 +1,193 @@
+@page "/admin/organization"
+@rendermode InteractiveServer
+@attribute [FleetPermission(PermissionCatalog.Administration.SystemManage)]
+@using FleetManagement.Infrastructure.Configuration
+@using Microsoft.AspNetCore.Components.Forms
+@inject OrganizationSettingsService OrganizationSettings
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+@inject ILogger<OrganizationSettingsPage> Logger
+
+<PageTitle>مشخصات سازمان</PageTitle>
+
+<section class="admin-panel">
+    <div class="eyebrow">تنظیمات عمومی سامانه</div>
+    <h1>مشخصات سازمان</h1>
+    <p>نام و نشان سازمان در سربرگ سامانه و خروجی‌های مأموریت نمایش داده می‌شود. تغییرات در سوابق ممیزی ثبت می‌شوند.</p>
+
+    @if (_loading)
+    {
+        <p>در حال دریافت مشخصات سازمان...</p>
+    }
+    else
+    {
+        <EditForm Model="_model" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="admin-section">
+                <label for="organization-name">نام سازمان</label>
+                <InputText id="organization-name" class="form-control" @bind-Value="_model.OrganizationName" maxlength="200" />
+
+                <label for="organization-logo">نشان سازمان (PNG یا JPEG، حداکثر ۱٫۵ مگابایت)</label>
+                <InputFile id="organization-logo" OnChange="LogoSelectedAsync" accept="image/png,image/jpeg" />
+
+                @if (!string.IsNullOrWhiteSpace(_newLogoBase64))
+                {
+                    <p>نشان جدید انتخاب شده است.</p>
+                }
+                else if (!string.IsNullOrWhiteSpace(_model.LogoBase64) && !string.IsNullOrWhiteSpace(_model.LogoContentType))
+                {
+                    <img class="organization-logo" src="@($"data:{_model.LogoContentType};base64,{_model.LogoBase64}")" alt="نشان فعلی سازمان" />
+                }
+                else
+                {
+                    <p>برای سازمان نشانی ثبت نشده است.</p>
+                }
+
+                <label class="checkbox-line">
+                    <InputCheckbox @bind-Value="_removeLogo" />
+                    حذف نشان فعلی
+                </label>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <div class="setup-error" role="alert">@_error</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(_message))
+            {
+                <div class="setup-info" role="status">@_message</div>
+            }
+
+            <div class="driver-actions">
+                <button type="submit" class="primary-button" disabled="@_busy">ذخیره تغییرات</button>
+                <button type="button" class="secondary-button" @onclick="ReloadAsync" disabled="@_busy">بازخوانی</button>
+            </div>
+        </EditForm>
+    }
+</section>
+
+@code {
+    private bool _loading = true;
+    private bool _busy;
+    private bool _removeLogo;
+    private string _newLogoBase64 = string.Empty;
+    private string _newLogoContentType = string.Empty;
+    private string _actor = string.Empty;
+    private string _error = string.Empty;
+    private string _message = string.Empty;
+    private OrganizationProfileConfiguration _model = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _actor = state.User.FindFirst("fleet:username")?.Value
+            ?? state.User.Identity?.Name
+            ?? "unknown";
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = string.Empty;
+        try
+        {
+            _model = await OrganizationSettings.GetAsync() ?? new OrganizationProfileConfiguration();
+            _removeLogo = false;
+            _newLogoBase64 = string.Empty;
+            _newLogoContentType = string.Empty;
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "دریافت مشخصات سازمان");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LogoSelectedAsync(InputFileChangeEventArgs args)
+    {
+        try
+        {
+            var file = args.File;
+            if (file.ContentType is not ("image/png" or "image/jpeg"))
+            {
+                throw new InvalidOperationException("فقط فایل PNG یا JPEG پذیرفته می‌شود.");
+            }
+
+            if (file.Size > 1_500_000)
+            {
+                throw new InvalidOperationException("حجم فایل نشان باید کمتر از ۱٫۵ مگابایت باشد.");
+            }
+
+            await using var stream = file.OpenReadStream(1_500_000);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            _newLogoBase64 = Convert.ToBase64String(memory.ToArray());
+            _newLogoContentType = file.ContentType;
+            _removeLogo = false;
+            _message = "فایل نشان جدید انتخاب شد.";
+            _error = string.Empty;
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "بارگذاری نشان سازمان");
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        _error = string.Empty;
+        _message = string.Empty;
+        try
+        {
+            var logoBase64 = _removeLogo
+                ? null
+                : !string.IsNullOrWhiteSpace(_newLogoBase64)
+                    ? _newLogoBase64
+                    : _model.LogoBase64;
+            var logoContentType = _removeLogo
+                ? null
+                : !string.IsNullOrWhiteSpace(_newLogoBase64)
+                    ? _newLogoContentType
+                    : _model.LogoContentType;
+
+            await OrganizationSettings.SaveAsync(
+                new OrganizationProfileConfiguration
+                {
+                    OrganizationName = _model.OrganizationName,
+                    LogoBase64 = logoBase64,
+                    LogoContentType = logoContentType
+                },
+                _actor);
+
+            _message = "مشخصات سازمان ذخیره شد.";
+            await LoadAsync();
+            Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception, "ذخیره مشخصات سازمان");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task ReloadAsync() => LoadAsync();
+
+    private void ReportError(Exception exception, string operation)
+    {
+        var trackingId = Guid.NewGuid().ToString("N");
+        Logger.LogError(exception, "{Operation} ناموفق بود. شناسه پیگیری: {TrackingId}", operation, trackingId);
+        _error = exception is ArgumentException or InvalidOperationException
+            ? exception.Message
+            : $"عملیات انجام نشد. شناسه پیگیری: {trackingId}";
+    }
+}
