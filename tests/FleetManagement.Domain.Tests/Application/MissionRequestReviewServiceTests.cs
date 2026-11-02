@@ -305,7 +305,7 @@ public sealed class MissionRequestReviewServiceTests
         public string? LastEventKey { get; private set; }
         public string[] LastRoleKeys { get; private set; } = [];
 
-        public Task CreateAsync(
+        public Task<Guid> CreateAsync(
             string recipientUsername,
             string title,
             string message,
@@ -317,7 +317,7 @@ public sealed class MissionRequestReviewServiceTests
             CallCount++;
             LastRecipient = recipientUsername;
             LastEventKey = eventKey;
-            return Task.CompletedTask;
+            return Task.FromResult(Guid.NewGuid());
         }
 
         public Task<int> CreateForRolesAsync(
