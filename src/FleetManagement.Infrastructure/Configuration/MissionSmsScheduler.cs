@@ -40,4 +40,31 @@ public sealed class MissionSmsScheduler(
                 mission.MissionNumber);
         }
     }
+    /// <inheritdoc />
+    public async Task CancelUnsentRemindersSafelyAsync(
+        Guid missionId,
+        string reason,
+        string actor,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await smsQueueService.CancelUnsentRemindersAsync(
+                missionId,
+                reason,
+                actor,
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                exception,
+                "لغو پیامک‌های یادآوری ارسال‌نشده برای مأموریت {MissionId} انجام نشد.",
+                missionId);
+        }
+    }
 }
