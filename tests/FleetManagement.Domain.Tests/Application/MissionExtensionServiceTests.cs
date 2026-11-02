@@ -13,7 +13,8 @@ public sealed class MissionExtensionServiceTests
     [Fact]
     public async Task ExtendAsync_WhenMissionHasNoAssignedResources_RejectsExtension()
     {
-        var mission = CreateMission("1405-301", PastWholeHour(), PastWholeHour().AddHours(2));
+        var start = PastWholeHour();
+        var mission = CreateMission("1405-301", start, start.AddHours(2));
         var store = new FakeStore(mission);
         var service = CreateService(store, new MissionRulesConfiguration(), new RecordingAuditWriter(),
             new RecordingNotificationSender(), new RecordingSmsScheduler());
