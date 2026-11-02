@@ -1,6 +1,7 @@
 @page "/admin/audit"
+@using FleetManagement.Application.Authorization
 @rendermode InteractiveServer
-@attribute [FleetPermission("security.audit.view")]
+@attribute [FleetPermission(PermissionCatalog.Security.AuditView)]
 @using System.Globalization
 @using FleetManagement.Domain.Auditing
 @using FleetManagement.Infrastructure.Configuration
