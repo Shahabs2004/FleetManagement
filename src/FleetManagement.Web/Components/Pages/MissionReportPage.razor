@@ -1,6 +1,7 @@
 @page "/reports/missions"
+@using FleetManagement.Application.Authorization
 @rendermode InteractiveServer
-@attribute [FleetPermission("reports.view")]
+@attribute [FleetPermission(PermissionCatalog.Reports.View)]
 @using System.Globalization
 @using FleetManagement.Domain.Missions
 @using FleetManagement.Domain.Drivers
@@ -85,7 +86,7 @@
     @if (_report is not null)
     {
         <div class="driver-actions report-actions">
-            <AuthorizeView Policy="Permission:reports.export">
+            <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Reports.Export)">
                 <Authorized>
                     <button type="button" class="primary-button" @onclick="ExportExcel">دریافت فایل Excel</button>
                 </Authorized>
