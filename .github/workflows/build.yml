@@ -76,3 +76,34 @@ jobs:
 
       - name: اجرای آزمون‌های یکپارچه SQL Server
         run: dotnet test tests/FleetManagement.Infrastructure.IntegrationTests/FleetManagement.Infrastructure.IntegrationTests.csproj --configuration Release --verbosity normal
+
+  migration-diagnostic:
+    name: تشخیص اختلاف مدل و Migration
+    runs-on: windows-latest
+    steps:
+      - name: دریافت سورس
+        uses: actions/checkout@v4
+
+      - name: نصب .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: نصب ابزار EF Core
+        run: dotnet tool install --global dotnet-ef --version 10.0.14
+
+      - name: تولید Migration تشخیصی
+        shell: pwsh
+        env:
+          FLEETMANAGEMENT_SQL_CONNECTION: "Server=(localdb)\\MSSQLLocalDB;Database=FleetManagementDesignTime;Trusted_Connection=True;TrustServerCertificate=True"
+        run: |
+          dotnet ef migrations add DiagnoseCurrentModel --project src/FleetManagement.Infrastructure/FleetManagement.Infrastructure.csproj --startup-project src/FleetManagement.Infrastructure/FleetManagement.Infrastructure.csproj --output-dir Persistence/Migrations
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: بارگذاری Migration تشخیصی
+        uses: actions/upload-artifact@v4
+        with:
+          name: ef-model-diagnostic
+          path: |
+            src/FleetManagement.Infrastructure/Persistence/Migrations/*DiagnoseCurrentModel*
+          if-no-files-found: error
