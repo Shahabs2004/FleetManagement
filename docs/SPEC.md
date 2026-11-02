@@ -190,13 +190,13 @@
 IIS + Windows Auth + LDAPS واقعی، ارسال واقعی پیامک و نگاشت وضعیت‌های تحویل ADP (نیاز به نمونه واقعی ارائه‌دهنده)، تست بار/امنیت، مسئولیت پشتیبان‌گیری. README صراحتاً می‌گوید هنوز برای استفاده عملیاتی تأیید نشده است.
 
 ### مغایرت‌های مشاهده‌شده بین مشخصات و کد
-1. **لایه Application تقریباً خالی است** (فقط `ISystemSettingsStore` و `INotificationPublisher`)؛ منطق کسب‌وکار در Infrastructure (`MissionManagementService.cs` ≈ ۱۵۸۰ خط) و Web است. این با تصمیم Clean Architecture و `ARCHITECTURE.md` نمی‌خواند.
-2. فایل‌های بسیار بزرگ (`MissionManagementService` ≈ ۱۵۸۰، `Mission.cs` ≈ ۶۵۰، `FleetAuthenticationEndpoints` ≈ ۴۶۰ خط) با قاعده «کد کوچک و خوانا» مغایرند.
-3. آزمون‌های واحد در پروژه `FleetManagement.UnitTests` و آزمون‌های یکپارچه SQL Server در پروژه مستقل `FleetManagement.Infrastructure.IntegrationTests` نگهداری می‌شوند؛ پوشش و نتیجه هر دو باید از CI بررسی شود.
+1. **انتقال منطق مأموریت به Application انجام شده است**: طبق PRهای ۲۲ تا ۲۹، ثبت/ویرایش/بررسی، تغییر، کیلومتر، تقسیم، انصراف، چرخه‌عمر و تمدید در سرویس‌های Application قرار دارند؛ EF Core و تراکنش‌ها در آداپتورهای Infrastructure باقی مانده‌اند. این بند قدیمی در نسخه پیشین SPEC بود و با وضعیت فعلی کد اصلاح شد.
+2. `Mission.cs` و برخی صفحات همچنان بزرگ‌اند. تفکیک `FleetAuthenticationEndpoints` در PR شماره ۳۱ ادغام شده است؛ CI شماره ۷۴۹ در Ubuntu، Windows و SQL Server موفق بود.
+3. آزمون‌های واحد در پروژه `FleetManagement.UnitTests` و آزمون‌های یکپارچه SQL Server در پروژه مستقل `FleetManagement.Infrastructure.IntegrationTests` قرار دارند؛ تغییر نام در PR شماره ۳۲ ادغام و CI شماره ۷۶۹ پس از اصلاح مسیر Solution موفق شد.
 4. SignalR فقط برای اعلان‌ها است؛ به‌روزرسانی زنده تایم‌لاین/فهرست‌ها تأیید نشد.
 5. کتابخانه PDF در کد نیست؛ «ذخیره PDF حکم» به چاپ مرورگر متکی است (باید تأیید شود).
-6. کد مجوزها پراکنده در رشته‌های داخل صفحات/تنظیمات است و کاتالوگ مرکزی ندارد (نگاه کنید به پیوست ب). بعضی کدها (`settings.sessions`، `security.sessions.view`) هم‌پوشان به‌نظر می‌رسند.
-7. تقسیم مأموریت: وجود `RelatedMissionId` برای نمایش «ادامه مأموریت» مطابق مشخصات است؛ ولی قاعده «بدون مأموریت مادر» و رعایت ساعت‌گرد بودن باید با تست تأیید شود.
+6. کاتالوگ مرکزی مجوزها در PR جاری P1-8 اضافه شده است. `settings.sessions` برای مدیریت سیاست نشست و `security.sessions.view` برای مشاهده سوابق ورود است؛ این دو کاربرد متفاوت دارند و هم‌پوشانی معنایی ندارند.
+7. تقسیم مأموریت: وجود `RelatedMissionId` برای نمایش «ادامه مأموریت» مطابق مشخصات است؛ ولی قاعده «بدون مأموریت مادر» و رعایت ساعت‌گرد بودن باید با تست تأیید شود. مجوز مستقل `missions.split.schedule.edit` در P1-8 تعریف و فقط به FleetManager داده شده، اما فیلد زمان در فرم فعلی هنوز به این مجوز متصل نیست؛ رفتار زمان پیش‌فرض برای اپراتور مشخص نشده و نباید حدس زده شود. فهرست دلایل تقسیم نیز فعلاً enum ثابت است؛ مجوز مدیریت آن در کاتالوگ ثبت شده ولی صفحه مدیریت هنوز وجود ندارد.
 8. تأیید/رد توسط «مدیر ناوگان یا اپراتور دارای مجوز» پیاده شده است (نقش Operator پیش‌فرض `missions.approve` دارد)؛ بخش ۲۰-۲ را ببینید.
 
 ### نقشه کار باقی‌مانده
@@ -222,6 +222,7 @@ Administrator محلی: دسترسی کامل، مستقل از AD، همیشه 
 8. گزارش ممیزی/پیامک بدون خروجی فایل؛ گزارش مستقل تقسیم نداریم.
 9. نمای تایم‌لاین: فقط رانندگان (ثابت). طراحی دسکتاپ‌محور. SQL Authentication و رمز‌های بدون رمزنگاری در SQL (پذیرش ریسک).
 10. فاصله اجباری و بازه آینده و مدت نشست: قابل تنظیم توسط مدیر سیستم.
+11. کاتالوگ مرکزی مجوزها: کلیدهای مجوز در `PermissionCatalog` لایه Application ثبت و تخصیص کلید ناشناخته رد می‌شود. مجوزهای مستقل کیلومتر، ویرایش زمان تقسیم، بررسی انصراف/درخواست تغییر، مدیریت کاربران/سامانه/مکان‌ها، قالب حکم و دلایل تقسیم تعریف می‌شوند. پیش‌فرض‌ها مطابق پیوست ب است؛ `settings.sessions` (مدیریت مدت نشست) و `security.sessions.view` (مشاهده سوابق) دو مجوز مستقل‌اند. مجوزهای مدیریتی قالب حکم و دلایل تقسیم در فضای نام `settings.*` قرار می‌گیرند تا با wildcard `missions.*` اعطا نشوند.
 
 ---
 
@@ -246,27 +247,43 @@ Administrator محلی: دسترسی کامل، مستقل از AD، همیشه 
 **روابط**: Mission→Driver و Mission→Vehicle (اختیاری تا تأیید)؛ Mission↔Mission از طریق `RelatedMissionId` (تقسیم، بدون والد)؛ MissionChangeRequest→Mission؛ SmsQueueItem→Mission؛ بقیه با Username.
 **ایندکس/محدودیت‌های لازم (باید در Migration بررسی شود)**: یکتایی MissionNumber؛ RowVersion روی Mission/Driver/Vehicle؛ جلوگیری هم‌زمان از تداخل راننده/خودرو در تراکنش Serializable یا قفل؛ شمارنده سالانه جدا.
 
-## پیوست ب. کاتالوگ مجوزها (استخراج‌شده از کد؛ قاعده: `*` همه، Deny بر Grant غالب است)
+## پیوست ب. کاتالوگ مجوزها (مرجع مرکزی: `FleetManagement.Application.Authorization.PermissionCatalog`)
+
+قاعده: `*` همه مجوزها، الگوهای `module.*` تمام مجوزهای همان ماژول، و Deny بر Grant غالب است. کلیدهای تخصیص‌یافته باید در کاتالوگ ثبت شده باشند.
 
 | کد | معنی | پیش‌فرض نقش‌ها |
 |---|---|---|
-| `*` | همه | SystemAdministrator |
+| `*` | همه عملیات | SystemAdministrator و Administrator محلی |
 | `dashboard.view` | داشبورد | همه نقش‌ها |
-| `drivers.view` / `drivers.*` / `drivers.default-vehicle.manage` | رانندگان | Viewer/Operator: view؛ FleetManager: همه |
-| `vehicles.view` / `vehicles.*` | خودروها | همانند بالا |
+| `drivers.view` / `drivers.manage` / `drivers.*` | مشاهده/مدیریت رانندگان | Viewer/Operator: view؛ FleetManager: همه |
+| `drivers.default-vehicle.manage` | تغییر خودروی پیش‌فرض راننده | FleetManager |
+| `vehicles.view` / `vehicles.manage` / `vehicles.*` | مشاهده/مدیریت خودروها | Viewer/Operator: view؛ FleetManager: همه |
 | `missions.view` / `missions.view.own` | مشاهده همه / مأموریت‌های خود | Viewer: view؛ Requester: own؛ Operator: هر دو |
-| `missions.create` / `.edit` | ثبت / ویرایش | Requester: create؛ Operator |
-| `missions.review` / `.approve` / `.reject` | بررسی/تأیید/رد | Operator و FleetManager |
-| `missions.cancel` / `.extend` / `.split` | لغو / تمدید / تقسیم | Operator و FleetManager |
-| `missions.print` | چاپ حکم | Requester، Operator |
-| `missions.timeline.view` | تایم‌لاین | Operator، FleetManager |
-| `reports.view` / `reports.export` | گزارش‌ها / خروجی | FleetManager |
-| `notifications.view` / `notifications.sms.view` | اعلان / صف پیامک | notifications.view: Requester, Operator, FleetManager |
-| `security.audit.view` / `security.sessions.view` | ممیزی / سوابق نشست | مدیر سامانه |
-| `settings.authorization` / `settings.sessions` | مدیریت نقش‌ها / تنظیم نشست | مدیر سامانه |
+| `missions.create` / `missions.edit` | ثبت / ویرایش | Requester: create؛ Operator |
+| `missions.review` / `missions.approve` / `missions.reject` | شروع بررسی / تأیید / رد درخواست | Operator و FleetManager |
+| `missions.cancel` / `missions.extend` / `missions.split` | لغو / تمدید / تقسیم | Operator و FleetManager |
+| `missions.print` / `missions.timeline.view` | چاپ حکم / مشاهده تایم‌لاین | چاپ: Requester و Operator؛ تایم‌لاین: Operator و FleetManager |
+| `missions.*` | همه عملیات مأموریت | FleetManager |
+| `missions.odometer.manage` | ثبت و اصلاح کیلومتر | Operator و FleetManager |
+| `missions.split.schedule.edit` | ویرایش زمان تقسیم | فقط FleetManager |
+| `missions.withdrawal.review` / `missions.change.review` | بررسی انصراف / درخواست تغییر | انصراف: FleetManager؛ Operator فقط با تخصیص صریح. درخواست تغییر: Operator و FleetManager |
+| `reports.view` / `reports.export` | مشاهده / خروجی گزارش‌ها | FleetManager |
+| `notifications.view` | اعلان‌های داخلی | Requester، Operator، FleetManager |
+| `notifications.sms.view` / `notifications.sms.retry` | مشاهده پیامک / ارسال مجدد | مستقل و قابل تخصیص؛ بدون اعطای پیش‌فرض به نقش‌های عملیاتی |
+| `notifications.sms.templates.manage` | مدیریت قالب پیامک | SystemAdministrator |
+| `security.audit.view` / `security.sessions.view` | مشاهده ممیزی / سوابق نشست | SystemAdministrator |
+| `settings.authorization` / `settings.sessions` | مدیریت مجوزها / سیاست نشست | SystemAdministrator |
+| `settings.system.manage` | تنظیمات سامانه | SystemAdministrator |
+| `users.manage` / `locations.manage` | مدیریت کاربران / مکان‌ها | SystemAdministrator |
+| `settings.mission-template.manage` / `settings.mission-split-reasons.manage` | قالب حکم / دلایل تقسیم | SystemAdministrator |
 
-**ناقص یا نیازمند تصمیم**: مجوز مستقل برای ویرایش کیلومتر، ویرایش زمان تقسیم (مشخصات: فقط مدیر ناوگان)، مدیریت کاربران، تنظیمات سیستم/فاصله اجباری، مدیریت مکان‌ها، قالب چاپ، مدیریت دلایل تقسیم، پاسخ به انصراف و درخواست تغییر. این‌ها یا زیر `missions.*` جمع شده‌اند یا کد جداگانه ندارند؛ باید صریح شوند.
-نقش‌های پیش‌فرض: SystemAdministrator، FleetManager، Operator، Viewer، Requester. Administrator محلی خارج از این سازوکار است.
+نکات:
+- `missions.split.schedule.edit` عمداً مستقل است؛ ویرایش زمان تقسیم فقط برای مدیر ناوگان مجاز است. این مجوز خارج از دسترسی عمومی اپراتور به تقسیم باقی می‌ماند.
+- برای `missions.withdrawal.review` چون نقش پیش‌فرض اپراتور در مشخصات به‌صراحت تعیین نشده، اعطای آن به Operator خودکار نیست و مدیر سامانه باید آن را صریحاً تخصیص دهد.
+- مجوزهای پیامک مستقل‌اند؛ مشاهده گزارش پیامک و ارسال مجدد باید جداگانه قابل اعطا/رد باشند.
+- کلیدهای تنظیمات قالب حکم و دلایل تقسیم در فضای نام `settings.*` قرار دارند تا مجوز فراگیر `missions.*` مدیر ناوگان، اختیار مدیریتی مدیر سامانه را ناخواسته گسترش ندهد.
+- `settings.sessions` برای تغییر مدت نشست/عدم فعالیت است؛ `security.sessions.view` صرفاً مشاهده سوابق ورود و نشست‌هاست.
+- نقش‌های پایه: SystemAdministrator، FleetManager، Operator، Viewer، Requester. Administrator محلی خارج از سازوکار نقش‌های عادی و دارای `*` است.
 
 ## پیوست پ. جدول انتقال وضعیت‌ها (از روی `Mission.cs`)
 
