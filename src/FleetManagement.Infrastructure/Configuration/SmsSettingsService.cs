@@ -114,6 +114,17 @@ public sealed class SmsSettingsService(
             cancellationToken: cancellationToken);
     }
 
+    /// <summary>خواندن نگاشت وضعیت تحویل بدون deserialize کردن اعتبارنامه‌های اتصال.</summary>
+    public async Task<IReadOnlyDictionary<string, AdpDeliveryStatusKind>> GetDeliveryStatusMappingsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var snapshot = await settingsStore.GetAsync<SmsTemplateSettingsSnapshot>(
+            SettingKey,
+            cancellationToken);
+        return snapshot?.DeliveryStatusMappings
+            ?? new Dictionary<string, AdpDeliveryStatusKind>(StringComparer.OrdinalIgnoreCase);
+    }
+
     /// <summary>اعتبارسنجی و ذخیره تنظیمات سرویس پیامک.</summary>
     public async Task SaveAsync(
         SmsProviderConfiguration configuration,
@@ -129,6 +140,14 @@ public sealed class SmsSettingsService(
         if (configuration.SourceNumber.Length > 20)
         {
             throw new ArgumentException("شماره فرستنده معتبر نیست.", nameof(configuration));
+        }
+
+        if (configuration.DeliveryStatusMappings is null
+            || configuration.DeliveryStatusMappings.Any(mapping =>
+                string.IsNullOrWhiteSpace(mapping.Key)
+                || mapping.Value != AdpDeliveryStatusKind.Delivered))
+        {
+            throw new ArgumentException("نگاشت وضعیت تحویل فقط می‌تواند وضعیت‌های تأییدشده را ثبت کند.", nameof(configuration));
         }
 
         if (configuration.EventTemplates.Count == 0)
@@ -188,6 +207,7 @@ public sealed class SmsSettingsService(
                     value.StatusPollingIntervalSeconds,
                     value.MaximumStatusPollingAttempts,
                     value.ReminderLeadMinutes,
+                    DeliveryStatusMappings = value.DeliveryStatusMappings,
                     EventTemplates = value.EventTemplates.Select(template => new
                     {
                         template.EventType,
@@ -217,6 +237,8 @@ public sealed class SmsSettingsService(
     public sealed class SmsTemplateSettingsSnapshot
     {
         public List<SmsEventTemplateConfiguration>? EventTemplates { get; set; }
+
+        public Dictionary<string, AdpDeliveryStatusKind>? DeliveryStatusMappings { get; set; }
     }
 
 }

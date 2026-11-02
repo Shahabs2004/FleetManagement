@@ -35,6 +35,9 @@ public sealed class SmsProviderConfiguration
     /// <summary>زمان یادآوری پیش از شروع مأموریت بر حسب دقیقه.</summary>
     public int ReminderLeadMinutes { get; set; } = 60;
 
+    /// <summary>نگاشت صریح وضعیت‌های تحویل ADP؛ تا دریافت نمونه واقعی خالی می‌ماند.</summary>
+    public Dictionary<string, AdpDeliveryStatusKind> DeliveryStatusMappings { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>قالب‌های قابل تنظیم برای رویدادهای پیامکی.</summary>
     public List<SmsEventTemplateConfiguration> EventTemplates { get; set; } = [];
 

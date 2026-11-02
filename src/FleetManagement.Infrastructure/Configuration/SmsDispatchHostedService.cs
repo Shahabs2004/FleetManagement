@@ -190,12 +190,29 @@ public sealed class SmsDispatchHostedService(
                 var result = statuses.FirstOrDefault(status => status.Id == item.ProviderMessageId);
                 if (result is null || string.IsNullOrWhiteSpace(result.Status))
                 {
+                    logger.LogWarning(
+                        "وضعیت تحویل ADP برای پیامک {QueueItemId} در پاسخ وجود نداشت؛ وضعیت «نامشخص» ثبت می‌شود.",
+                        item.Id);
                     item.DeferStatusPoll(DateTimeOffset.UtcNow, configuration.StatusPollingIntervalSeconds);
                     await db.SaveChangesAsync(cancellationToken);
                     continue;
                 }
 
-                item.RecordDeliveryStatus(result.Status, IsDeliveredStatus(result.Status), DateTimeOffset.UtcNow,
+                var mappedStatus = AdpDeliveryStatusMapper.Map(
+                    result.Status,
+                    configuration.DeliveryStatusMappings);
+                if (mappedStatus == AdpDeliveryStatusKind.Unknown)
+                {
+                    logger.LogWarning(
+                        "وضعیت تحویل ADP برای پیامک {QueueItemId} ناشناخته است؛ وضعیت خام {ProviderStatus} به «نامشخص» نگاشت شد.",
+                        item.Id,
+                        result.Status);
+                }
+
+                item.RecordDeliveryStatus(
+                    result.Status,
+                    mappedStatus == AdpDeliveryStatusKind.Delivered,
+                    DateTimeOffset.UtcNow,
                     configuration.StatusPollingIntervalSeconds);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -215,7 +232,5 @@ public sealed class SmsDispatchHostedService(
         }
     }
 
-    public static bool IsDeliveredStatus(string status) =>
-        string.Equals(status.Trim(), "Delivered", StringComparison.OrdinalIgnoreCase)
-        || string.Equals(status.Trim(), "DELIVRD", StringComparison.OrdinalIgnoreCase);
+
 }
