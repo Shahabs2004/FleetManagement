@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FleetManagement.Application.Notifications;
 using FleetManagement.Domain.Locations;
 using FleetManagement.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +12,8 @@ namespace FleetManagement.Infrastructure.Configuration;
 public sealed class LocationManagementService(
     IDbContextFactory<FleetDbContext> dbContextFactory,
     AuditLogService auditLog,
-    NotificationService notificationService)
+    NotificationService notificationService,
+    IFleetDataChangePublisher dataChangePublisher)
 {
     /// <summary>دریافت مکان‌های تأییدشده برای انتخاب در فرم مأموریت.</summary>
     public async Task<IReadOnlyList<Location>> GetApprovedAsync(CancellationToken cancellationToken = default)
@@ -66,6 +68,7 @@ public sealed class LocationManagementService(
             proposer, "Propose", "Location", location.Id.ToString(), "Success",
             afterJson: JsonSerializer.Serialize(new { location.Name, location.Status }),
             cancellationToken: cancellationToken);
+        await dataChangePublisher.PublishAsync(FleetDataChangeKind.Locations, cancellationToken);
         await notificationService.CreateForRolesAsync(
             ["SystemAdministrator"],
             "پیشنهاد مکان جدید",
@@ -96,6 +99,7 @@ public sealed class LocationManagementService(
             beforeJson: JsonSerializer.Serialize(new { Name = before }),
             afterJson: JsonSerializer.Serialize(new { location.Name, location.Status }),
             cancellationToken: cancellationToken);
+        await dataChangePublisher.PublishAsync(FleetDataChangeKind.Locations, cancellationToken);
     }
 
     /// <summary>رد پیشنهاد مکان با علت.</summary>
@@ -114,6 +118,7 @@ public sealed class LocationManagementService(
             reviewer, "Reject", "Location", location.Id.ToString(), "Rejected", reason,
             afterJson: JsonSerializer.Serialize(new { location.Name, location.Status }),
             cancellationToken: cancellationToken);
+        await dataChangePublisher.PublishAsync(FleetDataChangeKind.Locations, cancellationToken);
     }
 
     /// <summary>اصلاح نام مکان تأییدشده.</summary>
@@ -134,6 +139,7 @@ public sealed class LocationManagementService(
             beforeJson: JsonSerializer.Serialize(new { Name = before }),
             afterJson: JsonSerializer.Serialize(new { location.Name }),
             cancellationToken: cancellationToken);
+        await dataChangePublisher.PublishAsync(FleetDataChangeKind.Locations, cancellationToken);
     }
 
     /// <summary>غیرفعال‌سازی مکان بدون حذف سوابق مأموریت.</summary>
@@ -151,6 +157,7 @@ public sealed class LocationManagementService(
             reviewer, "Deactivate", "Location", location.Id.ToString(), "Success",
             afterJson: JsonSerializer.Serialize(new { location.Name, location.Status }),
             cancellationToken: cancellationToken);
+        await dataChangePublisher.PublishAsync(FleetDataChangeKind.Locations, cancellationToken);
     }
 
     private static async Task<Location> GetLocationAsync(
