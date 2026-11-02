@@ -6,6 +6,7 @@ using FleetManagement.Domain.Missions;
 using FleetManagement.Domain.Vehicles;
 using FleetManagement.Infrastructure.Configuration;
 using FleetManagement.Infrastructure.Persistence;
+using FleetManagement.Infrastructure.Persistence.Migrations;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
