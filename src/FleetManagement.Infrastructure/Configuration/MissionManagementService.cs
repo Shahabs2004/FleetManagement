@@ -18,7 +18,7 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// </summary>
 public sealed class MissionManagementService(
     IDbContextFactory<FleetDbContext> dbContextFactory,
-    ISystemSettingsStore settingsStore,
+    IMissionRulesService missionRulesService,
     AuditLogService auditLog,
     NotificationService notificationService,
     SmsQueueService smsQueueService,
@@ -31,40 +31,16 @@ public sealed class MissionManagementService(
     IMissionLifecycleProcessorService lifecycleProcessorService,
     IMissionQueryService queryService)
 {
-    private const string RulesKey = "Missions.Rules";
+    /// <summary>خواندن قواعد برنامه‌ریزی مأموریت از سناریوی کاربردی.</summary>
+    public Task<MissionRulesConfiguration> GetRulesAsync(CancellationToken cancellationToken = default)
+        => missionRulesService.GetRulesAsync(cancellationToken);
 
-    /// <summary>خواندن قواعد برنامه‌ریزی مأموریت.</summary>
-    public async Task<MissionRulesConfiguration> GetRulesAsync(CancellationToken cancellationToken = default)
-    {
-        var rules = await settingsStore.GetAsync<MissionRulesConfiguration>(RulesKey, cancellationToken)
-            ?? MissionRulesConfiguration.CreateDefault();
-
-        if (rules.MinimumGapHours is < 0 or > 24 || rules.BookingHorizonDays is < 1 or > 730)
-        {
-            throw new InvalidOperationException("قواعد برنامه‌ریزی مأموریت در تنظیمات معتبر نیست.");
-        }
-
-        return rules;
-    }
-
-    /// <summary>ذخیره قواعد فاصله بین مأموریت‌ها و افق رزرو.</summary>
-    public async Task SaveRulesAsync(
+    /// <summary>ذخیره قواعد برنامه‌ریزی مأموریت از سناریوی کاربردی.</summary>
+    public Task SaveRulesAsync(
         MissionRulesConfiguration rules,
         string actor,
         CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(rules);
-        if (rules.MinimumGapHours is < 0 or > 24 || rules.BookingHorizonDays is < 1 or > 730)
-        {
-            throw new ArgumentOutOfRangeException(nameof(rules), "مقادیر قواعد مأموریت خارج از محدوده مجاز هستند.");
-        }
-
-        await settingsStore.SetAsync(RulesKey, rules, cancellationToken);
-        await auditLog.RecordAsync(
-            actor, "UpdateRules", "MissionRules", null, "Success",
-            afterJson: JsonSerializer.Serialize(rules),
-            cancellationToken: cancellationToken);
-    }
+        => missionRulesService.SaveRulesAsync(rules, actor, cancellationToken);
 
     /// <summary>ثبت درخواست تغییر مأموریت؛ اجرای سناریو در سرویس تخصصی تغییر انجام می‌شود.</summary>
     public Task<Guid> RequestChangeAsync(
