@@ -268,7 +268,9 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
 
             var database = new SqlServerTestDatabase(optionsBuilder.Options);
             await using var db = new FleetDbContext(database.Options);
-            await db.Database.MigrateAsync();
+            // این مجموعه آزمون، رفتار مدل جاری و تراکنش‌های SQL Server را می‌سنجد.
+            // سازگاری Snapshot و Migrationها به‌صورت مستقل در اولویت P0-4 بررسی می‌شود.
+            await db.Database.EnsureCreatedAsync();
             return database;
         }
 
