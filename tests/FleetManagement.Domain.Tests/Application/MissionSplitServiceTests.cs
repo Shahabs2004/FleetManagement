@@ -45,7 +45,7 @@ public sealed class MissionSplitServiceTests
         Assert.Equal(125, second.OdometerStartKm);
         Assert.Equal(second.Id, first.RelatedMissionId);
         Assert.Equal(first.Id, second.RelatedMissionId);
-        Assert.Equal(["SplitFirstSegment", "SplitSecondSegment"], audit.Actions);
+        Assert.Equal(new[] { "SplitFirstSegment", "SplitSecondSegment" }, audit.Actions);
         Assert.Equal("MissionSplit", notifications.EventKey);
     }
 
@@ -244,8 +244,19 @@ public sealed class MissionSplitServiceTests
     private static Driver CreateDriver() => new("راننده", "آزمون", "09120000000");
     private static Vehicle CreateVehicle() => new("ایران‌خودرو", "سمند", "۱۲ الف ۳۴۵ ایران ۶۷");
 
-    private sealed class FakeStore(Mission mission, Driver driver, Vehicle vehicle) : IMissionSplitStore
+    private sealed class FakeStore : IMissionSplitStore
     {
+        private readonly Mission _mission;
+        private readonly Driver _driver;
+        private readonly Vehicle _vehicle;
+
+        public FakeStore(Mission mission, Driver driver, Vehicle vehicle)
+        {
+            _mission = mission;
+            _driver = driver;
+            _vehicle = vehicle;
+        }
+
         public bool Committed { get; private set; }
         public Mission? AddedMission { get; private set; }
         public long? LastOdometerEndKm { get; init; }
@@ -263,13 +274,13 @@ public sealed class MissionSplitServiceTests
         private sealed class FakeUnitOfWork(FakeStore owner) : IMissionSplitUnitOfWork
         {
             public Task<Mission?> GetMissionAsync(Guid missionId, CancellationToken cancellationToken = default) =>
-                Task.FromResult<Mission?>(ownerMission(owner).Id == missionId ? ownerMission(owner) : null);
+                Task.FromResult<Mission?>(owner._mission.Id == missionId ? owner._mission : null);
 
             public Task<Driver?> GetDriverAsync(Guid driverId, CancellationToken cancellationToken = default) =>
-                Task.FromResult<Driver?>(ownerDriver(owner).Id == driverId ? ownerDriver(owner) : null);
+                Task.FromResult<Driver?>(owner._driver.Id == driverId ? owner._driver : null);
 
             public Task<Vehicle?> GetVehicleAsync(Guid vehicleId, CancellationToken cancellationToken = default) =>
-                Task.FromResult<Vehicle?>(ownerVehicle(owner).Id == vehicleId ? ownerVehicle(owner) : null);
+                Task.FromResult<Vehicle?>(owner._vehicle.Id == vehicleId ? owner._vehicle : null);
 
             public Task<long?> GetLastOdometerEndAsync(Guid vehicleId, CancellationToken cancellationToken = default) =>
                 Task.FromResult(owner.LastOdometerEndKm);
@@ -284,12 +295,8 @@ public sealed class MissionSplitServiceTests
                 CancellationToken cancellationToken = default) =>
                 Task.FromResult(owner.Candidates);
 
-            public void Add(Mission value) => owner.AddedMission = value;
+            public void Add(Mission mission) => owner.AddedMission = mission;
             public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-            private static Mission ownerMission(FakeStore store) => store.mission;
-            private static Driver ownerDriver(FakeStore store) => store.driver;
-            private static Vehicle ownerVehicle(FakeStore store) => store.vehicle;
         }
     }
 
