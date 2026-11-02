@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FleetManagement.Application.Authorization;
 using FleetManagement.Application.Configuration;
 
 namespace FleetManagement.Infrastructure.Configuration;
@@ -74,6 +75,7 @@ public sealed class AuthorizationSettingsService(
 
         if (configuration.Roles.Any(role => role.Permissions.Any(permission =>
                 string.IsNullOrWhiteSpace(permission.Permission)
+                || !PermissionCatalog.Contains(permission.Permission)
                 || !Enum.IsDefined(permission.Effect))))
         {
             throw new ArgumentException("قاعده مجوز یکی از نقش‌ها معتبر نیست.", nameof(configuration));
@@ -99,6 +101,7 @@ public sealed class AuthorizationSettingsService(
                 || mapping.Permissions.Count == 0
                 || mapping.Permissions.Any(permission =>
                     string.IsNullOrWhiteSpace(permission.Permission)
+                    || !PermissionCatalog.Contains(permission.Permission)
                     || !Enum.IsDefined(permission.Effect))))
         {
             throw new ArgumentException("مجوز مستقیم یکی از کاربران معتبر نیست.", nameof(configuration));
