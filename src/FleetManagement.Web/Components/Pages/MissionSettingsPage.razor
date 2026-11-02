@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "SystemAdministrator")]
 @using FleetManagement.Infrastructure.Configuration
+@using FleetManagement.Application.Configuration
 @using Microsoft.AspNetCore.Components.Authorization
 @inject MissionManagementService MissionService
 @inject AuthenticationStateProvider AuthenticationStateProvider
