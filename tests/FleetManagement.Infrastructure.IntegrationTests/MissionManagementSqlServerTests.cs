@@ -177,7 +177,7 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
             splitAt,
             firstSegmentOdometerEndKm: 125,
             secondVehicleOdometerStartKm: null,
-            MissionSplitReason.DriverChange,
+            splitReason: MissionSplitReason.DriverChange,
             explanation: null,
             actor: "integration-test");
 
@@ -189,8 +189,8 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         Assert.Equal(MissionStatus.Running, second.Status);
         Assert.Equal(splitAt, first.PlannedEndAtUtc);
         Assert.Equal(splitAt, second.PlannedStartAtUtc);
-        Assert.Equal(125, first.OdometerEndKm);
-        Assert.Equal(125, second.OdometerStartKm);
+        Assert.Equal(125L, first.OdometerEndKm);
+        Assert.Equal(125L, second.OdometerStartKm);
         Assert.Equal(second.Id, first.RelatedMissionId);
         Assert.Equal(first.Id, second.RelatedMissionId);
         Assert.Equal(resources.DriverIds[0], first.DriverId);
@@ -358,7 +358,7 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         Assert.Equal(resources.VehicleIds[1], changed.VehicleId);
         Assert.Equal("مبدأ تأییدشده", changed.Origin);
         Assert.Equal("مقصد تأییدشده", changed.Destination);
-        Assert.Equal(500, changed.OdometerStartKm);
+        Assert.Equal(500L, changed.OdometerStartKm);
         Assert.Equal(MissionChangeRequestStatus.Approved, approved.Status);
     }
 
@@ -385,8 +385,8 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         await using var db = await _factory.CreateDbContextAsync();
         var first = await db.Missions.SingleAsync(item => item.Id == firstId);
         var second = await db.Missions.SingleAsync(item => item.Id == secondId);
-        Assert.Equal(150, first.OdometerEndKm);
-        Assert.Equal(160, second.OdometerStartKm);
+        Assert.Equal(150L, first.OdometerEndKm);
+        Assert.Equal(160L, second.OdometerStartKm);
     }
 
     /// <summary>ایجاد درخواست و تخصیص منابع برای سناریوهای چرخه عمر.</summary>
