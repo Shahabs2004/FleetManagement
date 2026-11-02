@@ -1,6 +1,7 @@
 @page "/drivers"
+@using FleetManagement.Application.Authorization
 @rendermode InteractiveServer
-@attribute [FleetPermission("drivers.view")]
+@attribute [FleetPermission(PermissionCatalog.Drivers.View)]
 @using FleetManagement.Domain.Drivers
 @using FleetManagement.Domain.Vehicles
 @using FleetManagement.Infrastructure.Configuration
@@ -45,7 +46,7 @@
         <div class="setup-error">@_error</div>
     }
 
-    <AuthorizeView Policy="Permission:drivers.manage">
+    <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Drivers.Manage)">
         <Authorized Context="driverManageContext">
     <section class="driver-editor">
         <h2>@(_editingId.HasValue ? "ویرایش راننده" : "ثبت راننده جدید")</h2>
@@ -119,7 +120,7 @@
                             <td>@GetStatusName(driver.EmploymentStatus)</td>
                             <td>@(driver.IsArchived ? "بایگانی‌شده" : "فعال")</td>
                             <td>
-                                <AuthorizeView Policy="Permission:drivers.default-vehicle.manage">
+                                <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Drivers.DefaultVehicleManage)">
                                     <Authorized Context="defaultVehiclePermissionContext">
                                         <select value="@GetDefaultVehicleSelection(driver.Id)"
                                                 @onchange="args => SetDefaultVehicleAsync(driver.Id, args)"
@@ -132,7 +133,7 @@
                                         </select>
                                     </Authorized>
                                     <NotAuthorized>
-                                        <AuthorizeView Policy="Permission:vehicles.view">
+                                        <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Vehicles.View)">
                                             <Authorized Context="vehicleViewPermissionContext">
                                                 @GetDefaultVehicleName(driver.Id)
                                             </Authorized>
@@ -142,7 +143,7 @@
                                 </AuthorizeView>
                             </td>
                             <td>
-                                <AuthorizeView Policy="Permission:drivers.manage">
+                                <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Drivers.Manage)">
                                     <Authorized Context="driverActionsContext">
                                         <button type="button" class="secondary-button" @onclick="() => Edit(driver)">ویرایش</button>
                                         @if (!driver.IsArchived)
@@ -231,7 +232,7 @@
     /// <summary>ثبت یا حذف خودروی پیش‌فرض راننده.</summary>
     private async Task SetDefaultVehicleAsync(Guid driverId, ChangeEventArgs args)
     {
-        if (!await HasPermissionAsync("Permission:drivers.default-vehicle.manage"))
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Drivers.DefaultVehicleManage)))
         {
             return;
         }
@@ -277,7 +278,7 @@
     /// <summary>ثبت راننده جدید یا ذخیره تغییرات راننده موجود.</summary>
     private async Task SaveAsync()
     {
-        if (!await HasPermissionAsync("Permission:drivers.manage"))
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Drivers.Manage)))
         {
             return;
         }
@@ -322,7 +323,7 @@
     /// <summary>بایگانی راننده بدون حذف اطلاعات او.</summary>
     private async Task ArchiveAsync(Guid driverId)
     {
-        if (!await HasPermissionAsync("Permission:drivers.manage"))
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Drivers.Manage)))
         {
             return;
         }
@@ -347,7 +348,7 @@
     /// <summary>بازگرداندن راننده بایگانی‌شده.</summary>
     private async Task ReactivateAsync(Guid driverId)
     {
-        if (!await HasPermissionAsync("Permission:drivers.manage"))
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Drivers.Manage)))
         {
             return;
         }
