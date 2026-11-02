@@ -1,6 +1,6 @@
 @page "/admin/directory-settings"
 @rendermode InteractiveServer
-@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "SystemAdministrator")]
+@attribute [FleetPermission(PermissionCatalog.Administration.SystemManage)]
 @using FleetManagement.Infrastructure.Configuration
 @using Microsoft.AspNetCore.Components.Forms
 @inject ActiveDirectorySettingsService DirectorySettings
