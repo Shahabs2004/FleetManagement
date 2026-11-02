@@ -122,7 +122,7 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
             entity.Property<string>("DirectoryGroupsJson")
                 .IsRequired()
                 .HasMaxLength(12000)
-                .HasColumnType("nvarchar(12000)");
+                .HasColumnType("nvarchar(max)");
 
             entity.Property<string>("DirectoryDistinguishedName")
                 .IsRequired()
@@ -150,7 +150,7 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
             entity.Property<Guid>("MissionId").HasColumnType("uniqueidentifier");
             entity.Property<string>("RequesterUsername").IsRequired().HasMaxLength(64).HasColumnType("nvarchar(64)");
             entity.Property<string>("Reason").IsRequired().HasMaxLength(1000).HasColumnType("nvarchar(1000)");
-            entity.Property<string>("ProposedValuesJson").IsRequired().HasMaxLength(12000).HasColumnType("nvarchar(12000)");
+            entity.Property<string>("ProposedValuesJson").IsRequired().HasMaxLength(12000).HasColumnType("nvarchar(max)");
             entity.Property<int>("Status").HasColumnType("int");
             entity.Property<string>("ReviewerUsername").HasMaxLength(64).HasColumnType("nvarchar(64)");
             entity.Property<DateTimeOffset?>("ReviewStartedAtUtc").HasColumnType("datetimeoffset");
@@ -179,7 +179,7 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
             entity.Property<Guid>("MissionId").HasColumnType("uniqueidentifier");
             entity.Property<string>("RequesterUsername").IsRequired().HasMaxLength(64).HasColumnType("nvarchar(64)");
             entity.Property<string>("Reason").IsRequired().HasMaxLength(1000).HasColumnType("nvarchar(1000)");
-            entity.Property<string>("ProposedValuesJson").IsRequired().HasMaxLength(12000).HasColumnType("nvarchar(12000)");
+            entity.Property<string>("ProposedValuesJson").IsRequired().HasMaxLength(12000).HasColumnType("nvarchar(max)");
             entity.Property<int>("Status").HasColumnType("int");
             entity.Property<string>("ReviewerUsername").HasMaxLength(64).HasColumnType("nvarchar(64)");
             entity.Property<DateTimeOffset?>("ReviewStartedAtUtc").HasColumnType("datetimeoffset");
@@ -377,11 +377,11 @@ public sealed class FleetDbContextModelSnapshot : ModelSnapshot
 
             entity.Property<string>("BeforeJson")
                 .HasMaxLength(12000)
-                .HasColumnType("nvarchar(12000)");
+                .HasColumnType("nvarchar(max)");
 
             entity.Property<string>("AfterJson")
                 .HasMaxLength(12000)
-                .HasColumnType("nvarchar(12000)");
+                .HasColumnType("nvarchar(max)");
 
             entity.Property<string>("ClientIpAddress")
                 .HasMaxLength(45)
