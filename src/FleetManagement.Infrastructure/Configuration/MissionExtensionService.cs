@@ -15,27 +15,12 @@ namespace FleetManagement.Infrastructure.Configuration;
 /// </summary>
 public sealed class MissionExtensionService(
     IDbContextFactory<FleetDbContext> dbContextFactory,
-    ISystemSettingsStore settingsStore,
+    IMissionRulesService rulesService,
     AuditLogService auditLog,
     NotificationService notificationService,
     SmsQueueService smsQueueService,
     ILogger<MissionExtensionService> logger) : IMissionExtensionService
 {
-    private const string RulesKey = "Missions.Rules";
-
-    private async Task<MissionRulesConfiguration> GetRulesAsync(CancellationToken cancellationToken = default)
-    {
-        var rules = await settingsStore.GetAsync<MissionRulesConfiguration>(RulesKey, cancellationToken)
-            ?? MissionRulesConfiguration.CreateDefault();
-
-        if (rules.MinimumGapHours is < 0 or > 24 || rules.BookingHorizonDays is < 1 or > 730)
-        {
-            throw new InvalidOperationException("قواعد برنامه‌ریزی مأموریت در تنظیمات معتبر نیست.");
-        }
-
-        return rules;
-    }
-
     public async Task ExtendAsync(
         Guid missionId,
         DateTimeOffset newEndAtUtc,
@@ -43,7 +28,7 @@ public sealed class MissionExtensionService(
         string actor,
         CancellationToken cancellationToken = default)
     {
-        var rules = await GetRulesAsync(cancellationToken);
+        var rules = await rulesService.GetRulesAsync(cancellationToken);
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var mission = await GetMissionAsync(db, missionId, cancellationToken);
