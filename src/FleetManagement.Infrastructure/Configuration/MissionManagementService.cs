@@ -28,7 +28,8 @@ public sealed class MissionManagementService(
     IMissionSplitService splitService,
     IMissionWithdrawalService withdrawalService,
     IMissionRequestService requestService,
-    IMissionLifecycleProcessorService lifecycleProcessorService)
+    IMissionLifecycleProcessorService lifecycleProcessorService,
+    IMissionQueryService queryService)
 {
     private const string RulesKey = "Missions.Rules";
 
@@ -274,76 +275,28 @@ public sealed class MissionManagementService(
     public Task<int> ProcessDueMissionsAsync(CancellationToken cancellationToken = default)
         => lifecycleProcessorService.ProcessDueMissionsAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<Mission>> GetTimelineAsync(
+    /// <summary>دریافت بازه زمانی مأموریت‌ها.</summary>
+    public Task<IReadOnlyList<Mission>> GetTimelineAsync(
         DateTimeOffset fromUtc,
         DateTimeOffset toUtc,
         int take = 1000,
         CancellationToken cancellationToken = default)
-    {
-        if (toUtc <= fromUtc)
-        {
-            throw new ArgumentException("پایان بازه باید بعد از شروع آن باشد.");
-        }
+        => queryService.GetTimelineAsync(fromUtc, toUtc, take, cancellationToken);
 
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+    /// <summary>دریافت مأموریت بر اساس شناسه.</summary>
+    public Task<Mission> GetByIdAsync(Guid missionId, CancellationToken cancellationToken = default)
+        => queryService.GetByIdAsync(missionId, cancellationToken);
 
-        return await db.Missions
-            .AsNoTracking()
-            .Where(mission => mission.DriverId.HasValue
-                && mission.PlannedStartAtUtc < toUtc
-                && mission.PlannedEndAtUtc > fromUtc)
-            .OrderBy(mission => mission.PlannedStartAtUtc)
-            .Take(Math.Clamp(take, 1, 2000))
-            .ToListAsync(cancellationToken);
-    }
-
-    /// <summary>دریافت یک مأموریت با شناسه برای نمایش جزئیات و چاپ دستور.</summary>
-    public async Task<Mission> GetByIdAsync(Guid missionId, CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await GetMissionAsync(db, missionId, cancellationToken);
-    }
-
-    /// <summary>جست‌وجوی مأموریت‌ها؛ درخواست‌کننده فقط سوابق خود را دریافت می‌کند.</summary>
-    public async Task<IReadOnlyList<Mission>> SearchAsync(
+    /// <summary>جست‌وجوی مأموریت‌ها بر اساس فیلترهای درخواست‌کننده، وضعیت و تاریخ.</summary>
+    public Task<IReadOnlyList<Mission>> SearchAsync(
         string? requesterUsername = null,
         MissionStatus? status = null,
         DateTimeOffset? fromUtc = null,
         DateTimeOffset? toUtc = null,
         int take = 200,
         CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var query = db.Missions.AsNoTracking();
+        => queryService.SearchAsync(requesterUsername, status, fromUtc, toUtc, take, cancellationToken);
 
-        if (!string.IsNullOrWhiteSpace(requesterUsername))
-        {
-            query = query.Where(mission => mission.RequesterUsername == requesterUsername);
-        }
-
-        if (status.HasValue)
-        {
-            query = query.Where(mission => mission.Status == status.Value);
-        }
-
-        if (fromUtc.HasValue)
-        {
-            query = query.Where(mission => mission.PlannedStartAtUtc >= fromUtc.Value);
-        }
-
-        if (toUtc.HasValue)
-        {
-            query = query.Where(mission => mission.PlannedStartAtUtc <= toUtc.Value);
-        }
-
-        return await query
-            .OrderByDescending(mission => mission.CreatedAtUtc)
-            .Take(Math.Clamp(take, 1, 500))
-            .ToListAsync(cancellationToken);
-    }
-
-    /// <summary>تولید شماره یکتای سالانه بر اساس تقویم جلالی در تراکنش سریال‌پذیر.</summary>
-    /// <summary>بررسی هم‌پوشانی یا فاصله ناکافی برای راننده و خودرو.</summary>
     private static async Task<bool> HasResourceConflictAsync(
         FleetDbContext db,
         Mission current,
