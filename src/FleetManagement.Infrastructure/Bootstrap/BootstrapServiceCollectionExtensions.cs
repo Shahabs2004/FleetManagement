@@ -1,4 +1,5 @@
 using FleetManagement.Application.Configuration;
+using FleetManagement.Application.Missions;
 using FleetManagement.Infrastructure.Configuration;
 using FleetManagement.Infrastructure.Persistence;
 using FleetManagement.Infrastructure.Reporting;
@@ -41,6 +42,7 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<DriverManagementService>();
         services.AddScoped<DriverVehiclePreferenceService>();
         services.AddScoped<VehicleManagementService>();
+        services.AddScoped<IMissionChangeManagementService, MissionChangeManagementService>();
         services.AddScoped<MissionManagementService>();
         services.AddScoped<MissionOrderTemplateService>();
         services.AddHostedService<MissionLifecycleHostedService>();
