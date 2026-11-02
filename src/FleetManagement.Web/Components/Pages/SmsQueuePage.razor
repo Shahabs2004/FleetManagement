@@ -1,6 +1,7 @@
 @page "/admin/sms"
+@using FleetManagement.Application.Authorization
 @rendermode InteractiveServer
-@attribute [FleetPermission("notifications.sms.view")]
+@attribute [FleetPermission(PermissionCatalog.Notifications.SmsView)]
 @using System.Globalization
 @using Microsoft.AspNetCore.Components.Authorization
 @using FleetManagement.Domain.Notifications
@@ -99,7 +100,7 @@
                             <td>
                                 @if (item.Status is SmsQueueStatus.Failed or SmsQueueStatus.PermanentFailure)
                                 {
-                                    <AuthorizeView Policy="Permission:notifications.sms.retry">
+                                    <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Notifications.SmsRetry)">
                                         <Authorized Context="retryPermissionContext">
                                             <input class="sms-retry-reason"
                                                    value="@GetRetryReason(item.Id)"
