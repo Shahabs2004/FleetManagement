@@ -1,7 +1,8 @@
 @page "/timeline"
+@using FleetManagement.Application.Authorization
 @rendermode InteractiveServer
 @implements IDisposable
-@attribute [FleetPermission("missions.timeline.view")]
+@attribute [FleetPermission(PermissionCatalog.Missions.TimelineView)]
 @using System.Globalization
 @using FleetManagement.Domain.Drivers
 @using FleetManagement.Domain.Missions
