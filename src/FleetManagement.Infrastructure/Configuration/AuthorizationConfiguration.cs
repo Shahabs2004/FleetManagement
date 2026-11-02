@@ -1,3 +1,5 @@
+using FleetManagement.Application.Authorization;
+
 namespace FleetManagement.Infrastructure.Configuration;
 
 /// <summary>
@@ -32,7 +34,7 @@ public sealed class AuthorizationConfiguration
                     Name = "مدیر سامانه",
                     Description = "دسترسی کامل به همه بخش‌ها و تنظیمات سامانه.",
                     IsSystemRole = true,
-                    Permissions = [new() { Permission = "*", Effect = PermissionEffect.Grant }]
+                    Permissions = [new() { Permission = PermissionCatalog.All, Effect = PermissionEffect.Grant }]
                 },
                 new()
                 {
@@ -42,15 +44,16 @@ public sealed class AuthorizationConfiguration
                     IsSystemRole = true,
                     Permissions =
                     [
-                        new() { Permission = "drivers.*" },
-                        new() { Permission = "drivers.default-vehicle.manage" },
-                        new() { Permission = "vehicles.*" },
-                        new() { Permission = "missions.*" },
-                        new() { Permission = "reports.view" },
-                        new() { Permission = "reports.export" },
-                        new() { Permission = "missions.timeline.view" },
-                        new() { Permission = "notifications.view" },
-                        new() { Permission = "dashboard.view" }
+                        new() { Permission = PermissionCatalog.Drivers.All },
+                        new() { Permission = PermissionCatalog.Drivers.DefaultVehicleManage },
+                        new() { Permission = PermissionCatalog.Vehicles.All },
+                        new() { Permission = PermissionCatalog.Missions.All },
+                        new() { Permission = PermissionCatalog.Missions.SplitScheduleEdit },
+                        new() { Permission = PermissionCatalog.Reports.View },
+                        new() { Permission = PermissionCatalog.Reports.Export },
+                        new() { Permission = PermissionCatalog.Missions.TimelineView },
+                        new() { Permission = PermissionCatalog.Notifications.View },
+                        new() { Permission = PermissionCatalog.Dashboard.View }
                     ]
                 },
                 new()
@@ -61,22 +64,24 @@ public sealed class AuthorizationConfiguration
                     IsSystemRole = true,
                     Permissions =
                     [
-                        new() { Permission = "drivers.view" },
-                        new() { Permission = "vehicles.view" },
-                        new() { Permission = "missions.view" },
-                        new() { Permission = "missions.view.own" },
-                        new() { Permission = "missions.review" },
-                        new() { Permission = "missions.print" },
-                        new() { Permission = "missions.create" },
-                        new() { Permission = "missions.edit" },
-                        new() { Permission = "missions.approve" },
-                        new() { Permission = "missions.reject" },
-                        new() { Permission = "missions.cancel" },
-                        new() { Permission = "missions.extend" },
-                        new() { Permission = "missions.split" },
-                        new() { Permission = "missions.timeline.view" },
-                        new() { Permission = "notifications.view" },
-                        new() { Permission = "dashboard.view" }
+                        new() { Permission = PermissionCatalog.Drivers.View },
+                        new() { Permission = PermissionCatalog.Vehicles.View },
+                        new() { Permission = PermissionCatalog.Missions.View },
+                        new() { Permission = PermissionCatalog.Missions.ViewOwn },
+                        new() { Permission = PermissionCatalog.Missions.Review },
+                        new() { Permission = PermissionCatalog.Missions.Print },
+                        new() { Permission = PermissionCatalog.Missions.Create },
+                        new() { Permission = PermissionCatalog.Missions.Edit },
+                        new() { Permission = PermissionCatalog.Missions.Approve },
+                        new() { Permission = PermissionCatalog.Missions.Reject },
+                        new() { Permission = PermissionCatalog.Missions.Cancel },
+                        new() { Permission = PermissionCatalog.Missions.Extend },
+                        new() { Permission = PermissionCatalog.Missions.Split },
+                        new() { Permission = PermissionCatalog.Missions.TimelineView },
+                        new() { Permission = PermissionCatalog.Missions.OdometerManage },
+                        new() { Permission = PermissionCatalog.Missions.ChangeReview },
+                        new() { Permission = PermissionCatalog.Notifications.View },
+                        new() { Permission = PermissionCatalog.Dashboard.View }
                     ]
                 },
                 new()
@@ -87,10 +92,10 @@ public sealed class AuthorizationConfiguration
                     IsSystemRole = true,
                     Permissions =
                     [
-                        new() { Permission = "drivers.view" },
-                        new() { Permission = "vehicles.view" },
-                        new() { Permission = "missions.view" },
-                        new() { Permission = "dashboard.view" }
+                        new() { Permission = PermissionCatalog.Drivers.View },
+                        new() { Permission = PermissionCatalog.Vehicles.View },
+                        new() { Permission = PermissionCatalog.Missions.View },
+                        new() { Permission = PermissionCatalog.Dashboard.View }
                     ]
                 },
                 new()
@@ -101,11 +106,11 @@ public sealed class AuthorizationConfiguration
                     IsSystemRole = true,
                     Permissions =
                     [
-                        new() { Permission = "missions.view.own" },
-                        new() { Permission = "missions.create" },
-                        new() { Permission = "missions.print" },
-                        new() { Permission = "notifications.view" },
-                        new() { Permission = "dashboard.view" }
+                        new() { Permission = PermissionCatalog.Missions.ViewOwn },
+                        new() { Permission = PermissionCatalog.Missions.Create },
+                        new() { Permission = PermissionCatalog.Missions.Print },
+                        new() { Permission = PermissionCatalog.Notifications.View },
+                        new() { Permission = PermissionCatalog.Dashboard.View }
                     ]
                 }
             ]

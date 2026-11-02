@@ -1,6 +1,6 @@
 @page "/admin/users"
 @rendermode InteractiveServer
-@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "SystemAdministrator")]
+@attribute [FleetPermission(PermissionCatalog.Administration.UsersManage)]
 @using FleetManagement.Domain.Users
 @using FleetManagement.Infrastructure.Configuration
 @using Microsoft.AspNetCore.Components.Authorization

@@ -1,7 +1,8 @@
 @page "/missions"
+@using FleetManagement.Application.Authorization
 @rendermode InteractiveServer
 @implements IDisposable
-@attribute [FleetPermission("missions.view.own")]
+@attribute [FleetPermission(PermissionCatalog.Missions.ViewOwn)]
 @using System.Globalization
 @using System.Security.Claims
 @using FleetManagement.Domain.Missions
@@ -35,7 +36,7 @@
         <div class="setup-error">@_error</div>
     }
 
-    <AuthorizeView Policy="Permission:missions.create">
+    <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Missions.Create)">
         <Authorized>
             <section class="driver-editor">
                 <h2>@(_editingMissionId.HasValue ? "ویرایش درخواست مأموریت" : "ثبت درخواست جدید")</h2>

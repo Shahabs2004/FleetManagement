@@ -1,6 +1,7 @@
 @page "/admin/session-settings"
+@using FleetManagement.Application.Authorization
 @rendermode InteractiveServer
-@attribute [FleetPermission("settings.sessions")]
+@attribute [FleetPermission(PermissionCatalog.Administration.SessionsManage)]
 @using Microsoft.AspNetCore.Components.Authorization
 @using FleetManagement.Infrastructure.Configuration
 @inject SessionPolicySettingsService PolicySettings

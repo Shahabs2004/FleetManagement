@@ -1,6 +1,7 @@
 @page "/reports/mileage"
+@using FleetManagement.Application.Authorization
 @rendermode InteractiveServer
-@attribute [FleetPermission("reports.view")]
+@attribute [FleetPermission(PermissionCatalog.Reports.View)]
 @using System.Globalization
 @using FleetManagement.Domain.Missions
 @using FleetManagement.Domain.Vehicles

@@ -1,6 +1,8 @@
 @page "/notifications"
+@using FleetManagement.Application.Authorization
+@using FleetManagement.Web.Security
 @rendermode InteractiveServer
-@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@attribute [FleetPermission(PermissionCatalog.Notifications.View)]
 @using System.Globalization
 @using FleetManagement.Domain.Notifications
 @using FleetManagement.Infrastructure.Configuration

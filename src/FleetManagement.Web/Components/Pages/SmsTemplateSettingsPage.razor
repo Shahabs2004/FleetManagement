@@ -1,6 +1,6 @@
 @page "/admin/sms-templates"
 @rendermode InteractiveServer
-@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "SystemAdministrator")]
+@attribute [FleetPermission(PermissionCatalog.Notifications.SmsTemplatesManage)]
 @using FleetManagement.Domain.Notifications
 @using FleetManagement.Infrastructure.Configuration
 @inject SmsSettingsService SmsSettings
