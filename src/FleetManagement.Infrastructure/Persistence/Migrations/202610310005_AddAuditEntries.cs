@@ -29,8 +29,8 @@ public sealed class AddAuditEntries : Migration
                 OccurredAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                 Outcome = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false),
                 Reason = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
-                BeforeJson = table.Column<string>(type: "nvarchar(12000)", maxLength: 12000, nullable: true),
-                AfterJson = table.Column<string>(type: "nvarchar(12000)", maxLength: 12000, nullable: true),
+                BeforeJson = table.Column<string>(type: "nvarchar(max)", maxLength: 12000, nullable: true),
+                AfterJson = table.Column<string>(type: "nvarchar(max)", maxLength: 12000, nullable: true),
                 ClientIpAddress = table.Column<string>(type: "nvarchar(45)", maxLength: 45, nullable: true)
             },
             constraints: table =>
