@@ -327,10 +327,9 @@ public sealed class Mission : Entity
     /// <summary>ثبت درخواست انصراف توسط درخواست‌کننده.</summary>
     public void RequestWithdrawal(string reason)
     {
-        if (Status is MissionStatus.Completed or MissionStatus.Cancelled or MissionStatus.Rejected
-            or MissionStatus.WithdrawalPending)
+        if (Status is not (MissionStatus.Confirmed or MissionStatus.Running))
         {
-            throw new InvalidOperationException("وضعیت فعلی امکان درخواست انصراف ندارد.");
+            throw new InvalidOperationException("فقط مأموریت تأییدشده یا در حال اجرا قابل درخواست انصراف است؛ درخواست تأییدنشده باید مستقیماً لغو شود.");
         }
 
         StatusBeforeWithdrawal = Status;
@@ -387,12 +386,13 @@ public sealed class Mission : Entity
         }
 
         DecisionReason = Required(reason, 1000, nameof(reason));
-        if (Status == MissionStatus.Running)
+        if (Status == MissionStatus.Running || StatusBeforeWithdrawal == MissionStatus.Running)
         {
             ActualEndAtUtc = nowUtc;
         }
 
         Status = MissionStatus.Cancelled;
+        StatusBeforeWithdrawal = null;
     }
 
     /// <summary>اصلاح اطلاعات درخواست تا پیش از شروع بررسی.</summary>
