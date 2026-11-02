@@ -142,6 +142,264 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         Assert.All(numbers, number => Assert.Matches(@"^\d{4}-\d{3,}$", number));
     }
 
+
+    [Fact]
+    public async Task تقسیم_مأموریت_دو_بخش_پیوسته_با_کیلومتر_و_منابع_مستقل_ایجاد_می‌کند()
+    {
+        var resources = await AddResourcesAsync(driverCount: 2, vehicleCount: 1);
+        var futureStart = FutureWholeHour();
+        var missionId = await CreateApprovedMissionAsync(
+            resources.DriverIds[0], resources.VehicleIds[0], futureStart, futureStart.AddHours(4));
+
+        // برای آزمون تقسیم، بازه مأموریت را به بازه‌ای گذشته منتقل می‌کنیم تا زمان تقسیم معتبر باشد.
+        var pastStart = futureStart.AddDays(-3);
+        var pastEnd = pastStart.AddHours(4);
+        await using (var db = await _factory.CreateDbContextAsync())
+        {
+            await db.Missions
+                .Where(item => item.Id == missionId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(item => item.PlannedStartAtUtc, pastStart)
+                    .SetProperty(item => item.PlannedEndAtUtc, pastEnd));
+
+            var mission = await db.Missions.SingleAsync(item => item.Id == missionId);
+            mission.StartAutomatically(DateTimeOffset.UtcNow);
+            mission.SetOdometerStart(100);
+            await db.SaveChangesAsync();
+        }
+
+        var splitAt = pastStart.AddHours(2);
+        var secondMissionId = await _service.SplitAsync(
+            missionId,
+            resources.DriverIds[1],
+            resources.VehicleIds[0],
+            splitAt,
+            firstSegmentOdometerEndKm: 125,
+            secondVehicleOdometerStartKm: null,
+            MissionSplitReason.DriverChange,
+            explanation: null,
+            actor: "integration-test");
+
+        await using var verify = await _factory.CreateDbContextAsync();
+        var first = await verify.Missions.SingleAsync(item => item.Id == missionId);
+        var second = await verify.Missions.SingleAsync(item => item.Id == secondMissionId);
+
+        Assert.Equal(MissionStatus.Completed, first.Status);
+        Assert.Equal(MissionStatus.Running, second.Status);
+        Assert.Equal(splitAt, first.PlannedEndAtUtc);
+        Assert.Equal(splitAt, second.PlannedStartAtUtc);
+        Assert.Equal(125, first.OdometerEndKm);
+        Assert.Equal(125, second.OdometerStartKm);
+        Assert.Equal(second.Id, first.RelatedMissionId);
+        Assert.Equal(first.Id, second.RelatedMissionId);
+        Assert.Equal(resources.DriverIds[0], first.DriverId);
+        Assert.Equal(resources.DriverIds[1], second.DriverId);
+        Assert.Equal(resources.VehicleIds[0], second.VehicleId);
+    }
+
+    [Fact]
+    public async Task انصراف_در_انتظار_منابع_را_رزرو_نگه_می‌دارد_و_تأیید_آن_منابع_را_آزاد_می‌کند()
+    {
+        var resources = await AddResourcesAsync(driverCount: 1, vehicleCount: 1);
+        var start = FutureWholeHour();
+        var end = start.AddHours(2);
+        var missionId = await CreateApprovedMissionAsync(
+            resources.DriverIds[0], resources.VehicleIds[0], start, end);
+        var competingRequest = await CreateRequestAsync(start, end, "درخواست رقیب");
+
+        await _service.RequestWithdrawalAsync(missionId, "integration.requester", "تغییر برنامه");
+
+        await using (var db = await _factory.CreateDbContextAsync())
+        {
+            var pending = await db.Missions.SingleAsync(item => item.Id == missionId);
+            Assert.Equal(MissionStatus.WithdrawalPending, pending.Status);
+        }
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.ApproveAsync(
+                competingRequest, resources.DriverIds[0], resources.VehicleIds[0], "integration-test"));
+
+        await _service.ApproveWithdrawalAsync(missionId, "fleet-reviewer");
+
+        await using (var db = await _factory.CreateDbContextAsync())
+        {
+            var cancelled = await db.Missions.SingleAsync(item => item.Id == missionId);
+            Assert.Equal(MissionStatus.Cancelled, cancelled.Status);
+        }
+
+        await _service.ApproveAsync(
+            competingRequest, resources.DriverIds[0], resources.VehicleIds[0], "integration-test");
+    }
+
+    [Fact]
+    public async Task رد_انصراف_وضعیت_قبلی_مأموریت_را_بازمی‌گرداند()
+    {
+        var resources = await AddResourcesAsync(driverCount: 1, vehicleCount: 1);
+        var start = FutureWholeHour();
+        var missionId = await CreateApprovedMissionAsync(
+            resources.DriverIds[0], resources.VehicleIds[0], start, start.AddHours(2));
+
+        await _service.RequestWithdrawalAsync(missionId, "integration.requester", "تغییر برنامه");
+        await _service.RejectWithdrawalAsync(missionId, "لغو برنامه منتفی شد", "fleet-reviewer");
+
+        await using var db = await _factory.CreateDbContextAsync();
+        var mission = await db.Missions.SingleAsync(item => item.Id == missionId);
+        Assert.Equal(MissionStatus.Confirmed, mission.Status);
+        Assert.Equal("لغو برنامه منتفی شد", mission.DecisionReason);
+        Assert.Null(mission.StatusBeforeWithdrawal);
+    }
+
+    [Fact]
+    public async Task انصراف_تعیین_تکلیف_نشده_پس_از_پایان_زمان_مأموریت_خودکار_بسته_می‌شود()
+    {
+        var resources = await AddResourcesAsync(driverCount: 1, vehicleCount: 1);
+        var start = FutureWholeHour();
+        var missionId = await CreateApprovedMissionAsync(
+            resources.DriverIds[0], resources.VehicleIds[0], start, start.AddHours(2));
+
+        var pastStart = start.AddDays(-3);
+        var pastEnd = pastStart.AddHours(2);
+        await using (var db = await _factory.CreateDbContextAsync())
+        {
+            await db.Missions
+                .Where(item => item.Id == missionId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(item => item.PlannedStartAtUtc, pastStart)
+                    .SetProperty(item => item.PlannedEndAtUtc, pastEnd));
+        }
+
+        Assert.Equal(1, await _service.ProcessDueMissionsAsync());
+        await _service.RequestWithdrawalAsync(missionId, "integration.requester", "تغییر برنامه");
+        Assert.Equal(1, await _service.ProcessDueMissionsAsync());
+
+        await using var verify = await _factory.CreateDbContextAsync();
+        var mission = await verify.Missions.SingleAsync(item => item.Id == missionId);
+        Assert.Equal(MissionStatus.Cancelled, mission.Status);
+        Assert.NotNull(mission.ActualEndAtUtc);
+        Assert.Contains("تعیین تکلیف نشد", mission.DecisionReason);
+        Assert.Null(mission.StatusBeforeWithdrawal);
+    }
+
+    [Fact]
+    public async Task درخواست_تغییر_تا_تأیید_به_مأموریت_اعمال_نمی‌شود_و_تأیید_نامعتبر_اتمی_برمی‌گردد()
+    {
+        var resources = await AddResourcesAsync(driverCount: 2, vehicleCount: 2);
+        var start = FutureWholeHour();
+        var missionId = await CreateApprovedMissionAsync(
+            resources.DriverIds[0], resources.VehicleIds[0], start, start.AddHours(2));
+
+        var origin = new Location("مبدأ تأییدشده", "integration-test");
+        var destination = new Location("مقصد تأییدشده", "integration-test");
+        origin.Approve("system-admin");
+        destination.Approve("system-admin");
+        await using (var db = await _factory.CreateDbContextAsync())
+        {
+            db.Locations.AddRange(origin, destination);
+            await db.SaveChangesAsync();
+        }
+
+        var proposal = new MissionChangeProposal(
+            "عنوان پس از تغییر",
+            MissionType.Freight,
+            "هدف جدید",
+            origin.Name,
+            destination.Name,
+            [],
+            start.AddHours(4),
+            start.AddHours(6),
+            resources.DriverIds[1],
+            resources.VehicleIds[1],
+            "درخواست‌کننده اصلاح‌شده",
+            "09121111111",
+            "واحد جدید",
+            "گروه جدید",
+            "شرح جدید",
+            null,
+            "حکم-تغییر",
+            new DateOnly(2026, 11, 2),
+            500);
+
+        var changeId = await _service.RequestChangeAsync(
+            missionId, "integration.requester", "اصلاح اطلاعات مأموریت", proposal);
+
+        await using (var db = await _factory.CreateDbContextAsync())
+        {
+            var unchanged = await db.Missions.SingleAsync(item => item.Id == missionId);
+            Assert.Equal("آزمون یکپارچه مأموریت", unchanged.Title);
+            Assert.Equal(resources.DriverIds[0], unchanged.DriverId);
+            Assert.Equal(resources.VehicleIds[0], unchanged.VehicleId);
+        }
+
+        await _service.StartChangeReviewAsync(changeId, "reviewer-one");
+
+        // شکست پس از تغییر شیء در حافظه، باید کل تراکنش را Rollback کند.
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.ApproveChangeAsync(changeId, "reviewer-two"));
+
+        await using (var db = await _factory.CreateDbContextAsync())
+        {
+            var unchanged = await db.Missions.SingleAsync(item => item.Id == missionId);
+            var pending = await db.MissionChangeRequests.SingleAsync(item => item.Id == changeId);
+            Assert.Equal("آزمون یکپارچه مأموریت", unchanged.Title);
+            Assert.Equal(resources.DriverIds[0], unchanged.DriverId);
+            Assert.Equal(resources.VehicleIds[0], unchanged.VehicleId);
+            Assert.Equal(MissionChangeRequestStatus.UnderReview, pending.Status);
+        }
+
+        await _service.ApproveChangeAsync(changeId, "reviewer-one");
+
+        await using var verify = await _factory.CreateDbContextAsync();
+        var changed = await verify.Missions.SingleAsync(item => item.Id == missionId);
+        var approved = await verify.MissionChangeRequests.SingleAsync(item => item.Id == changeId);
+        Assert.Equal("عنوان پس از تغییر", changed.Title);
+        Assert.Equal(MissionType.Freight, changed.Type);
+        Assert.Equal(resources.DriverIds[1], changed.DriverId);
+        Assert.Equal(resources.VehicleIds[1], changed.VehicleId);
+        Assert.Equal("مبدأ تأییدشده", changed.Origin);
+        Assert.Equal("مقصد تأییدشده", changed.Destination);
+        Assert.Equal(500, changed.OdometerStartKm);
+        Assert.Equal(MissionChangeRequestStatus.Approved, approved.Status);
+    }
+
+    [Fact]
+    public async Task کیلومترشمار_در_کل_ترتیب_زمانی_مأموریت‌های_یک_خودرو_پیوسته_می‌ماند()
+    {
+        var resources = await AddResourcesAsync(driverCount: 2, vehicleCount: 1);
+        var start = FutureWholeHour();
+        var firstId = await CreateApprovedMissionAsync(
+            resources.DriverIds[0], resources.VehicleIds[0], start, start.AddHours(2));
+        var secondId = await CreateApprovedMissionAsync(
+            resources.DriverIds[1], resources.VehicleIds[0], start.AddHours(3), start.AddHours(4));
+
+        await _service.SetOdometerAsync(firstId, 100, 150, "integration-test");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.SetOdometerAsync(secondId, 140, null, "integration-test"));
+
+        await _service.SetOdometerAsync(secondId, 160, null, "integration-test");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.SetOdometerAsync(firstId, null, 170, "integration-test"));
+
+        await using var db = await _factory.CreateDbContextAsync();
+        var first = await db.Missions.SingleAsync(item => item.Id == firstId);
+        var second = await db.Missions.SingleAsync(item => item.Id == secondId);
+        Assert.Equal(150, first.OdometerEndKm);
+        Assert.Equal(160, second.OdometerStartKm);
+    }
+
+    /// <summary>ایجاد درخواست و تخصیص منابع برای سناریوهای چرخه عمر.</summary>
+    private async Task<Guid> CreateApprovedMissionAsync(
+        Guid driverId,
+        Guid vehicleId,
+        DateTimeOffset start,
+        DateTimeOffset end)
+    {
+        var missionId = await CreateRequestAsync(start, end);
+        await _service.ApproveAsync(missionId, driverId, vehicleId, "integration-test");
+        return missionId;
+    }
+
     private async Task<bool> TryApproveAsync(Guid missionId, Guid driverId, Guid vehicleId)
     {
         try
