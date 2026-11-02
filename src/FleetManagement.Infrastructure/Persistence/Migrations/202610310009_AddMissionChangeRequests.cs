@@ -21,7 +21,7 @@ public sealed class AddMissionChangeRequests : Migration
                 MissionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                 RequesterUsername = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
                 Reason = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: false),
-                ProposedValuesJson = table.Column<string>(type: "nvarchar(12000)", maxLength: 12000, nullable: false),
+                ProposedValuesJson = table.Column<string>(type: "nvarchar(max)", maxLength: 12000, nullable: false),
                 Status = table.Column<int>(type: "int", nullable: false),
                 ReviewerUsername = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
                 ReviewStartedAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
