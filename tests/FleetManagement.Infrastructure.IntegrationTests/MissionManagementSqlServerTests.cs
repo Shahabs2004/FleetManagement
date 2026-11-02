@@ -92,9 +92,8 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
             requestWorkflow,
             pendingRequestWorkflow,
             reviewWorkflow);
-        var lifecycle = new MissionLifecycleProcessorService(
-            _factory, audit, notifications, smsQueue,
-            NullLogger<MissionLifecycleProcessorService>.Instance);
+        var lifecycle = new FleetManagement.Application.Missions.MissionLifecycleProcessorService(
+            new EfMissionLifecycleProcessorStore(_factory), audit, notifications, smsScheduler);
         var query = new MissionQueryService(_factory);
         var extension = new MissionExtensionService(
             _factory, rules, audit, notifications, smsQueue,
