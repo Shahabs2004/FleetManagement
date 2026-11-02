@@ -27,7 +27,8 @@ public sealed class MissionManagementService(
     IMissionOdometerService odometerService,
     IMissionSplitService splitService,
     IMissionWithdrawalService withdrawalService,
-    IMissionRequestService requestService)
+    IMissionRequestService requestService,
+    IMissionLifecycleProcessorService lifecycleProcessorService)
 {
     private const string RulesKey = "Missions.Rules";
 
@@ -269,93 +270,10 @@ public sealed class MissionManagementService(
     /// <summary>
     /// شروع خودکار مأموریت‌های تأییدشده و پایان خودکار مأموریت‌های در حال اجرا.
     /// </summary>
-    public async Task<int> ProcessDueMissionsAsync(CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        var now = DateTimeOffset.UtcNow;
-        var dueMissions = await db.Missions
-            .Where(mission =>
-                (mission.Status == MissionStatus.Confirmed && mission.PlannedStartAtUtc <= now)
-                || ((mission.Status == MissionStatus.Running || mission.Status == MissionStatus.WithdrawalPending)
-                    && mission.PlannedEndAtUtc <= now))
-            .ToListAsync(cancellationToken);
+    /// <summary>پردازش مأموریت‌های سررسیدشده از طریق سرویس تخصصی چرخه عمر.</summary>
+    public Task<int> ProcessDueMissionsAsync(CancellationToken cancellationToken = default)
+        => lifecycleProcessorService.ProcessDueMissionsAsync(cancellationToken);
 
-        var auditActions = new List<(Mission Mission, string Action)>();
-        foreach (var mission in dueMissions)
-        {
-            if (mission.Status == MissionStatus.Confirmed)
-            {
-                mission.StartAutomatically(now);
-                auditActions.Add((mission, "AutoStart"));
-            }
-            else if (mission.Status == MissionStatus.Running)
-            {
-                mission.CompleteAutomatically();
-                auditActions.Add((mission, "AutoComplete"));
-            }
-            else if (mission.Status == MissionStatus.WithdrawalPending)
-            {
-                mission.AutoCloseExpiredWithdrawal(now);
-                auditActions.Add((mission, "AutoCloseWithdrawal"));
-            }
-        }
-
-        if (dueMissions.Count == 0)
-        {
-            return 0;
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-
-        foreach (var item in auditActions)
-        {
-            await RecordMissionAuditAsync(
-                "system",
-                item.Action,
-                item.Mission,
-                "Success",
-                cancellationToken);
-            if (item.Action == "AutoCloseWithdrawal")
-            {
-                await CancelUnsentRemindersSafelyAsync(
-                    item.Mission.Id,
-                    "مهلت مأموریت هنگام بررسی انصراف به پایان رسید.",
-                    "system",
-                    cancellationToken);
-                await QueueSmsSafelyAsync(
-                    item.Mission,
-                    SmsEventType.MissionCancelled,
-                    "پایان زمان برنامه‌ریزی‌شده در زمان بررسی انصراف",
-                    cancellationToken);
-            }
-
-            if (item.Action == "AutoComplete")
-            {
-                await notificationService.CreateForRolesAsync(
-                    ["Operator"],
-                    "مأموریت پایان یافت",
-                    $"مأموریت {item.Mission.MissionNumber} به پایان برنامه‌ریزی‌شده رسید.",
-                    "MissionCompleted",
-                    "Mission",
-                    item.Mission.Id.ToString(),
-                    cancellationToken);
-
-                await QueueSmsSafelyAsync(
-                    item.Mission,
-                    SmsEventType.MissionCompleted,
-                    null,
-                    cancellationToken);
-            }
-        }
-
-        return dueMissions.Count;
-    }
-
-    /// <summary>
-    /// دریافت مأموریت‌های دارای راننده که با بازه قابل مشاهده جدول زمانی هم‌پوشانی دارند.
-    /// </summary>
     public async Task<IReadOnlyList<Mission>> GetTimelineAsync(
         DateTimeOffset fromUtc,
         DateTimeOffset toUtc,
