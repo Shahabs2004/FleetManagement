@@ -67,7 +67,8 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<IMissionLifecycleProcessorStore, EfMissionLifecycleProcessorStore>();
         services.AddScoped<IMissionLifecycleProcessorService, FleetManagement.Application.Missions.MissionLifecycleProcessorService>();
         services.AddScoped<IMissionQueryService, MissionQueryService>();
-        services.AddScoped<IMissionExtensionService, MissionExtensionService>();
+        services.AddScoped<IMissionExtensionStore, EfMissionExtensionStore>();
+        services.AddScoped<IMissionExtensionService, FleetManagement.Application.Missions.MissionExtensionService>();
         services.AddScoped<IMissionRulesService, MissionRulesService>();
         services.AddScoped<MissionManagementService>();
         services.AddScoped<MissionOrderTemplateService>();

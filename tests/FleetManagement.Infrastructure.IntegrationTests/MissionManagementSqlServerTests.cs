@@ -95,9 +95,8 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         var lifecycle = new FleetManagement.Application.Missions.MissionLifecycleProcessorService(
             new EfMissionLifecycleProcessorStore(_factory), audit, notifications, smsScheduler);
         var query = new MissionQueryService(_factory);
-        var extension = new MissionExtensionService(
-            _factory, rules, audit, notifications, smsQueue,
-            NullLogger<MissionExtensionService>.Instance);
+        var extension = new FleetManagement.Application.Missions.MissionExtensionService(
+            new EfMissionExtensionStore(_factory), rules, audit, notifications, smsScheduler);
         _service = new MissionManagementService(
             missionChanges, odometer, split, withdrawal, request, lifecycle, query, extension, rules);
     }
@@ -708,6 +707,46 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         {
             return false;
         }
+    }
+
+    [Fact]
+    public async Task تمدید_مأموریت_با_تداخل_راننده_در_بازه_جدید_رد_می‌شود()
+    {
+        var resources = await AddResourcesAsync(driverCount: 1, vehicleCount: 2);
+        var futureStart = FutureWholeHour();
+        var firstId = await CreateApprovedMissionAsync(
+            resources.DriverIds[0], resources.VehicleIds[0], futureStart, futureStart.AddHours(2));
+        var secondId = await CreateApprovedMissionAsync(
+            resources.DriverIds[0], resources.VehicleIds[1], futureStart.AddHours(4), futureStart.AddHours(6));
+
+        var pastStart = futureStart.AddDays(-3);
+        var pastEnd = pastStart.AddHours(2);
+        var competingStart = pastEnd.AddHours(3);
+        await using (var db = await _factory.CreateDbContextAsync())
+        {
+            await db.Missions
+                .Where(item => item.Id == firstId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(item => item.PlannedStartAtUtc, pastStart)
+                    .SetProperty(item => item.PlannedEndAtUtc, pastEnd));
+            await db.Missions
+                .Where(item => item.Id == secondId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(item => item.PlannedStartAtUtc, competingStart)
+                    .SetProperty(item => item.PlannedEndAtUtc, competingStart.AddHours(2)));
+
+            var first = await db.Missions.SingleAsync(item => item.Id == firstId);
+            first.StartAutomatically(DateTimeOffset.UtcNow);
+            await db.SaveChangesAsync();
+        }
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.ExtendAsync(firstId, pastEnd.AddHours(4), "تمدید برای آزمون تعارض", "integration-test"));
+
+        await using var verify = await _factory.CreateDbContextAsync();
+        var unchanged = await verify.Missions.SingleAsync(item => item.Id == firstId);
+        Assert.Equal(pastEnd, unchanged.PlannedEndAtUtc);
+        Assert.Equal(MissionStatus.Running, unchanged.Status);
     }
 
     private async Task AddApprovedLocationsAsync(params string[] names)
