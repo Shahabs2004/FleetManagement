@@ -154,9 +154,9 @@ public sealed class MissionSplitService(
                 token);
             var minimumGap = TimeSpan.FromHours(rules.MinimumGapHours);
             var hasConflict = candidates.Any(existing =>
-                existing.Status is MissionStatus.Confirmed
+                existing.Status is (MissionStatus.Confirmed
                     or MissionStatus.Running
-                    or MissionStatus.WithdrawalPending
+                    or MissionStatus.WithdrawalPending)
                 && splitAtUtc < existing.PlannedEndAtUtc.Add(minimumGap)
                 && originalEnd.Add(minimumGap) > existing.PlannedStartAtUtc);
 
