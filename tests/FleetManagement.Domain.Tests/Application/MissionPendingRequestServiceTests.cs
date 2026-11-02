@@ -21,6 +21,7 @@ public sealed class MissionPendingRequestServiceTests
             store,
             audit);
 
+        var start = FutureWholeHour();
         await service.UpdatePendingRequestAsync(
             mission.Id,
             "requester",
@@ -32,8 +33,8 @@ public sealed class MissionPendingRequestServiceTests
             "مبدأ جدید",
             "مقصد جدید",
             ["توقف جدید"],
-            FutureWholeHour().AddHours(1),
-            FutureWholeHour().AddHours(3),
+            start.AddHours(1),
+            start.AddHours(3),
             "شرح جدید",
             2,
             "ORDER-22",
@@ -62,6 +63,7 @@ public sealed class MissionPendingRequestServiceTests
             store,
             audit);
 
+        var start = FutureWholeHour();
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             service.UpdatePendingRequestAsync(
                 mission.Id,
@@ -74,8 +76,8 @@ public sealed class MissionPendingRequestServiceTests
                 "مبدأ جدید",
                 "مقصد جدید",
                 [],
-                FutureWholeHour(),
-                FutureWholeHour().AddHours(2),
+                start,
+                start.AddHours(2),
                 null,
                 1,
                 null,
@@ -96,6 +98,7 @@ public sealed class MissionPendingRequestServiceTests
             store,
             audit);
 
+        var start = FutureWholeHour();
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.UpdatePendingRequestAsync(
                 mission.Id,
@@ -108,8 +111,8 @@ public sealed class MissionPendingRequestServiceTests
                 "مبدأ جدید",
                 "مقصد جدید",
                 [],
-                FutureWholeHour(),
-                FutureWholeHour().AddHours(2),
+                start,
+                start.AddHours(2),
                 null,
                 1,
                 null,
