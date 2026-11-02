@@ -58,7 +58,8 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
             notifications,
             smsQueue,
             NullLogger<MissionManagementService>.Instance,
-            missionChanges);
+            missionChanges,
+            new MissionOdometerService(_factory, audit));
     }
 
     public async Task DisposeAsync()
