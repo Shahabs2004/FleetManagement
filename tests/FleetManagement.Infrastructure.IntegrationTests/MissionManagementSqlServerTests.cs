@@ -88,6 +88,19 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task زنجیره_۱۲_مهاجرت_روی_پایگاه_داده_خالی_اعمال_و_بدون_مهاجرت_معوق_است()
+    {
+        await using var database = await SqlServerTestDatabase.CreateAsync(applyMigrations: true);
+        await using var db = new FleetDbContext(database.Options);
+
+        Assert.False(db.Database.HasPendingModelChanges());
+        Assert.Empty(await db.Database.GetPendingMigrationsAsync());
+
+        var appliedMigrations = await db.Database.GetAppliedMigrationsAsync();
+        Assert.Equal(12, appliedMigrations.Count());
+    }
+
+    [Fact]
     public async Task دو_تأیید_همزمان_نمی‌توانند_یک_راننده_و_خودرو_را_رزرو_کنند()
     {
         var resources = await AddResourcesAsync(driverCount: 1, vehicleCount: 1);
@@ -593,7 +606,7 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
 
         public DbContextOptions<FleetDbContext> Options { get; }
 
-        public static async Task<SqlServerTestDatabase> CreateAsync()
+        public static async Task<SqlServerTestDatabase> CreateAsync(bool applyMigrations = false)
         {
             var baseConnectionString = Environment.GetEnvironmentVariable(
                 "FLEETMANAGEMENT_TEST_SQL_CONNECTION");
@@ -615,8 +628,15 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
 
             var database = new SqlServerTestDatabase(optionsBuilder.Options);
             await using var db = new FleetDbContext(database.Options);
-            // این آزمون پایگاه داده را از مدل جاری می‌سازد؛ اختلاف Snapshot جداگانه سنجیده می‌شود.
-            await db.Database.EnsureCreatedAsync();
+            if (applyMigrations)
+            {
+                await db.Database.MigrateAsync();
+            }
+            else
+            {
+                // آزمون‌های رفتاری از مدل جاری استفاده می‌کنند؛ آزمون زنجیره Migration مستقل است.
+                await db.Database.EnsureCreatedAsync();
+            }
             return database;
         }
 
