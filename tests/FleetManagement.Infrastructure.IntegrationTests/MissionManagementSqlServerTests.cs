@@ -34,6 +34,7 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         _settings = new SqlSystemSettingsStore(_factory);
 
         var audit = new AuditLogService(_factory);
+        var missionRules = new MissionRulesService(_settings, audit);
         var authorization = new AuthorizationSettingsService(_settings, audit);
         var recipients = new UserNotificationRecipientResolver(_factory, authorization);
         var notifications = new NotificationService(
@@ -46,7 +47,7 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
 
         var missionChanges = new MissionChangeManagementService(
             _factory,
-            _settings,
+            missionRules,
             audit,
             notifications,
             smsQueue,
@@ -60,17 +61,16 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
             NullLogger<MissionManagementService>.Instance,
             missionChanges,
             new MissionOdometerService(_factory, audit),
-            new MissionSplitService(_factory, _settings, audit, notifications),
+            new MissionSplitService(_factory, missionRules, audit, notifications),
             new MissionWithdrawalService(
                 _factory,
-                _settings,
                 audit,
                 notifications,
                 smsQueue,
                 NullLogger<MissionWithdrawalService>.Instance),
             new MissionRequestService(
                 _factory,
-                _settings,
+                missionRules,
                 audit,
                 notifications,
                 smsQueue,
