@@ -1,6 +1,7 @@
 using FleetManagement.Application.Auditing;
 using FleetManagement.Application.Configuration;
 using FleetManagement.Application.Missions;
+using FleetManagement.Application.Notifications;
 using FleetManagement.Infrastructure.Configuration;
 using FleetManagement.Infrastructure.Persistence;
 using FleetManagement.Infrastructure.Reporting;
@@ -48,7 +49,11 @@ public static class BootstrapServiceCollectionExtensions
         services.AddScoped<IMissionOdometerService, MissionOdometerService>();
         services.AddScoped<IMissionSplitService, MissionSplitService>();
         services.AddScoped<IMissionWithdrawalService, MissionWithdrawalService>();
-        services.AddScoped<IMissionRequestService, MissionRequestService>();
+        services.AddScoped<IMissionRequestStore, EfMissionRequestStore>();
+        services.AddScoped<IMissionReviewStore, EfMissionReviewStore>();
+        services.AddScoped<FleetManagement.Application.Missions.MissionRequestService>();
+        services.AddScoped<MissionReviewService>();
+        services.AddScoped<IMissionRequestService, FleetManagement.Infrastructure.Configuration.MissionRequestService>();
         services.AddScoped<IMissionLifecycleProcessorService, MissionLifecycleProcessorService>();
         services.AddScoped<IMissionQueryService, MissionQueryService>();
         services.AddScoped<IMissionExtensionService, MissionExtensionService>();
@@ -58,6 +63,8 @@ public static class BootstrapServiceCollectionExtensions
         services.AddHostedService<MissionLifecycleHostedService>();
         services.AddScoped<LocationManagementService>();
         services.AddScoped<NotificationService>();
+        services.AddScoped<IMissionNotificationSender>(provider => provider.GetRequiredService<NotificationService>());
+        services.AddScoped<IMissionSmsScheduler, MissionSmsScheduler>();
         services.AddScoped<UserNotificationRecipientResolver>();
         services.AddScoped<MissionReportService>();
         services.AddScoped<FleetDashboardService>();

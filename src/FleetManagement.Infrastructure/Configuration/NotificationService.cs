@@ -13,7 +13,7 @@ public sealed class NotificationService(
     IDbContextFactory<FleetDbContext> dbContextFactory,
     INotificationPublisher publisher,
     ILogger<NotificationService> logger,
-    UserNotificationRecipientResolver recipientResolver)
+    UserNotificationRecipientResolver recipientResolver) : IMissionNotificationSender
 {
     /// <summary>ثبت اعلان برای یک کاربر و انتشار آن به نشست‌های فعال.</summary>
     public async Task<Guid> CreateAsync(
