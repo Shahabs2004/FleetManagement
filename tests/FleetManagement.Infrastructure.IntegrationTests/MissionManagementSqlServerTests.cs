@@ -65,7 +65,8 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         await using var database = await SqlServerTestDatabase.CreateAsync();
         await using var db = new FleetDbContext(database.Options);
 
-        var snapshotModel = new FleetDbContextModelSnapshot().Model;
+        var snapshotModel = db.GetService<IModelRuntimeInitializer>()
+            .Initialize(new FleetDbContextModelSnapshot().Model, designTime: true);
         var differ = db.GetService<IMigrationsModelDiffer>();
         var differences = differ.GetDifferences(
             snapshotModel.GetRelationalModel(),
