@@ -1,6 +1,7 @@
 @page "/vehicles"
+@using FleetManagement.Application.Authorization
 @rendermode InteractiveServer
-@attribute [FleetPermission("vehicles.view")]
+@attribute [FleetPermission(PermissionCatalog.Vehicles.View)]
 @using FleetManagement.Domain.Vehicles
 @using FleetManagement.Infrastructure.Configuration
 @using FleetManagement.Web.Security
@@ -42,7 +43,7 @@
         <div class="setup-error">@_error</div>
     }
 
-    <AuthorizeView Policy="Permission:vehicles.manage">
+    <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Vehicles.Manage)">
         <Authorized Context="vehicleManageContext">
     <section class="driver-editor">
         <h2>@(_editingId.HasValue ? "ویرایش خودرو" : "ثبت خودروی جدید")</h2>
@@ -120,7 +121,7 @@
                             <td>@GetStatusName(vehicle.ManualStatus)</td>
                             <td>@(vehicle.IsArchived ? "بایگانی‌شده" : "فعال")</td>
                             <td>
-                                <AuthorizeView Policy="Permission:vehicles.manage">
+                                <AuthorizeView Policy="@PermissionCatalog.Policy(PermissionCatalog.Vehicles.Manage)">
                                     <Authorized Context="vehicleActionsContext">
                                         <button type="button" class="secondary-button" @onclick="() => Edit(vehicle)">ویرایش</button>
                                         @if (!vehicle.IsArchived)
@@ -194,7 +195,7 @@
     /// <summary>ثبت یا اصلاح مشخصات خودرو.</summary>
     private async Task SaveAsync()
     {
-        if (!await HasPermissionAsync("Permission:vehicles.manage"))
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Vehicles.Manage)))
         {
             return;
         }
@@ -239,7 +240,7 @@
     /// <summary>بایگانی خودرو بدون حذف سوابق آن.</summary>
     private async Task ArchiveAsync(Guid vehicleId)
     {
-        if (!await HasPermissionAsync("Permission:vehicles.manage"))
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Vehicles.Manage)))
         {
             return;
         }
@@ -264,7 +265,7 @@
     /// <summary>بازگرداندن خودروی بایگانی‌شده در صورت آماده‌به‌کار بودن.</summary>
     private async Task ReactivateAsync(Guid vehicleId)
     {
-        if (!await HasPermissionAsync("Permission:vehicles.manage"))
+        if (!await HasPermissionAsync(PermissionCatalog.Policy(PermissionCatalog.Vehicles.Manage)))
         {
             return;
         }
