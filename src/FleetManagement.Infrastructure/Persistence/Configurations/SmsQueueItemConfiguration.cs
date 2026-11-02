@@ -30,6 +30,11 @@ public sealed class SmsQueueItemConfiguration : IEntityTypeConfiguration<SmsQueu
         builder.Property(item => item.ProviderDeliveryStatus).HasMaxLength(100);
         builder.Property(item => item.ErrorReason).HasMaxLength(1000);
 
+        builder.HasOne<FleetManagement.Domain.Missions.Mission>()
+            .WithMany()
+            .HasForeignKey(item => item.MissionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(item => new { item.Status, item.ScheduledAtUtc });
         builder.HasIndex(item => new { item.Status, item.NextAttemptAtUtc });
         builder.HasIndex(item => new { item.MissionId, item.CreatedAtUtc });
