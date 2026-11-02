@@ -25,7 +25,8 @@ public sealed class MissionManagementService(
     SmsQueueService smsQueueService,
     ILogger<MissionManagementService> logger,
     IMissionChangeManagementService changeManagementService,
-    IMissionOdometerService odometerService)
+    IMissionOdometerService odometerService,
+    IMissionSplitService splitService)
 {
     private const string RulesKey = "Missions.Rules";
 
@@ -714,7 +715,8 @@ public sealed class MissionManagementService(
     /// <summary>
     /// تقسیم مأموریت در حال اجرا به دو رکورد مستقل با شماره‌های جداگانه.
     /// </summary>
-    public async Task<Guid> SplitAsync(
+    /// <summary>تقسیم مأموریت از طریق سرویس تخصصی تقسیم.</summary>
+    public Task<Guid> SplitAsync(
         Guid missionId,
         Guid newDriverId,
         Guid newVehicleId,
@@ -725,183 +727,17 @@ public sealed class MissionManagementService(
         string? explanation,
         string actor,
         CancellationToken cancellationToken = default)
-    {
-        var rules = await GetRulesAsync(cancellationToken);
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-
-        var first = await GetMissionAsync(db, missionId, cancellationToken);
-        if (first.DriverId is null || first.VehicleId is null)
-        {
-            throw new InvalidOperationException("مأموریت جاری راننده و خودرو ندارد.");
-        }
-
-        var driverChanged = first.DriverId.Value != newDriverId;
-        var vehicleChanged = first.VehicleId.Value != newVehicleId;
-        if (!driverChanged && !vehicleChanged)
-        {
-            throw new InvalidOperationException("برای تقسیم باید راننده یا خودرو تغییر کند.");
-        }
-
-        var expectedReason = (driverChanged, vehicleChanged) switch
-        {
-            (true, false) => MissionSplitReason.DriverChange,
-            (false, true) => MissionSplitReason.VehicleBreakdown,
-            (true, true) => MissionSplitReason.DriverAndVehicleChange,
-            _ => splitReason
-        };
-
-        if (splitReason != MissionSplitReason.Other && splitReason != expectedReason)
-        {
-            throw new InvalidOperationException("دلیل انتخاب‌شده با نوع تغییر راننده یا خودرو سازگار نیست.");
-        }
-
-        if (splitReason == MissionSplitReason.Other && string.IsNullOrWhiteSpace(explanation))
-        {
-            throw new InvalidOperationException("برای دلیل «سایر موارد» توضیح الزامی است.");
-        }
-
-        var reasonText = splitReason == MissionSplitReason.Other
-            ? $"سایر موارد: {explanation!.Trim()}"
-            : splitReason switch
-            {
-                MissionSplitReason.VehicleBreakdown => "خرابی خودرو",
-                MissionSplitReason.DriverChange => "تعویض راننده",
-                MissionSplitReason.DriverAndVehicleChange => "تعویض هم‌زمان راننده و خودرو",
-                _ => throw new ArgumentOutOfRangeException(nameof(splitReason))
-            };
-
-        var newDriver = await db.Drivers.SingleOrDefaultAsync(item => item.Id == newDriverId, cancellationToken)
-            ?? throw new KeyNotFoundException("راننده جدید پیدا نشد.");
-        var newVehicle = await db.Vehicles.SingleOrDefaultAsync(item => item.Id == newVehicleId, cancellationToken)
-            ?? throw new KeyNotFoundException("خودروی جدید پیدا نشد.");
-
-        if (!newDriver.CanBeAssignedToMission())
-        {
-            throw new InvalidOperationException("راننده جدید فعال و قابل تخصیص نیست.");
-        }
-
-        if (!newVehicle.CanBeAssignedToMission(hasActiveMission: false))
-        {
-            throw new InvalidOperationException("خودروی جدید آماده تخصیص نیست.");
-        }
-
-        var originalEnd = first.PlannedEndAtUtc;
-        var originalStart = first.PlannedStartAtUtc;
-        var splitAt = splitAtUtc;
-        first.CloseFirstSegmentForSplit(
-            splitAt,
-            firstSegmentOdometerEndKm,
-            reasonText,
-            actor);
-
-        // ذخیره موقت بخش اول در همان تراکنش تا هنگام کنترل تعارض، مأموریت جاری منبع را اشغال نکند.
-        await db.SaveChangesAsync(cancellationToken);
-
-        var missionNumber = await GenerateMissionNumberAsync(db, DateTimeOffset.UtcNow, cancellationToken);
-        var second = new Mission(
-            missionNumber,
-            first.Title,
-            first.RequesterUsername,
-            first.RequesterName,
-            first.RequesterPhoneSnapshot,
-            first.RequesterOrganizationalUnit,
-            first.RequestingGroup,
-            first.Type,
-            first.Purpose,
-            first.Origin,
-            first.Destination,
-            first.GetIntermediateStops(),
-            splitAt,
-            originalEnd,
-            first.Description,
-            first.PassengerCount,
-            first.MissionOrderNumber,
-            first.MissionOrderDate);
-
-        if (newVehicleId == first.VehicleId)
-        {
-            second.SetOdometerStart(firstSegmentOdometerEndKm);
-        }
-        else
-        {
-            if (!secondVehicleOdometerStartKm.HasValue)
-            {
-                throw new InvalidOperationException("برای خودروی جدید باید کیلومترشمار شروع ثبت شود.");
-            }
-
-            var lastRecordedOdometer = await db.Missions
-                .Where(item => item.VehicleId == newVehicleId && item.OdometerEndKm.HasValue)
-                .OrderByDescending(item => item.ActualEndAtUtc ?? item.PlannedEndAtUtc)
-                .Select(item => item.OdometerEndKm)
-                .FirstOrDefaultAsync(cancellationToken);
-
-            if (lastRecordedOdometer.HasValue
-                && secondVehicleOdometerStartKm.Value < lastRecordedOdometer.Value)
-            {
-                throw new InvalidOperationException("کیلومترشمار شروع خودروی جدید از آخرین مقدار ثبت‌شده کمتر است.");
-            }
-
-            second.SetOdometerStart(secondVehicleOdometerStartKm.Value);
-        }
-
-        if (await HasResourceConflictAsync(
-            db,
-            second,
+        => splitService.SplitAsync(
+            missionId,
             newDriverId,
             newVehicleId,
-            TimeSpan.FromHours(rules.MinimumGapHours),
-            cancellationToken))
-        {
-            throw new InvalidOperationException("منابع جدید در بازه بخش دوم مأموریت تعارض زمانی دارند.");
-        }
-
-        var now = DateTimeOffset.UtcNow;
-        second.Approve(newDriverId, newVehicleId, actor, now);
-        second.StartAutomatically(splitAt);
-        second.MarkAsSecondSplitSegment(first.Id, splitAt, reasonText, actor);
-        first.SetRelatedMission(second.Id);
-
-        db.Missions.Add(second);
-        await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-
-        await auditLog.RecordAsync(
-            actor, "SplitFirstSegment", "Mission", first.Id.ToString(), "Success", reasonText,
-            afterJson: JsonSerializer.Serialize(new
-            {
-                first.MissionNumber,
-                RelatedMissionId = second.Id,
-                first.SplitAtUtc,
-                first.OdometerStartKm,
-                first.OdometerEndKm
-            }),
-            cancellationToken: cancellationToken);
-
-        await auditLog.RecordAsync(
-            actor, "SplitSecondSegment", "Mission", second.Id.ToString(), "Success", reasonText,
-            afterJson: JsonSerializer.Serialize(new
-            {
-                second.MissionNumber,
-                RelatedMissionId = first.Id,
-                second.DriverId,
-                second.VehicleId,
-                second.PlannedStartAtUtc,
-                second.PlannedEndAtUtc,
-                second.OdometerStartKm
-            }),
-            cancellationToken: cancellationToken);
-        await notificationService.CreateForRolesAsync(
-            ["FleetManager", "Operator"],
-            "مأموریت تقسیم شد",
-            $"مأموریت {first.MissionNumber} به دو مأموریت مستقل تقسیم شد. شماره بخش دوم: {second.MissionNumber}.",
-            "MissionSplit",
-            "Mission",
-            first.Id.ToString(),
+            splitAtUtc,
+            firstSegmentOdometerEndKm,
+            secondVehicleOdometerStartKm,
+            splitReason,
+            explanation,
+            actor,
             cancellationToken);
-
-        return second.Id;
-    }
 
     /// <summary>
     /// شروع خودکار مأموریت‌های تأییدشده و پایان خودکار مأموریت‌های در حال اجرا.
