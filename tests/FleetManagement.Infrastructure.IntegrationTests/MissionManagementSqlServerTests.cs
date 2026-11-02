@@ -67,10 +67,11 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
 
         var snapshotModel = db.GetService<IModelRuntimeInitializer>()
             .Initialize(new FleetDbContextModelSnapshot().Model, designTime: true);
+        var currentModel = db.GetService<IDesignTimeModel>().Model;
         var differ = db.GetService<IMigrationsModelDiffer>();
         var differences = differ.GetDifferences(
             snapshotModel.GetRelationalModel(),
-            db.Model.GetRelationalModel());
+            currentModel.GetRelationalModel());
 
         var details = differences.Select(operation =>
         {
