@@ -6,8 +6,12 @@ using FleetManagement.Domain.Missions;
 using FleetManagement.Domain.Vehicles;
 using FleetManagement.Infrastructure.Configuration;
 using FleetManagement.Infrastructure.Persistence;
+using FleetManagement.Infrastructure.Persistence.Migrations;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FleetManagement.Infrastructure.IntegrationTests;
@@ -54,6 +58,47 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
         {
             await _database.DisposeAsync();
         }
+    }
+
+    [Fact]
+    public async Task اختلاف_مدل_فعلی_با_Snapshot_به_صورت_دقیق_گزارش_می‌شود()
+    {
+        await using var database = await SqlServerTestDatabase.CreateAsync();
+        await using var db = new FleetDbContext(database.Options);
+
+        var snapshotModel = db.GetService<IModelRuntimeInitializer>()
+            .Initialize(new FleetDbContextModelSnapshot().Model, designTime: true);
+        var currentModel = db.GetService<IDesignTimeModel>().Model;
+        var differ = db.GetService<IMigrationsModelDiffer>();
+        var differences = differ.GetDifferences(
+            snapshotModel.GetRelationalModel(),
+            currentModel.GetRelationalModel());
+
+        var details = differences.Select(operation =>
+        {
+            var properties = operation.GetType().GetProperties()
+                .Where(property => property.PropertyType == typeof(string)
+                    || property.PropertyType.IsPrimitive)
+                .Select(property => $"{property.Name}={property.GetValue(operation)}");
+            return $"{operation.GetType().Name}: {string.Join(", ", properties)}";
+        });
+
+        Assert.True(!differences.Any(), string.Join(Environment.NewLine, details));
+        Assert.False(db.Database.HasPendingModelChanges());
+    }
+
+    [Fact]
+    public async Task زنجیره_۱۲_مهاجرت_روی_پایگاه_داده_خالی_اعمال_و_بدون_مهاجرت_معوق_است()
+    {
+        // این آزمون مسیر production را می‌سنجد، نه EnsureCreated را.
+        await using var database = await SqlServerTestDatabase.CreateAsync(applyMigrations: true);
+        await using var db = new FleetDbContext(database.Options);
+
+        Assert.False(db.Database.HasPendingModelChanges());
+        Assert.Empty(await db.Database.GetPendingMigrationsAsync());
+
+        var appliedMigrations = await db.Database.GetAppliedMigrationsAsync();
+        Assert.Equal(12, appliedMigrations.Count());
     }
 
     [Fact]
@@ -562,7 +607,7 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
 
         public DbContextOptions<FleetDbContext> Options { get; }
 
-        public static async Task<SqlServerTestDatabase> CreateAsync()
+        public static async Task<SqlServerTestDatabase> CreateAsync(bool applyMigrations = false)
         {
             var baseConnectionString = Environment.GetEnvironmentVariable(
                 "FLEETMANAGEMENT_TEST_SQL_CONNECTION");
@@ -584,9 +629,15 @@ public sealed class MissionManagementSqlServerTests : IAsyncLifetime
 
             var database = new SqlServerTestDatabase(optionsBuilder.Options);
             await using var db = new FleetDbContext(database.Options);
-            // این مجموعه آزمون، رفتار مدل جاری و تراکنش‌های SQL Server را می‌سنجد.
-            // سازگاری Snapshot و Migrationها به‌صورت مستقل در اولویت P0-4 بررسی می‌شود.
-            await db.Database.EnsureCreatedAsync();
+            if (applyMigrations)
+            {
+                await db.Database.MigrateAsync();
+            }
+            else
+            {
+                // آزمون‌های رفتاری از مدل جاری استفاده می‌کنند؛ آزمون زنجیره Migration مستقل است.
+                await db.Database.EnsureCreatedAsync();
+            }
             return database;
         }
 
